@@ -1,5 +1,4 @@
 # Local AI Agent Development Plan
-*Version v-0.1.0*
 
 ## Project Overview
 

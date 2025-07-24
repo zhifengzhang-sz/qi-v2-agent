@@ -1,6 +1,6 @@
 # Qi V2 Agent
 
-Local AI coding assistant with RAG-powered codebase understanding.
+Local AI agent with conversational interface and extensible tool integration.
 
 ## Architecture
 
@@ -14,11 +14,11 @@ Local AI coding assistant with RAG-powered codebase understanding.
 
 - [Design Document](docs/architecture/design.md) - Complete system architecture
 - [Development Plan](docs/plan/plan.study.md) - Implementation roadmap and technology analysis
-- [CLAUDE.md](CLAUDE.md) - Claude Code integration guide
+- **[Phase 1 Study](docs/study/phase1/README.md)** - LangGraph + MCP implementation analysis with TypeScript trivialization proof
 
 ## Current Status
 
-**v-0.1.0**: Design and planning phase complete. Implementation not yet started.
+**v-0.2.0**: Phase 1 study complete. Proven TypeScript implementation reduces complexity from 12+ weeks to 10-12 days through official SDK availability.
 
 ## Development
 

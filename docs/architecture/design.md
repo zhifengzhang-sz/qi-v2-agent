@@ -1,5 +1,4 @@
 # Local AI Agent Design Document
-*Version v-0.1.0*
 
 ## Executive Summary
 
