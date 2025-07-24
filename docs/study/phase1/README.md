@@ -264,24 +264,29 @@ The Phase 1 study demonstrates that **TypeScript implementation is not just feas
 
 ### 📖 Reading Order
 
+**For Everyone - Start Here:**
+1. **[Conceptual Overview](./conceptual-overview.md)** - Understand what LangGraph, LangChain, and MCP actually do
+
 **For Implementation Teams:**
-1. **Start here**: [Architecture Analysis](./architecture-analysis.md) - Visual proof of trivialization
-2. **Core concepts**: [T1: MCP Architecture](./mcp-architecture.md) - Foundation understanding
-3. **Implementation path**: [T4: LangGraph Integration](./langgraph-integration.md) - Agent creation patterns
-4. **Production concerns**: [T6: Session Management](./session-management.md) - Resource lifecycle
+1. **[Architecture Analysis](./architecture-analysis.md)** - Visual proof of trivialization
+2. **[T1: MCP Architecture](./mcp-architecture.md)** - Foundation understanding
+3. **[T4: LangGraph Integration](./langgraph-integration.md)** - Agent creation patterns
+4. **[T6: Session Management](./session-management.md)** - Resource lifecycle
 
 **For Technical Leadership:**
 1. **Executive summary**: This README - Business case and timeline
-2. **Architecture overview**: [Architecture Analysis](./architecture-analysis.md) - Technology impact
-3. **Verification details**: [Plan Check](./plan.check.md) - Quality assurance
+2. **[Conceptual Overview](./conceptual-overview.md)** - Technology foundations
+3. **[Architecture Analysis](./architecture-analysis.md)** - Technology impact
+4. **[Plan Check](./plan.check.md)** - Quality assurance
 
 **For Complete Understanding:**
-Read all topics T1-T6 in order for comprehensive coverage.
+Read Conceptual Overview first, then all topics T1-T6 in order for comprehensive coverage.
 
 ### 🎯 Study Topic Overview
 
 | Topic | Focus Area | Implementation Impact | Read Time |
 |-------|------------|----------------------|-----------|
+| **[T0: Conceptual Overview](./conceptual-overview.md)** | 🎯 **What/Why fundamentals** | **Essential foundation** | **20 min** |
 | **[T1: MCP Architecture](./mcp-architecture.md)** | Protocol fundamentals | Foundation understanding | 15 min |
 | **[T2: Transport Methods](./transport-methods.md)** | Connection types | SDK usage patterns | 10 min |
 | **[T3: Tool Integration](./tool-integration.md)** | Tool conversion | Automatic tool loading | 20 min |
@@ -347,6 +352,7 @@ See [Verification Log](./plan.check.md) for complete audit trail.
 ## Study Documentation
 
 ### Completed Analysis (All Verified Against Source Code)
+- **[T0: Conceptual Overview](./conceptual-overview.md)** - 🎯 **Start here: What/Why foundations**
 - [T1: MCP Architecture Fundamentals](./mcp-architecture.md) 
 - [T2: Transport Methods Implementation](./transport-methods.md)
 - [T3: Tool Integration Patterns](./tool-integration.md)

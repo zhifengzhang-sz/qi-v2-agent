@@ -18,7 +18,7 @@ Local AI agent with conversational interface and extensible tool integration.
 
 ## Current Status
 
-**v-0.2.0**: Phase 1 study complete. Proven TypeScript implementation reduces complexity from 12+ weeks to 10-12 days through official SDK availability.
+**v-0.2.1**: Phase 1 study complete with conceptual foundation. Added T0: Conceptual Overview explaining LangGraph, LangChain, and MCP fundamentals before implementation details.
 
 ## Development
 
