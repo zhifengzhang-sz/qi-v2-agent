@@ -55,6 +55,8 @@ LangGraph sits ON TOP OF LangChain
 
 **Why Both Are Needed**: LangChain provides the "parts", LangGraph provides the "assembly instructions."
 
+**Latest Capabilities (v0.2.0)**: LangGraph.js now includes LangGraph Studio integration for visual debugging and development with automatic TypeScript type inference.
+
 ### 3. What is MCP (Model Context Protocol) and why is it needed?
 
 **MCP is a protocol for connecting AI applications to external tools and data sources.** Think of it as "USB for AI tools" - a standard way to plug capabilities into AI systems.
@@ -73,6 +75,10 @@ LangGraph sits ON TOP OF LangChain
 Before MCP: 1 tool = 1 custom integration per AI app
 After MCP:  1 tool = works with ALL MCP-compatible AI apps
 ```
+
+**2025 Industry Adoption**: OpenAI (March 2025), Google DeepMind (April 2025), Block, Apollo, Zed, Replit, Codeium, Sourcegraph, with 1,000+ open-source connectors by February 2025.
+
+**Security Considerations**: As of April 2025, security researchers have identified potential prompt injection vulnerabilities, tool permission issues, and lookalike tool replacement concerns. Production implementations should include proper input sanitization, tool permission scoping, and trusted server verification.
 
 **Real Example from Study**:
 ```python
@@ -222,9 +228,10 @@ TypeScript Reality: Import and use (3 npm installs)
 ```
 
 **Ecosystem Maturity**:
-- **@langchain/langgraph**: Native TypeScript, API-identical to Python
+- **@langchain/langgraph**: Native TypeScript, API-identical to Python, v0.2.0+ with advanced features
 - **@modelcontextprotocol/sdk**: Official Anthropic SDK, full TypeScript support
 - **@langchain/mcp-adapters**: Production-ready integration layer
+- **Enterprise Adoption**: Used by Replit, Uber, LinkedIn, GitLab, and major AI platforms
 
 ### 2. What does @langchain/langgraph provide that eliminates custom work?
 
@@ -242,9 +249,12 @@ const agent = createReactAgent({
 });
 ```
 
-**What You Get Out-of-the-Box**:
+**What You Get Out-of-the-Box** (LangGraph.js v0.2.0+):
 - ✅ **ReAct Pattern Implementation** - No custom loop logic needed
-- ✅ **Streaming Support** - Built-in `.stream()` method
+- ✅ **Flexible Streaming** - Multiple streaming modes for intermediate steps and messages
+- ✅ **Built-in Checkpointing** - Rewind to past states and debug errors
+- ✅ **Human-in-the-Loop** - Interrupt, update state, and resume at any point
+- ✅ **Parallel Node Support** - Run multiple nodes simultaneously
 - ✅ **Memory Management** - Persistent conversation context
 - ✅ **Error Handling** - Production-ready error boundaries
 - ✅ **TypeScript Types** - Full type safety throughout

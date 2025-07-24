@@ -16,17 +16,13 @@ Where:
 - **pe**: Process Executor (workflow orchestration)
 - **llm**: Language model interaction layer
 
-### Workflow Hierarchy
+### Simplified Architecture Approach
 
-**Macro-workflow**: High-level agent orchestration
-- Each node represents a complete subagent
-- Handles routing between specialized agents
-- Managed by LangGraph StateGraph
-
-**Micro-workflow**: Internal agent logic
-- Each node represents a prompt-based operation
-- Handles prompt chains within agents
-- Managed by n8n visual workflows
+**Agent Orchestration**: Unified LangGraph-based workflow management
+- Single orchestration layer using LangGraph.js v0.3.11+ capabilities
+- Built-in state management, checkpointing, and parallel execution
+- Eliminates need for separate micro-workflow tools
+- Leverages LangGraph Studio for visual debugging and development
 
 ## System Architecture
 
@@ -39,28 +35,26 @@ Where:
 └─────────────────────────────┬───────────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────────┐
-│                      Macro-Workflow                             │
-│                       (LangGraph)                               │
+│                   Agent Orchestration Layer                     │
+│                    (LangGraph.js v0.3.11+)                      │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────┐ │
-│  │ Context     │ │ Reasoning   │ │ Tool        │ │ Response  │ │
-│  │ Agent       │ │ Agent       │ │ Agent       │ │ Agent     │ │
+│  │ Built-in    │ │ Parallel    │ │ Human-in-   │ │ Streaming │ │
+│  │ Checkpoint  │ │ Execution   │ │ Loop        │ │ Management│ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └───────────┘ │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────────┐
-│                      Micro-Workflows                            │
-│                          (n8n)                                  │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────┐ │
-│  │ Prompt      │ │ Context     │ │ RAG         │ │ Output    │ │
-│  │ Chain       │ │ Processing  │ │ Pipeline    │ │ Format    │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └───────────┘ │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │           LangGraph Studio Integration                  │   │
+│  │     (Visual Debugging & Development)                    │   │
+│  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────┬───────────────────────────────────┘
                               │
 ┌─────────────────────────────▼───────────────────────────────────┐
 │                      Foundation Layer                           │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────┐ │
-│  │ LLM         │ │ RAG System  │ │ MCP         │ │ Tools &   │ │
-│  │ (LangChain) │ │ (ChromaDB)  │ │ Servers     │ │ Modules   │ │
+│  │ LLM         │ │ RAG System  │ │ MCP         │ │ Multi     │ │
+│  │ (LangChain) │ │ (ChromaDB)  │ │ Integration │ │ Server    │ │
+│  │ + Ollama    │ │ + Semantic  │ │ (Official   │ │ Client    │ │
+│  │             │ │ Search      │ │ SDK)        │ │ Support   │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └───────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -94,16 +88,18 @@ graph TB
         RespA --> CA
     end
     
-    %% Micro-Workflow Layer
-    subgraph MiW[Micro-Workflows - n8n]
-        PC[Prompt Chain]
-        CP[Context Processing]
-        RAG[RAG Pipeline]
-        OF[Output Format]
+    %% Agent Orchestration Layer
+    subgraph AOL[Agent Orchestration - LangGraph.js v0.3.11+]
+        BC[Built-in Checkpointing]
+        PE[Parallel Execution]
+        HIL[Human-in-Loop]
+        SM[Streaming Management]
+        LSI[LangGraph Studio Integration]
         
-        PC --> CP
-        CP --> RAG
-        RAG --> OF
+        BC --> PE
+        PE --> HIL
+        HIL --> SM
+        SM --> LSI
     end
     
     %% Foundation Layer
@@ -124,8 +120,8 @@ graph TB
     
     %% Connections
     UI --> MW
-    MW --> MiW
-    MiW --> FL
+    MW --> AOL
+    AOL --> FL
     
     %% RAG Connections
     RS <--> KB
@@ -133,7 +129,7 @@ graph TB
     RAG <--> RS
     
     %% LLM Connections
-    MiW --> LLM
+    AOL --> LLM
     MW --> LLM
     
     %% Tool Connections
@@ -152,7 +148,7 @@ graph TB
     classDef knowledgeLayer fill:#fff3e0
     
     class UI uiLayer
-    class MW,MiW workflowLayer
+    class MW,AOL workflowLayer
     class FL foundationLayer
     class KB knowledgeLayer
 ```
@@ -168,29 +164,39 @@ graph TB
   - Interactive command palette
 - **Features**: React-based components, Flexbox layouts, terminal animations
 
-#### 2. Macro-Workflow Layer (LangGraph)
-- **Purpose**: Agent orchestration and state management
-- **Components**:
-  - **Context Agent**: RAG-powered file discovery, semantic relevance filtering, context assembly with ChromaDB
-  - **Reasoning Agent**: Task analysis, planning, decision making with enriched context
-  - **Tool Agent**: Action execution, result processing, and knowledge base updates
-  - **Response Agent**: Output formatting, streaming management, and conversation memory storage
+#### 2. Macro-Workflow Layer (LangGraph.js v0.3.11+)
+- **Purpose**: Unified agent orchestration with enhanced capabilities
+- **Enhanced Features**:
+  - **Built-in Checkpointing**: State persistence for debugging and recovery, eliminating custom checkpoint implementations
+  - **Parallel Node Execution**: Concurrent agent operations for improved performance and reduced latency
+  - **Human-in-the-Loop**: Interactive approval workflows with interrupt and resume capabilities
+  - **Advanced Streaming**: Multiple streaming modes (messages, updates, events) with real-time feedback
+  - **LangGraph Studio Integration**: Visual workflow debugging with automatic TypeScript type inference
+- **Agent Components**:
+  - **Context Agent**: RAG-powered file discovery with ChromaDB semantic search
+  - **Reasoning Agent**: Enhanced task analysis with parallel reasoning paths
+  - **Tool Agent**: MCP-integrated action execution with automatic tool conversion
+  - **Response Agent**: Streaming-optimized output with structured response formatting
 
-#### 3. Micro-Workflow Layer (n8n)
-- **Purpose**: Internal agent prompt chains with RAG integration
+#### 3. Agent Orchestration Layer (LangGraph Enhanced)
+- **Purpose**: Intelligent workflow orchestration with built-in capabilities
 - **Components**:
-  - Prompt template management with context injection
-  - RAG pipeline orchestration and document retrieval
-  - Data transformation nodes for embedding processing
-  - Conditional logic branches based on context relevance
-  - Error handling and retry mechanisms with fallback strategies
+  - **Built-in Checkpointing**: State persistence and debugging support
+  - **Parallel Node Execution**: Concurrent agent operations for improved performance
+  - **Human-in-the-Loop**: Interactive approval and intervention capabilities
+  - **Streaming Management**: Real-time response streaming with multiple modes
+  - **LangGraph Studio Integration**: Visual debugging and workflow development
+  - **Prompt Chain Management**: Internal agent logic without external workflow tools
 
 #### 4. Foundation Layer
 - **LLM Interface (LangChain)**: 
-  - Ollama integration
-  - Multiple model support
-  - Response streaming
-  - Error handling
+  - Ollama integration (Llama 3.3, DeepSeek-R1, Phi-4, Gemma 3, Mistral Small 3.1)
+  - Structured outputs support for JSON Schema constraints
+  - Vision model support (Llama 3.2 Vision 11B/90B)
+  - Multiple model support with model switching
+  - Response streaming with async iterators
+  - Full TypeScript integration with type safety
+  - Error handling and retry logic
 - **RAG System (ChromaDB + LangChain)**:
   - Vector database for codebase indexing
   - Semantic search for context retrieval
@@ -201,30 +207,32 @@ graph TB
   - Multi-turn conversation memory
   - Code relationship mapping
   - Token-efficient context compression
-- **MCP Servers**: 
-  - File operations
-  - Shell command execution
-  - Git integration
-  - Web search capabilities
-- **Tool Modules**:
-  - Custom tool implementations
-  - Plugin architecture
-  - External service integrations
+- **MCP Integration Architecture**:
+  - **MultiServerMCPClient**: Official @langchain/mcp-adapters integration for managing multiple MCP servers
+  - **Transport Support**: All transport types (stdio, SSE, HTTP, WebSocket) via @modelcontextprotocol/sdk
+  - **Tool Auto-Loading**: Automatic conversion from MCP tools to LangChain tools with type safety
+  - **Server Management**: Dynamic server configuration, health monitoring, and failover support
+  - **Built-in MCP Servers**: File operations, shell commands, Git integration, web search
+- **Security & Validation**:
+  - Tool permission scoping with whitelist-based access control
+  - Trusted server verification for MCP connections
+  - Input sanitization and prompt injection protection
+  - Audit logging for all tool calls and MCP interactions
 
 ## Data Flow
 
-### Request Processing Pipeline
+### Streamlined Request Processing Pipeline
 
-1. **User Input** → Ink CLI Interface
-2. **Command Parsing** → LangGraph State Machine
-3. **Context Retrieval** → ChromaDB semantic search + RAG pipeline
-4. **Agent Routing** → Appropriate specialized agent
-5. **Micro-Workflow Execution** → n8n prompt chains with context
-6. **Tool Execution** → MCP server calls
-7. **LLM Processing** → LangChain + Ollama with enriched context
-8. **Response Streaming** → Back through the stack
-9. **UI Updates** → Real-time terminal display
-10. **Context Update** → Update vector database with new interactions
+1. **User Input** → Ink CLI Interface with real-time input validation
+2. **Command Parsing** → LangGraph State Machine with built-in routing
+3. **Context Retrieval** → ChromaDB semantic search with parallel embeddings
+4. **Agent Orchestration** → LangGraph parallel execution with checkpointing
+5. **Tool Execution** → MCP MultiServerClient with automatic tool conversion
+6. **LLM Processing** → LangChain + Ollama with structured outputs and context injection
+7. **Response Streaming** → Multi-mode streaming (messages/updates) with real-time UI updates
+8. **Context Persistence** → ChromaDB updates with conversation memory and tool results
+
+**Simplified from 10 to 8 steps** by eliminating separate agent routing and micro-workflow layers, leveraging LangGraph's built-in capabilities for orchestration and parallel execution.
 
 ### State Management
 
@@ -272,14 +280,24 @@ graph TB
 ```json
 {
   "ui": ["ink", "@inkjs/ui", "react"],
-  "agents": ["langgraph", "langchain", "langchain-mcp-adapters"],
-  "workflows": ["n8n", "n8n-nodes-base"],
-  "llm": ["ollama", "@langchain/ollama"],
+  "agents": ["@langchain/langgraph", "@langchain/core", "@langchain/mcp-adapters"],
+  "mcp": ["@modelcontextprotocol/sdk"],
+  "llm": ["@langchain/ollama", "@langchain/openai"],
   "rag": ["chromadb", "@langchain/community", "@langchain/textsplitters"],
   "embeddings": ["@langchain/ollama", "@langchain/openai"],
+  "validation": ["zod"],
+  "config": ["js-yaml"],
   "tools": ["commander", "chalk", "inquirer"]
 }
 ```
+
+**Critical Package Updates:**
+- **@langchain/langgraph** (v0.3.11+): Complete LangGraph implementation with built-in checkpointing, parallel execution, and LangGraph Studio integration
+- **@modelcontextprotocol/sdk**: Official MCP SDK with full TypeScript support for all transport types
+- **@langchain/mcp-adapters**: Production-ready MCP-LangChain integration layer
+- **@langchain/core**: Required peer dependency for LangGraph.js
+- **zod**: Type-safe configuration validation
+- **js-yaml**: YAML configuration file support
 
 ### Configuration
 - YAML-based configuration files
@@ -295,11 +313,19 @@ graph TB
 - Conversation history encrypted at rest
 - Configurable data retention policies
 
+### MCP Security (2025 Updated)
+- **Prompt Injection Protection**: Input sanitization and validation to prevent malicious prompt manipulation
+- **Tool Permission Scoping**: Granular permissions for each MCP server with capability-based access control
+- **Trusted Server Verification**: Cryptographic verification of MCP server authenticity and integrity
+- **Lookalike Tool Prevention**: Server identity validation to prevent tool impersonation attacks
+- **Audit Trail**: Comprehensive logging of all MCP interactions, tool calls, and security events
+
 ### Tool Execution
-- Sandboxed command execution
-- User confirmation for destructive operations
-- Whitelist-based tool access
-- Audit logging for all tool calls
+- Sandboxed command execution with restricted filesystem access
+- User confirmation for destructive operations with risk assessment
+- Whitelist-based tool access with dynamic permission updates
+- Process isolation and resource limits for tool execution
+- Automatic rollback capabilities for failed operations
 
 ## Performance Requirements
 
@@ -310,10 +336,10 @@ graph TB
 - Model switching: < 5 seconds
 
 ### Resource Usage
-- Memory: < 512MB base usage
-- CPU: Efficient batching for LLM calls
-- Storage: Configurable cache limits
-- Network: Local-only by default
+- Memory: < 1GB base usage (updated for Ollama model requirements)
+- CPU: Efficient batching for LLM calls with parallel processing support
+- Storage: Configurable cache limits with ChromaDB optimization
+- Network: Local-only by default with optional remote MCP server support
 
 ## Extensibility
 
