@@ -12,6 +12,10 @@ Local AI agent with conversational interface and extensible tool integration.
 
 ## Documentation
 
+### Usage
+- **[Ollama Setup Guide](docs/usage/ollama-setup.md)** - Complete setup and usage instructions
+
+### Architecture
 - [Design Document](docs/architecture/design.md) - Complete system architecture
 - [Development Plan](docs/plan/plan.study.md) - Implementation roadmap and technology analysis
 - **[Phase 1 Study](docs/study/phase1/README.md)** - LangGraph + MCP implementation analysis with TypeScript trivialization proof
@@ -41,7 +45,7 @@ git clone https://github.com/langchain-ai/langchain-mcp-adapters.git
 
 ## Current Status
 
-**v-0.2.3**: Complete SDK-first implementation with 2-layer architecture. Features LangGraph agent factory, MCP integration, Ollama LLM support, professional terminal UI, and comprehensive test suite. 1,200+ lines of production-ready TypeScript achieving 80%+ complexity reduction through official SDKs.
+**v-0.3.0**: Phase 3 documentation complete. Comprehensive research and implementation guides for RAG system with ChromaDB, streaming responses, and context retrieval. All guides properly integrated with existing QiAgentFactory architecture, ready for implementation.
 
 ## Quick Start
 
@@ -54,10 +58,9 @@ bun run check
 
 # Start development
 bun run dev
-
-# Chat with the agent
-bun run chat --config config/qi-config.yaml
 ```
+
+📖 **For complete setup with Ollama, configuration, and usage instructions, see [Ollama Setup Guide](docs/usage/ollama-setup.md)**
 
 ## Scripts
 
