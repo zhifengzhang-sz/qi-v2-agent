@@ -7,13 +7,14 @@ interface SimpleChatAppProps {
   threadId?: string;
   debug?: boolean;
   onExit: () => Promise<void>;
+  initialMessages?: ChatMessage[];
 }
 
 interface ChatMessage extends AgentMessage {
   id: string;
 }
 
-export function SimpleChatApp({ agentFactory, threadId, debug, onExit }: SimpleChatAppProps) {
+export function SimpleChatApp({ agentFactory, threadId, debug, onExit, initialMessages }: SimpleChatAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,17 +26,27 @@ export function SimpleChatApp({ agentFactory, threadId, debug, onExit }: SimpleC
     console.log('⚡ Simple ChatApp starting...');
     const config = agentFactory.getConfig();
     
-    setMessages([
-      {
-        id: '0',
-        role: 'system',
-        content: `🤖 Qi Agent V2 - Ready!\n\nModel: ${config.model.name}\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\n\nType your message and press Enter. Press Ctrl+C to exit.`,
-        timestamp: new Date(),
-      },
-    ]);
+    const systemMessage = {
+      id: '0',
+      role: 'system' as const,
+      content: `🤖 Qi Agent V2 - Ready!\n\nModel: ${config.model.name}\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\n\n${initialMessages ? 'Starting workflow...' : 'Type your message and press Enter. Press Ctrl+C to exit.'}`,
+      timestamp: new Date(),
+    };
+    
+    if (initialMessages && initialMessages.length > 0) {
+      // Set messages with system message + initial workflow messages
+      setMessages([systemMessage, ...initialMessages]);
+      // Auto-process the first initial message after a brief delay
+      setTimeout(() => {
+        processWorkflowMessage(initialMessages[0]);
+      }, 500);
+    } else {
+      // Standard chat mode
+      setMessages([systemMessage]);
+    }
     
     console.log('✅ Simple Chat UI ready!');
-  }, [agentFactory]);
+  }, [agentFactory, initialMessages]);
 
   // React 18 automatic batching-optimized token display
   useEffect(() => {
@@ -113,6 +124,107 @@ export function SimpleChatApp({ agentFactory, threadId, debug, onExit }: SimpleC
       setInput(prev => prev + input);
     }
   });
+
+  const processWorkflowMessage = async (workflowMessage: ChatMessage) => {
+    if (isLoading) return;
+
+    console.log('🔄 Processing workflow message...');
+    setIsLoading(true);
+    setShowPrompt(false);
+
+    try {
+      const startTime = Date.now();
+      
+      // Convert workflow message to the format expected by agent factory
+      const conversationMessages = [{
+        role: workflowMessage.role,
+        content: workflowMessage.content,
+      }];
+
+      console.log('📤 Sending workflow to agent factory...');
+      let assistantResponse = '';
+      let firstTokenTime: number | null = null;
+      let renderCount = 0;
+
+      await agentFactory.stream(
+        conversationMessages,
+        {
+          onToken: (token) => {
+            if (!firstTokenTime) {
+              firstTokenTime = Date.now();
+              console.log(`⚡ First token received after ${firstTokenTime - startTime}ms`);
+            }
+            
+            // Accumulate tokens in response and pending state
+            assistantResponse += token;
+            setPendingTokens(assistantResponse);
+            
+            renderCount++;
+            // Track token batching performance (disabled for production)
+          },
+          onComplete: (response) => {
+            const totalTime = Date.now() - startTime;
+            console.log(`✅ Workflow completed in ${totalTime}ms (${renderCount} tokens total)`);
+            
+            // Ensure final message is properly set and stop loading
+            setMessages(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                // Update existing assistant message with final response
+                return prev.slice(0, -1).concat({
+                  ...lastMsg,
+                  content: response,
+                });
+              } else {
+                // Create new assistant message if none exists
+                return prev.concat({
+                  id: (Date.now() + 1).toString(),
+                  role: 'assistant',
+                  content: response,
+                  timestamp: new Date(),
+                });
+              }
+            });
+            
+            // Clear pending tokens and stop loading
+            setPendingTokens('');
+            setIsLoading(false);
+            setShowPrompt(true);
+          },
+          onError: (error) => {
+            // Clear pending tokens and show error
+            setPendingTokens('');
+            setMessages(prev => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: 'assistant',
+                content: `❌ Workflow Error: ${error.message}`,
+                timestamp: new Date(),
+              },
+            ]);
+            setIsLoading(false);
+            setShowPrompt(true);
+          },
+        },
+        threadId
+      );
+    } catch (error) {
+      // Clear pending tokens and show error
+      setPendingTokens('');
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 3).toString(),
+          role: 'assistant',
+          content: `❌ Workflow Error: ${error instanceof Error ? error.message : String(error)}`,
+          timestamp: new Date(),
+        },
+      ]);
+      setIsLoading(false);
+      setShowPrompt(true);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!input.trim() || isLoading) return;

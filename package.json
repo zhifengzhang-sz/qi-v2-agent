@@ -1,6 +1,6 @@
 {
   "name": "qi-v2-agent",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "AI Coding Assistant with Local LLM Support",
   "private": true,
   "workspaces": [

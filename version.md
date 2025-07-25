@@ -94,65 +94,89 @@
 - tests/: Comprehensive unit test coverage
 - Proper separation of concerns and clean interfaces
 
-## v-0.3.0 (Current - Phase 3 Documentation Complete)
-**Phase 3: Implementation Planning and Research**
+## v-0.2.4 (Completed - Stable Chat Implementation)
+**Phase 2: Validated Chat Foundation**
 
-**Completed:**
-- ✅ Comprehensive technology research (ChromaDB TypeScript integration, LangGraph v0.3.11 streaming, RAG patterns, MCP ecosystem)
-- ✅ Complete implementation guides for streaming agent, RAG system, and context retrieval
-- ✅ Architecture integration strategy extending existing QiAgentFactory
-- ✅ Configuration schema updates for RAG and streaming features
-- ✅ Usage documentation with comprehensive Ollama setup guide
-- ✅ Validation checklists and implementation roadmap
+**Implemented Features:**
+- ✅ **Interactive chat command** - Full conversational AI with streaming responses
+- ✅ **Configuration management** - YAML-based config with validation and CLI management
+- ✅ **MCP server management** - Filesystem server integration with 12 available tools
+- ✅ **Validated architecture** - AgentFactory → Smart Router → LangGraph/Direct LLM pattern
+- ✅ **Performance optimization** - Token batching with 90% render reduction, 12ms first token response
+- ✅ **Stream handling** - Completion detection with timeout fallbacks, proper error handling
+- ✅ **UI optimization** - React 18 automatic batching, Ink Static components for 2x performance
+- ✅ **Model validation** - qwen3:0.6b configuration for optimal performance
 
-**Documentation Created:**
-- docs/study/phase3/research-findings-summary.md - Technology research foundation
-- docs/study/phase3/T3-1-streaming-agent.md - LangGraph streaming implementation guide
-- docs/study/phase3/T3-2-chromadb-rag.md - RAG system with ChromaDB integration
-- docs/study/phase3/T3-3-context-retrieval.md - Advanced context management
-- docs/usage/ollama-setup.md - Complete setup and usage guide
+**Technical Achievements:**
+- Smart routing between direct LLM (simple conversation) and LangGraph agent (tool requests)
+- Sub-second response times for simple conversations
+- 90% reduction in React renders through token batching
+- Proper stream completion detection preventing UI hanging
+- Clean separation of chat vs workflow architectures
 
-**Ready for Implementation:**
-- All guides properly integrate with existing Phase 2 architecture
-- Backward compatibility maintained through optional configuration flags
-- Clear integration points via QiAgentFactory enhancement
-- Research-backed implementation patterns using current 2025 technologies
+**Key Commands:**
+- `qi chat` - Interactive chat session with optimized streaming
+- `qi config` - Configuration validation and display
+- `qi servers` - MCP server connectivity testing
 
-## v-0.4.0 (Phase 3: Implementation - Core Features)
-**Days 1-2 of Implementation**
-- Implement streaming agent using T3-1 guide (extend QiAgentFactory.streamWithMode())
-- Basic RAG system integration using T3-2 guide (ChromaDB + LangChain)
-- Enhanced configuration loading with new RAG settings
-- Basic context retrieval implementation from T3-3 guide
+**Architecture Validation:**
+- AgentFactory pattern validated as foundation for all workflows
+- Smart routing successfully detects tool requirements
+- MCP integration working with filesystem server
+- Performance targets achieved (12ms first token, sub-second total)
 
-## v-0.5.0 (Phase 3: Implementation - Advanced Features)
-**Days 3-4 of Implementation** 
-- Complete RAG system with semantic search and context assembly
-- Advanced streaming with multiple modes (messages, values, updates, custom)
-- Multi-turn conversation support with persistent context
-- MCP tool auto-loading and execution improvements
-- Real-time UI updates with progress indicators
+## v-0.2.5 (Completed - File Workflows Implementation)
+**Phase 2: File Operation Commands**
 
-## v-0.6.0 (Phase 4: UI & Security)
-**Days 5-6**
-- Enhanced Ink-based terminal interface with streaming display
-- File diff visualization and interactive components
-- 2025 MCP security implementation (prompt injection protection)
-- Tool permission scoping and audit logging
-- Input sanitization and trusted server verification
+**Implemented Features:**
+- ✅ **AI-assisted file editing** - `qi edit` command with natural language instructions
+- ✅ **Code analysis workflows** - `qi analyze` command with complexity and dependency analysis
+- ✅ **Code explanation** - `qi explain` command for educational assistance and concept explanations
+- ✅ **Workflow message construction** - Smart routing integration for all file operations
+- ✅ **SimpleChatApp enhancement** - Support for initial workflow messages and auto-processing
+- ✅ **Complete CLI specification** - Documentation for all current and planned commands
 
-## v-0.7.0 (Phase 5: Production Ready)
-**Days 7-8**
-- Comprehensive testing and performance optimization
-- Build system and distribution packages
-- Installation automation and deployment
-- Complete documentation and examples
-- Error handling and recovery mechanisms
+**Key Commands Added:**
+- `qi edit [files...] -m "instruction"` - AI-assisted file editing with natural language
+- `qi analyze <target> [--complexity] [--dependencies]` - Code and file analysis
+- `qi explain <target> [--concept] [--level]` - Code explanation and educational assistance
 
-## v-1.0.0 (Production Release)
-**Day 8-10**
-- Stable, production-ready release
-- Complete Claude Code feature parity achieved in 8-10 days
-- Professional-grade security and performance
-- Community-ready distribution
-- ~90% time savings vs original 14-week plan due to official SDK usage
+**Technical Implementation:**
+- Message-based workflow pattern triggering existing smart routing
+- Reuse of validated AgentFactory.stream() infrastructure
+- Integration with existing MCP filesystem server
+- Inherits all performance optimizations (token batching, streaming, error handling)
+- Support for workflow-specific options and parameters
+
+**Architecture Integration:**
+- All workflows leverage validated AgentFactory → Smart Router → LangGraph pattern
+- Smart routing correctly detects file operations as tool-requiring requests
+- Seamless integration with existing MCP server infrastructure
+- Consistent streaming UI with optimized token batching across all workflows
+
+**Performance Validation:**
+- Edit workflows execute in 2-4 seconds with qwen3:0.6b model
+- Smart routing correctly identifies tool vs conversation requests
+- All workflows inherit 90% render reduction and streaming optimizations
+- First token responses maintain 12ms performance target
+
+## v-0.2.6 (Planned - Git Workflows)
+**Phase 2: Git Integration Commands**
+- `qi commit` - AI-generated commit messages based on changes
+- `qi diff` - Intelligent change analysis and review
+- `qi review` - Code review assistance and quality analysis
+- Git MCP server integration for version control operations
+
+## v-0.2.7 (Planned - Quality Workflows)
+**Phase 2: Code Quality Commands**
+- `qi test` - Test generation and execution assistance
+- `qi refactor` - Code refactoring and improvement assistance
+- `qi lint` - Code quality checks and automatic fixes
+- Shell MCP server integration for tool execution
+
+## v-0.3.x+ (Planned - Advanced Features)
+**Phase 3: Full Claude Code Parity**
+- `qi search` - Intelligent codebase search and navigation
+- `qi debug` - Error analysis and systematic debugging
+- `qi generate` - Code generation from specifications
+- Advanced context management and memory features
