@@ -1,0 +1,30 @@
+{
+  "name": "qi-v2-agent",
+  "version": "0.1.0",
+  "description": "AI Coding Assistant with Local LLM Support",
+  "private": true,
+  "workspaces": [
+    "lib",
+    "app"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd app dev",
+    "build": "bun build.ts build",
+    "compile": "bun build.ts compile",
+    "test": "bun run --cwd lib test && bun run --cwd app test",
+    "typecheck": "bun run --cwd lib type-check && bun --cwd app tsc --noEmit",
+    "lint": "bun run --cwd lib lint && bun run --cwd app lint",
+    "format": "bun run --cwd lib format && bun run --cwd app format",
+    "clean": "rm -rf lib/dist app/dist app/qi-agent",
+    "servers:list": "bun --cwd app src/main.ts servers --list --config ../config/qi-config.yaml",
+    "servers:test": "bun --cwd app src/main.ts servers --test --config ../config/qi-config.yaml",
+    "config:show": "bun --cwd app src/main.ts config --show ../config/qi-config.yaml",
+    "config:validate": "bun --cwd app src/main.ts config --validate ../config/qi-config.yaml",
+    "check": "bun run typecheck && bun run lint && bun run test"
+  },
+  "devDependencies": {
+    "bun-types": "^1.1.38",
+    "typescript": "^5.6.3",
+    "chalk": "^5.4.1"
+  }
+}

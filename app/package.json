@@ -1,0 +1,33 @@
+{
+  "name": "@qi/app",
+  "version": "0.1.0",
+  "description": "Qi V2 Agent - Application Layer",
+  "type": "module",
+  "main": "src/main.ts",
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "build": "bun build src/main.ts --outdir dist --target node --format esm",
+    "compile": "bun build --compile src/main.ts --outfile qi-agent",
+    "start": "bun run dist/main.js",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --watch",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "@qi/lib": "workspace:^",
+    "ink": "^5.0.1",
+    "@inkjs/ui": "^2.0.0",
+    "react": "^18.3.1",
+    "commander": "^12.1.0",
+    "chalk": "^5.4.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "vitest": "^3.0.0",
+    "@types/react": "^18.3.12",
+    "bun-types": "^1.1.38",
+    "typescript": "^5.6.3"
+  }
+}

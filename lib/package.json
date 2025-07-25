@@ -1,0 +1,42 @@
+{
+  "name": "@qi/lib",
+  "version": "0.1.0",
+  "description": "Qi V2 Agent - Fundamental Layer SDK",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target node --format esm",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "^0.3.11",
+    "@langchain/core": "^0.3.30",
+    "@langchain/ollama": "^0.2.3",
+    "@modelcontextprotocol/sdk": "^1.16.0",
+    "zod": "^3.24.1",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "vitest": "^3.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "bun-types": "^1.1.38",
+    "typescript": "^5.6.3"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./agent": "./dist/agent/index.js",
+    "./mcp": "./dist/mcp/index.js",
+    "./llm": "./dist/llm/index.js",
+    "./config": "./dist/config/index.js",
+    "./utils": "./dist/utils/index.js"
+  }
+}

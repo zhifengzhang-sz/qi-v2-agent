@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": false,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@qi/agent": ["../lib/src/index.ts"],
+      "@qi/agent/*": ["../lib/src/*"],
+      "@/cli/*": ["./src/cli/*"],
+      "@/ui/*": ["./src/ui/*"],
+      "@/workflows/*": ["./src/workflows/*"]
+    },
+    "jsx": "react-jsx",
+    "types": ["bun-types"]
+  },
+  "include": ["src/**/*", "../lib/src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

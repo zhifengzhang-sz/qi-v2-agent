@@ -1,0 +1,32 @@
+model:
+  name: "deepseek-r1"
+  temperature: 0.1
+  baseUrl: "http://localhost:11434"
+  thinkingEnabled: true
+
+mcp:
+  servers:
+    time-server:
+      transport: stdio
+      command: "bun"
+      args: ["./servers/time-server.ts"]
+    
+    filesystem:
+      transport: stdio
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    
+    # Example: Additional servers can be added here
+    # git:
+    #   transport: stdio
+    #   command: "npx"
+    #   args: ["-y", "@modelcontextprotocol/server-git"]
+
+memory:
+  enabled: true
+  type: "memory"
+
+ui:
+  theme: "dark"
+  showTimestamps: true
+  progressIndicators: true
