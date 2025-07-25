@@ -1,4 +1,5 @@
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph';
 import { OllamaLLM } from '../llm/ollama.js';
 import { MCPManager } from '../mcp/manager.js';
@@ -36,11 +37,19 @@ export class QiAgentFactory {
     
     console.log(`🔧 Loaded ${tools.length} tools from MCP servers`);
 
-    // Create LangGraph agent
+    // Create LangGraph agent with proper system prompt for conversation
     this.agent = createReactAgent({
       llm: this.llm.getModel(),
       tools,
       ...(this.memorySaver && { checkpointSaver: this.memorySaver }),
+      systemMessage: `You are Qi Agent V2, a helpful AI coding assistant. 
+
+For conversational messages, respond naturally and helpfully.
+For tasks requiring file operations, use the available tools.
+
+Available tools: ${tools.map(t => t.name).join(', ')}
+
+Always be concise and helpful in your responses.`
     });
 
     console.log('✅ Qi Agent initialized successfully');
@@ -98,35 +107,120 @@ export class QiAgentFactory {
     const { onToken, onComplete, onError, controller } = options;
 
     try {
+      console.log('🔧 Agent factory stream started');
+      const startTime = Date.now();
+      
+      // Prepare messages with proper conversational context for ReAct agent
       const langchainMessages = messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
 
+      // Smart routing: simple conversation vs tool requests
+      const needsTools = messages.some(msg => 
+        msg.content.toLowerCase().includes('file') ||
+        msg.content.toLowerCase().includes('directory') ||
+        msg.content.toLowerCase().includes('list') ||
+        msg.content.toLowerCase().includes('read') ||
+        msg.content.toLowerCase().includes('write') ||
+        msg.content.toLowerCase().includes('help me') ||
+        msg.content.toLowerCase().includes('can you')
+      );
+      
+      if (!needsTools) {
+        console.log('💬 Simple conversation - using direct LLM');
+        try {
+          await this.llm.stream([
+            { role: 'system', content: 'You are Qi Agent V2, a helpful AI coding assistant. Respond naturally and helpfully.' },
+            ...langchainMessages
+          ], options);
+          return;
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
+          return;
+        }
+      }
+      
+      console.log('🔧 Tool request - using LangGraph agent');
+
+      console.log('📋 Prepared messages for LangGraph');
       const config = {
         ...(threadId && this.memorySaver && { configurable: { thread_id: threadId } }),
         ...(controller && { signal: controller.signal }),
       };
 
+      console.log('🚀 Starting LangGraph stream...');
       const stream = await this.agent.stream(
         { messages: langchainMessages },
         { ...config, streamMode: 'values' }
       );
+      
+      console.log(`🎯 LangGraph stream started after ${Date.now() - startTime}ms`);
 
       let fullResponse = '';
-
-      for await (const chunk of stream) {
-        if (chunk.messages && chunk.messages.length > 0) {
-          const lastMessage = chunk.messages[chunk.messages.length - 1];
-          if (lastMessage.content) {
-            const content = lastMessage.content;
-            fullResponse += content;
-            onToken?.(content);
+      let firstChunkTime: number | null = null;
+      let chunkCount = 0;
+      let lastContent = '';
+      let streamCompleted = false;
+      
+      // Add timeout as fallback, but try to complete naturally first
+      const streamTimeout = setTimeout(() => {
+        if (!streamCompleted) {
+          console.warn(`⚠️ Stream timeout after 5 seconds - completing with current response`);
+          streamCompleted = true;
+          onComplete?.(fullResponse);
+        }
+      }, 5000);
+      
+      try {
+        for await (const chunk of stream) {
+          if (streamCompleted) break;
+          
+          chunkCount++;
+          // Processing chunk (debug disabled for production)
+          
+          if (!firstChunkTime) {
+            firstChunkTime = Date.now();
+            // First chunk timing (debug disabled for production)
+          }
+          
+          // LangGraph values mode returns the graph state
+          if (chunk && chunk.messages && Array.isArray(chunk.messages)) {
+            const lastMessage = chunk.messages[chunk.messages.length - 1];
+            
+            if (lastMessage && lastMessage.content && typeof lastMessage.content === 'string') {
+              const newContent = lastMessage.content;
+              
+              // Only send the incremental token difference
+              if (newContent.length > lastContent.length) {
+                const newToken = newContent.slice(lastContent.length);
+                onToken?.(newToken);
+                // Token streaming (debug disabled for production)
+                lastContent = newContent;
+                fullResponse = newContent;
+              }
+            }
+          }
+          
+          // Safety check to prevent infinite loops
+          if (chunkCount > 1000) {
+            console.warn(`⚠️ Stream exceeded 1000 chunks, forcing completion`);
+            break;
           }
         }
+        
+        clearTimeout(streamTimeout);
+        
+        if (!streamCompleted) {
+          console.log(`🏁 Stream completed naturally after ${chunkCount} chunks`);
+          streamCompleted = true;
+          onComplete?.(fullResponse);
+        }
+        
+      } catch (streamError) {
+        console.error(`❌ Stream error:`, streamError);
+        throw streamError;
       }
-
-      onComplete?.(fullResponse);
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error(String(error));
       onError?.(errorObj);

@@ -74,8 +74,10 @@ export class OllamaLLM {
         }
       }
       
-      onComplete?.(fullResponse);
-      return fullResponse;
+      // Clean up thinking content from final response
+      const cleanResponse = this.cleanThinkingContent(fullResponse);
+      onComplete?.(cleanResponse);
+      return cleanResponse;
       
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error(String(error));
@@ -85,11 +87,20 @@ export class OllamaLLM {
   }
 
   private isThinkingContent(content: string): boolean {
-    // Simple heuristic for DeepSeek-R1 thinking mode
-    // In practice, this would be more sophisticated based on the actual implementation
-    return this.config.name.includes('deepseek-r1') && 
-           (this.config.thinkingEnabled === true) &&
-           content.includes('<think>');
+    // Filter thinking content for models that use <think> tags
+    return content.includes('<think>') || 
+           content.includes('</think>') ||
+           (this.config.name.includes('deepseek-r1') && 
+            (this.config.thinkingEnabled === true) &&
+            content.includes('<think>'));
+  }
+
+  private cleanThinkingContent(text: string): string {
+    // Remove everything between <think> and </think> tags
+    return text
+      .replace(/<think>[\s\S]*?<\/think>/g, '')
+      .replace(/\n\s*\n/g, '\n') // Remove extra newlines
+      .trim();
   }
 
   async healthCheck(): Promise<boolean> {

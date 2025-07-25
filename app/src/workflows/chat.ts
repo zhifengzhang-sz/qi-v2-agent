@@ -1,7 +1,7 @@
 import { render } from 'ink';
 import React from 'react';
 import type { QiAgentFactory } from '@qi/agent';
-import { ChatApp } from '../ui/ChatApp.js';
+import { SimpleChatApp } from '../ui/SimpleChatApp.js';
 
 export interface ChatWorkflowOptions {
   threadId?: string;
@@ -24,6 +24,8 @@ export class ChatWorkflow {
       console.log(`🧵 Using thread: ${this.options.threadId}`);
     }
 
+    console.log('🎨 Initializing UI...');
+
     // Clean up resources on exit
     const cleanup = async () => {
       console.log('\\n👋 Goodbye!');
@@ -34,15 +36,20 @@ export class ChatWorkflow {
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
 
+    console.log('📦 Creating React component...');
+    
     // Render the Chat UI
+    const startRender = Date.now();
     const { unmount } = render(
-      React.createElement(ChatApp, {
+      React.createElement(SimpleChatApp, {
         agentFactory: this.agentFactory,
         threadId: this.options.threadId,
         debug: this.options.debug,
         onExit: cleanup,
       })
     );
+    
+    console.log(`🚀 Ink render completed in ${Date.now() - startRender}ms`);
 
     // Handle unmount
     process.on('exit', () => {

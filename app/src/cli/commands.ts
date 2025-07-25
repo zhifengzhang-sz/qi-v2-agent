@@ -8,12 +8,12 @@ export function createCLI(): Command {
   program
     .name('qi-agent')
     .description('AI Coding Assistant with Local LLM Support')
-    .version('0.1.0');
+    .version('0.2.4');
 
   program
     .command('chat')
     .description('Start interactive chat session')
-    .option('-c, --config <path>', 'Configuration file path', './config/qi-config.yaml')
+    .option('-c, --config <path>', 'Configuration file path', '../config/qi-config.yaml')
     .option('-m, --model <name>', 'Model to use')
     .option('-t, --thread <id>', 'Thread ID for conversation persistence')
     .option('--debug', 'Enable debug logging')
@@ -56,19 +56,18 @@ export function createCLI(): Command {
         const agentFactory = new QiAgentFactory(config);
         await agentFactory.initialize();
 
-        // Health check
-        const isHealthy = await agentFactory.healthCheck();
-        if (!isHealthy) {
-          console.error('❌ Agent health check failed. Please check your configuration.');
-          process.exit(1);
-        }
+        // Skip health check for now - it's too slow and not critical for startup
+        // TODO: Implement a lightweight health check that doesn't make LLM calls
+        console.log('⚡ Skipping health check for faster startup');
 
         // Start chat workflow
+        console.log('🎯 Creating chat workflow...');
         const chatWorkflow = new ChatWorkflow(agentFactory, {
           threadId: options.thread,
           debug: options.debug,
         });
 
+        console.log('▶️  Starting chat workflow...');
         await chatWorkflow.start();
 
       } catch (error) {
@@ -80,11 +79,13 @@ export function createCLI(): Command {
   program
     .command('config')
     .description('Manage configuration')
-    .option('-v, --validate <path>', 'Validate configuration file')
-    .option('-s, --show <path>', 'Show current configuration')
+    .option('-v, --validate [path]', 'Validate configuration file')
+    .option('-s, --show [path]', 'Show current configuration')
     .action(async (options) => {
       try {
-        const configPath = options.validate || options.show || './config/qi-config.yaml';
+        const configPath = (typeof options.validate === 'string' ? options.validate : null) || 
+                          (typeof options.show === 'string' ? options.show : null) || 
+                          '../config/qi-config.yaml';
         const configLoader = new ConfigLoader(configPath);
 
         if (options.validate) {
@@ -111,7 +112,7 @@ export function createCLI(): Command {
     .description('Manage MCP servers')
     .option('-l, --list', 'List configured servers')
     .option('-t, --test', 'Test server connections')
-    .option('-c, --config <path>', 'Configuration file path', './config/qi-config.yaml')
+    .option('-c, --config <path>', 'Configuration file path', '../config/qi-config.yaml')
     .action(async (options) => {
       try {
         const configLoader = new ConfigLoader(options.config);

@@ -22,17 +22,31 @@ export function ChatApp({ agentFactory, threadId, debug, onExit }: ChatAppProps)
   const [thinking, setThinking] = useState('');
   const [showInput, setShowInput] = useState(true);
 
-  // Show welcome message
+  // Show welcome message with optimized initialization
   useEffect(() => {
-    const config = agentFactory.getConfig();
-    setMessages([
-      {
-        id: '0',
-        role: 'system',
-        content: `🤖 Qi Agent V2 - Ready!\\n\\nModel: ${config.model.name}\\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\\n\\nType your message and press Enter. Press Ctrl+C to exit.`,
-        timestamp: new Date(),
-      },
-    ]);
+    const initializeChat = async () => {
+      console.log('⚡ ChatApp useEffect started');
+      
+      // Allow React to render first, then initialize
+      await new Promise(resolve => setTimeout(resolve, 0));
+      console.log('🔧 Getting agent config...');
+      
+      const config = agentFactory.getConfig();
+      console.log('📝 Setting initial messages...');
+      
+      setMessages([
+        {
+          id: '0',
+          role: 'system',
+          content: `🤖 Qi Agent V2 - Ready!\\n\\nModel: ${config.model.name}\\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\\n\\nType your message and press Enter. Press Ctrl+C to exit.`,
+          timestamp: new Date(),
+        },
+      ]);
+      
+      console.log('✅ Chat UI fully ready!');
+    };
+    
+    initializeChat();
   }, [agentFactory]);
 
   // Handle keyboard input

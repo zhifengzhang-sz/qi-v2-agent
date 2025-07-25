@@ -1,6 +1,6 @@
 {
   "name": "@qi/lib",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "description": "Qi V2 Agent - Fundamental Layer SDK",
   "type": "module",
   "main": "dist/index.js",

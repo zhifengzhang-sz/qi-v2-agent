@@ -1,16 +1,11 @@
 model:
-  name: "deepseek-r1"
+  name: "qwen3:0.6b"
   temperature: 0.1
   baseUrl: "http://localhost:11434"
-  thinkingEnabled: true
+  thinkingEnabled: false
 
 mcp:
   servers:
-    time-server:
-      transport: stdio
-      command: "bun"
-      args: ["./servers/time-server.ts"]
-    
     filesystem:
       transport: stdio
       command: "npx"
@@ -23,7 +18,7 @@ mcp:
     #   args: ["-y", "@modelcontextprotocol/server-git"]
 
 memory:
-  enabled: true
+  enabled: false
   type: "memory"
 
 ui:
