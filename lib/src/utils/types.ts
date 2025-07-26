@@ -42,3 +42,16 @@ export interface PerformanceMetrics {
   errorRate: number;
   timestamp: Date;
 }
+
+// Common interface for all agent factories
+export interface IAgentFactory {
+  initialize(): Promise<void>;
+  stream(messages: AgentMessage[], options?: StreamingOptions, threadId?: string): Promise<void>;
+  invoke(messages: AgentMessage[], threadId?: string): Promise<AgentResponse>;
+  getAvailableTools(): Promise<string[]>;
+  getConnectedServers(): Promise<string[]>;
+  healthCheck(): Promise<boolean>;
+  cleanup(): Promise<void>;
+  getConfig(): any;
+  updateConfig?(newConfig: any): Promise<void>;
+}

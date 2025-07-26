@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { QiAgentFactory, ConfigLoader } from '@qi/agent';
+import { AgentFactory, ConfigLoader } from '@qi/agent';
 import { ChatWorkflow } from '../workflows/chat.js';
 import { createEditWorkflowMessages, createAnalyzeWorkflowMessages, createExplainWorkflowMessages } from '../workflows/messages.js';
 import { render } from 'ink';
@@ -27,7 +27,7 @@ export function createCLI(): Command {
           console.log('🐛 Debug mode enabled');
         }
 
-        console.log('🚀 Starting Qi Agent...');
+        console.log('🚀 Starting qi-v2 agent...');
 
         // Load configuration
         const configLoader = new ConfigLoader(options.config);
@@ -56,7 +56,7 @@ export function createCLI(): Command {
         }
 
         // Initialize agent
-        const agentFactory = new QiAgentFactory(config);
+        const agentFactory = new AgentFactory(config);
         await agentFactory.initialize();
 
         // Skip health check for now - it's too slow and not critical for startup
@@ -75,6 +75,84 @@ export function createCLI(): Command {
 
       } catch (error) {
         console.error('❌ Failed to start Qi Agent:', error);
+        process.exit(1);
+      }
+    });
+
+  // Unified Chat Interface (v-0.2.6+)
+  program
+    .command('unified')
+    .alias('u')
+    .description('Unified chat interface with natural language workflows')
+    .option('-c, --config <path>', 'Configuration file path', '../config/qi-config.yaml')
+    .option('-m, --model <name>', 'Model to use')
+    .option('-t, --thread <id>', 'Thread ID for conversation persistence')
+    .option('--debug', 'Enable debug logging')
+    .option('--no-thinking', 'Disable thinking mode for DeepSeek-R1')
+    .action(async (options) => {
+      try {
+        if (options.debug) {
+          console.log('🐛 Debug mode enabled for unified chat');
+        }
+
+        console.log('🚀 Starting Unified Qi Agent...');
+
+        // Load configuration
+        const configLoader = new ConfigLoader(options.config);
+        let config = configLoader.loadConfig();
+
+        // Override model if specified
+        if (options.model) {
+          config = {
+            ...config,
+            model: {
+              ...config.model,
+              name: options.model,
+            },
+          };
+        }
+
+        // Override thinking mode if specified
+        if (options.noThinking) {
+          config = {
+            ...config,
+            model: {
+              ...config.model,
+              thinkingEnabled: false,
+            },
+          };
+        }
+
+        // Initialize agent
+        const agent = new AgentFactory(config);
+        await agent.initialize();
+
+        // Use existing SimpleChatApp
+        const { SimpleChatApp } = await import('../ui/SimpleChatApp.js');
+        
+        console.log('🎯 Starting chat interface...');
+        console.log('💡 You can now use natural language for workflows:');
+        console.log('   - "Fix the bug in auth.ts"');
+        console.log('   - "Analyze my code complexity"'); 
+        console.log('   - "Explain how this function works"');
+        console.log('   - Or just chat normally!');
+        
+        // Create cleanup function
+        const cleanup = async () => {
+          await agent.cleanup();
+          process.exit(0);
+        };
+
+        // Render unified chat UI
+        render(React.createElement(SimpleChatApp, {
+          agentFactory: agent,
+          threadId: options.thread,
+          debug: options.debug,
+          onExit: cleanup
+        }));
+
+      } catch (error) {
+        console.error('❌ Failed to start unified chat:', error);
         process.exit(1);
       }
     });
@@ -136,7 +214,7 @@ export function createCLI(): Command {
 
         if (options.test) {
           console.log('🔌 Testing server connections...');
-          const agentFactory = new QiAgentFactory(config);
+          const agentFactory = new AgentFactory(config);
           await agentFactory.initialize();
           
           const connectedServers = await agentFactory.getConnectedServers();
@@ -191,7 +269,7 @@ export function createCLI(): Command {
         const config = configLoader.loadConfig();
 
         // Initialize agent
-        const agentFactory = new QiAgentFactory(config);
+        const agentFactory = new AgentFactory(config);
         await agentFactory.initialize();
 
         console.log(`✏️  Preparing to edit ${files.length} file(s): ${files.join(', ')}`);
@@ -258,7 +336,7 @@ export function createCLI(): Command {
         const config = configLoader.loadConfig();
 
         // Initialize agent
-        const agentFactory = new QiAgentFactory(config);
+        const agentFactory = new AgentFactory(config);
         await agentFactory.initialize();
 
         console.log(`🔍 Preparing to analyze: ${target}`);
@@ -329,7 +407,7 @@ export function createCLI(): Command {
         const config = configLoader.loadConfig();
 
         // Initialize agent
-        const agentFactory = new QiAgentFactory(config);
+        const agentFactory = new AgentFactory(config);
         await agentFactory.initialize();
 
         if (options.concept) {

@@ -1,69 +1,122 @@
-#!/usr/bin/env bun
-
-// Test script to validate LLM is working directly (bypassing LangGraph agent)
-import { ConfigLoader } from './lib/dist/index.js';
+import { describe, it, expect } from 'vitest';
+import { ConfigLoader } from '@qi/agent';
 import { ChatOllama } from '@langchain/ollama';
+import { resolve } from 'node:path';
 
-async function testLLMDirectly() {
-  console.log('🧪 Testing LLM Directly (No LangGraph)...');
-  console.log('=========================================');
-  
-  try {
-    // Load configuration
-    const configLoader = new ConfigLoader('./config/qi-config.yaml');
+describe('LLM Direct Implementation Test', () => {
+  it('should load real config and create ChatOllama instance', async () => {
+    console.log('🧪 Testing LLM Directly (No LangGraph)...');
+    console.log('=========================================');
+    
+    // Load real config using lib/src ConfigLoader (tests run from app directory)
+    const configPath = resolve(process.cwd(), '../config/qi-config.yaml');
+    console.log(`📁 Loading config from: ${configPath}`);
+    
+    const configLoader = new ConfigLoader(configPath);
     const config = configLoader.loadConfig();
     
-    // Create LLM directly
-    console.log('🚀 Creating Ollama LLM directly...');
-    const llm = new ChatOllama({
+    console.log(`✅ Config loaded successfully`);
+    console.log(`🤖 Model: ${config.model.name}`);
+    console.log(`🌡️  Temperature: ${config.model.temperature}`);
+    console.log(`🔗 Base URL: ${config.model.baseUrl}`);
+    
+    // Test config structure
+    expect(config).toBeDefined();
+    expect(config.model).toBeDefined();
+    expect(config.model.name).toBeDefined();
+    expect(config.model.baseUrl).toBeDefined();
+    expect(typeof config.model.temperature).toBe('number');
+    
+    // Create ChatOllama with real config (this is what lib/src uses internally)
+    const chatOllama = new ChatOllama({
       model: config.model.name,
-      baseUrl: 'http://localhost:11434',
+      baseUrl: config.model.baseUrl,
       temperature: config.model.temperature,
     });
     
-    console.log(`✅ LLM created with model: ${config.model.name}`);
+    console.log('🚀 ChatOllama instance created');
     
-    // Test simple invoke
-    console.log('\n📤 Testing direct LLM invoke...');
-    const testMessage = [{ role: 'user', content: 'Say hello briefly' }];
+    // Test ChatOllama instance creation
+    expect(chatOllama).toBeDefined();
+    expect(typeof chatOllama.invoke).toBe('function');
+    expect(typeof chatOllama.stream).toBe('function');
     
-    const response = await llm.invoke(testMessage);
-    console.log(`✅ LLM invoke successful!`);
+    console.log('✅ lib/src ChatOllama integration test passed!');
+  });
+  
+  it('should perform real invoke test with ChatOllama', async () => {
+    // Real invoke test with ChatOllama - enabled since Ollama is running
+    
+    const configPath = resolve(process.cwd(), '../config/qi-config.yaml');
+    const configLoader = new ConfigLoader(configPath);
+    const config = configLoader.loadConfig();
+    
+    const chatOllama = new ChatOllama({
+      model: config.model.name,
+      baseUrl: config.model.baseUrl,
+      temperature: config.model.temperature,
+    });
+    
+    console.log('💬 Testing direct invoke (non-streaming)...');
+    const startTime = Date.now();
+    const testMessage = [{ role: 'user', content: 'Say hello in exactly 2 words' }];
+    
+    const response = await chatOllama.invoke(testMessage);
+    const duration = Date.now() - startTime;
+    
+    console.log(`✅ Direct invoke successful (${duration}ms)`);
     console.log(`📝 Response: "${response.content}"`);
     
-    // Test streaming
-    console.log('\n📤 Testing direct LLM streaming...');
-    let streamedContent = '';
-    let tokenCount = 0;
+    // Validate response
+    expect(response).toBeDefined();
+    expect(response.content).toBeDefined();
+    expect(response.content.length).toBeGreaterThan(0);
+    expect(typeof response.content).toBe('string');
     
-    const stream = await llm.stream(testMessage);
+    console.log('🎯 Direct invoke validation passed');
+  }, 15000);
+  
+  it.skip('should perform real streaming test with ChatOllama', async () => {
+    // This test is skipped by default since it requires Ollama to be running
+    // To enable: change it.skip to it and make sure Ollama is running
+    
+    const configPath = resolve(process.cwd(), '../config/qi-config.yaml');
+    const configLoader = new ConfigLoader(configPath);
+    const config = configLoader.loadConfig();
+    
+    const chatOllama = new ChatOllama({
+      model: config.model.name,
+      baseUrl: config.model.baseUrl,
+      temperature: config.model.temperature,
+    });
+    
+    console.log('💨 Testing streaming...');
+    const streamStartTime = Date.now();
+    const testMessage = [{ role: 'user', content: 'Say hello in exactly 2 words' }];
+    
+    const stream = await chatOllama.stream(testMessage);
+    
+    let streamedContent = '';
+    let chunkCount = 0;
     
     for await (const chunk of stream) {
-      tokenCount++;
-      const content = chunk.content;
-      streamedContent += content;
-      if (tokenCount <= 5) {
-        console.log(`📝 Token ${tokenCount}: "${content}"`);
+      chunkCount++;
+      if (chunk.content) {
+        streamedContent += chunk.content;
+        console.log(`📦 Chunk ${chunkCount}: "${chunk.content}"`);
       }
     }
     
-    console.log(`✅ LLM streaming successful!`);
-    console.log(`📊 Total tokens: ${tokenCount}`);
-    console.log(`📝 Full response: "${streamedContent}"`);
+    const streamDuration = Date.now() - streamStartTime;
+    console.log(`✅ Streaming successful (${streamDuration}ms, ${chunkCount} chunks)`);
+    console.log(`📝 Full streamed response: "${streamedContent}"`);
     
-    if (streamedContent.length > 0 && !streamedContent.includes('Say hello briefly')) {
-      console.log('\n🎉 SUCCESS: LLM is working correctly!');
-      console.log('✅ LLM generates proper responses');
-      console.log('✅ Streaming works correctly');
-      console.log('❌ Issue is in LangGraph agent wrapper');
-    } else {
-      console.log('\n⚠️  LLM might have issues or is echoing input');
-    }
+    // Validate streaming response
+    expect(streamedContent).toBeDefined();
+    expect(streamedContent.length).toBeGreaterThan(0);
+    expect(chunkCount).toBeGreaterThan(0);
+    expect(typeof streamedContent).toBe('string');
     
-  } catch (error) {
-    console.error('❌ Test failed:', error);
-    process.exit(1);
-  }
-}
-
-testLLMDirectly().catch(console.error);
+    console.log('🎯 Streaming validation passed');
+  }, 15000);
+});

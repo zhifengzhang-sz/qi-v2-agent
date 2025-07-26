@@ -285,7 +285,7 @@ bun --cwd app src/main.ts analyze --codebase  # Full project analysis
 ```
 
 **Implementation Approach:**
-- Leverage existing QiAgentFactory for code understanding
+- Leverage existing qi-v2 agentFactory for code understanding
 - Use filesystem MCP server for file reading
 - Implement context-aware analysis similar to Cursor's approach
 
@@ -541,9 +541,9 @@ graph TB
 
 ### Integration with Validated Architecture ✅
 
-**No QiAgentFactory Changes Required:**
+**No qi-v2 agentFactory Changes Required:**
 
-The existing `QiAgentFactory` in `lib/src/agent/factory.ts` already provides all necessary workflow capabilities through the validated `stream()` method. No modifications needed.
+The existing `qi-v2 agentFactory` in `lib/src/agent/factory.ts` already provides all necessary workflow capabilities through the validated `stream()` method. No modifications needed.
 
 **Validated Pattern Benefits:**
 - ✅ **Smart routing** automatically detects workflow tool requirements
@@ -872,7 +872,7 @@ graph TB
 ### Design Principles
 
 1. **Incremental Value** - Each workflow provides immediate user benefit
-2. **Architecture Consistency** - Build on existing QiAgentFactory patterns
+2. **Architecture Consistency** - Build on existing qi-v2 agentFactory patterns
 3. **User Experience** - Follow established CLI patterns from research
 4. **Backward Compatibility** - New workflows don't break existing chat functionality
 5. **Configuration Driven** - Workflows can be enabled/disabled via config
@@ -983,12 +983,12 @@ bun test-mcp-integration.js       # Validate new MCP servers (git, shell)
 ```typescript
 // test/workflows/edit.test.ts - Follows validated patterns
 describe('Edit Workflow', () => {
-  let agentFactory: QiAgentFactory;
+  let agentFactory: qi-v2 agentFactory;
   
   beforeAll(async () => {
     // Use same initialization pattern as validated tests
     const config = configLoader.loadConfig();
-    agentFactory = new QiAgentFactory(config);
+    agentFactory = new QiV2AgentFactory(config);
     await agentFactory.initialize();
   });
   

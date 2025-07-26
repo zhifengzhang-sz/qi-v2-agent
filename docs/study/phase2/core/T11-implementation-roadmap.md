@@ -2,7 +2,7 @@
 
 ## Overview
 
-This roadmap provides a comprehensive 5-7 day execution plan for implementing the Qi V2 Agent based on the Phase 2 implementation guides T1-T10. The plan is designed for accelerated development using the modern toolchain (Bun + Biome + Vitest) and official TypeScript SDKs, enabling rapid delivery while maintaining high quality standards.
+This roadmap provides a comprehensive 5-7 day execution plan for implementing the qi-v2 agent based on the Phase 2 implementation guides T1-T10. The plan is designed for accelerated development using the modern toolchain (Bun + Biome + Vitest) and official TypeScript SDKs, enabling rapid delivery while maintaining high quality standards.
 
 ## Executive Summary
 

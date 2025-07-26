@@ -1,4 +1,4 @@
-# Qi V2 Agent
+# qi-v2 agent
 
 Local AI agent with conversational interface and extensible tool integration.
 
@@ -45,7 +45,7 @@ git clone https://github.com/langchain-ai/langchain-mcp-adapters.git
 
 ## Current Status
 
-**v-0.3.0**: Phase 3 documentation complete. Comprehensive research and implementation guides for RAG system with ChromaDB, streaming responses, and context retrieval. All guides properly integrated with existing QiAgentFactory architecture, ready for implementation.
+**v-0.3.0**: Phase 3 documentation complete. Comprehensive research and implementation guides for RAG system with ChromaDB, streaming responses, and context retrieval. All guides properly integrated with existing qi-v2 agent factory architecture, ready for implementation.
 
 ## Quick Start
 

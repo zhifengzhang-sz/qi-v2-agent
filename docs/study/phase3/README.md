@@ -25,7 +25,7 @@ All Phase 3 implementation guides are based on comprehensive research of current
 
 ### Integration Strategy
 
-**Primary Integration Point**: `lib/src/agent/factory.ts` (`QiAgentFactory` class)
+**Primary Integration Point**: `lib/src/agent/factory.ts` (`qi-v2 agentFactory` class)
 - All Phase 3 enhancements extend the existing factory pattern
 - Maintains backward compatibility with Phase 2 functionality  
 - Enables gradual feature adoption through configuration flags
@@ -33,19 +33,19 @@ All Phase 3 implementation guides are based on comprehensive research of current
 ### Day 3: Agent & RAG Implementation
 
 **Morning: Enhanced Streaming (T3-1)**
-- **Extend `QiAgentFactory`** with `streamWithMode()` method
+- **Extend `qi-v2 agentFactory`** with `streamWithMode()` method
 - **Add streaming capabilities** to existing agent (not replace)
 - **Update existing types** in `lib/src/utils/types.ts`
 - **Integrate with existing CLI** commands
 
 **Afternoon: RAG Integration (T3-2)**
-- **Enhance `QiAgentFactory.initialize()`** to optionally include RAG
+- **Enhance `qi-v2 agentFactory.initialize()`** to optionally include RAG
 - **Add `invokeWithRAG()`** method extending existing `invoke()`
 - **Update existing config schema** to include optional RAG settings
 - **ChromaDB integration** as new dependency, not replacement
 
 **Evening: Advanced Context (T3-3)**
-- **Add `invokeWithAdvancedContext()`** to `QiAgentFactory`
+- **Add `invokeWithAdvancedContext()`** to `qi-v2 agentFactory`
 - **Integrate semantic search** with existing RAG pipeline
 - **Enhance existing configuration** with context assembly options
 - **CLI integration** with advanced context options

@@ -1,0 +1,301 @@
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
+import type { AgentFactory } from '../agent/unified-factory.js';
+import type { AgentMessage } from '../utils/types.js';
+
+export interface WorkflowToolsConfig {
+  agentFactory: AgentFactory;
+  threadId?: string;
+}
+
+/**
+ * Creates workflow messages that trigger smart routing to LangGraph agent
+ * These are the same patterns used by the existing CLI commands
+ */
+function createEditWorkflowMessages(files: string[], instruction: string): AgentMessage[] {
+  const fileList = files.length > 0 ? files.join(', ') : 'the specified files';
+  
+  return [{
+    role: 'user' as const,
+    content: `I need help editing these files: ${fileList}
+
+Instructions: ${instruction}
+
+Please:
+1. Read the files to understand the current code
+2. Analyze the code structure and identify areas for improvement
+3. Make the requested changes following best practices
+4. Write the updated files with clear explanations of changes made
+
+Use the filesystem tools to read and write files as needed. Focus on code quality, maintainability, and following TypeScript/JavaScript best practices.`
+  }];
+}
+
+function createAnalyzeWorkflowMessages(target: string, options: { complexity?: boolean, dependencies?: boolean, format?: string }): AgentMessage[] {
+  const analysisScope = `Please analyze the file or directory: ${target}`;
+  
+  let focusAreas = [];
+  if (options.complexity) {
+    focusAreas.push('code complexity and cyclomatic complexity');
+  }
+  if (options.dependencies) {
+    focusAreas.push('dependencies, imports, and module relationships');
+  }
+  
+  const focusText = focusAreas.length > 0 
+    ? `Focus particularly on: ${focusAreas.join(', ')}.`
+    : 'Provide a comprehensive analysis including code quality, structure, and potential improvements.';
+  
+  return [{
+    role: 'user' as const,
+    content: `I need a detailed code analysis.
+
+${analysisScope}
+
+${focusText}
+
+Please:
+1. Read and examine the files thoroughly
+2. Analyze code structure, patterns, and architecture
+3. Identify complexity issues and potential improvements
+4. Check for code quality and maintainability concerns
+5. Provide actionable recommendations
+
+Use the filesystem tools to read files and directories as needed. Present the analysis in a clear, structured format${options.format === 'json' ? ' as JSON' : options.format === 'markdown' ? ' using markdown formatting' : ''}.`
+  }];
+}
+
+function createExplainWorkflowMessages(target: string, options: { concept?: string, level?: string }): AgentMessage[] {
+  let explanation = '';
+  
+  if (options.concept) {
+    explanation = `Please explain the programming concept: "${options.concept}"
+    
+Provide a clear explanation suitable for ${options.level || 'intermediate'} level understanding.`;
+  } else {
+    explanation = `Please explain the code in: ${target}
+    
+Explanation level: ${options.level || 'intermediate'}`;
+  }
+  
+  return [{
+    role: 'user' as const,
+    content: `I need help understanding this code.
+
+${explanation}
+
+Please:
+1. ${options.concept ? 'Explain the concept clearly with examples' : 'Read and examine the file'}
+2. Break down complex parts into understandable components  
+3. Explain the purpose and functionality
+4. Provide context and practical examples
+5. Suggest best practices and common patterns
+
+${options.concept ? '' : 'Use the filesystem tools to read the file as needed.'}
+
+Make the explanation clear, educational, and appropriate for the specified level.`
+  }];
+}
+
+/**
+ * Creates workflow tools that can be used by LangChain agents
+ * These tools wrap the existing workflow message patterns and execute them
+ * through the AgentFactory.stream method
+ */
+export function createWorkflowTools(config: WorkflowToolsConfig) {
+  const { agentFactory, threadId } = config;
+
+  const editFilesTool = tool(
+    async ({ files, instruction }) => {
+      try {
+        console.log(`🔧 Edit workflow triggered for files: ${files.join(', ')}`);
+        console.log(`📝 Instruction: ${instruction}`);
+        
+        const workflowMessages = createEditWorkflowMessages(files, instruction);
+        
+        let response = '';
+        let isComplete = false;
+        
+        await agentFactory.stream(workflowMessages, {
+          onToken: (token) => {
+            response += token;
+          },
+          onComplete: (final) => {
+            response = final || response;
+            isComplete = true;
+          },
+          onError: (error) => {
+            console.error('Edit workflow error:', error);
+            throw error;
+          }
+        }, threadId);
+        
+        // Wait for completion
+        let attempts = 0;
+        while (!isComplete && attempts < 100) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        console.log(`✅ Edit workflow completed for ${files.length} file(s)`);
+        return `Successfully processed edit request for ${files.join(', ')}:\n\n${response}`;
+      } catch (error) {
+        const errorMessage = `Edit workflow failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(errorMessage);
+        return errorMessage;
+      }
+    },
+    {
+      name: "edit_files",
+      description: `Edit, modify, fix, or update code files with natural language instructions.
+
+WHEN TO USE:
+- User wants to fix bugs or issues in code
+- User wants to modify existing functionality  
+- User wants to add new features to files
+- User wants to refactor or improve code
+- User says: "fix the bug in auth.ts", "add error handling", "refactor the function"
+
+EXAMPLES:
+- "Fix the null check issue in auth.ts" → files: ["auth.ts"], instruction: "fix null check issue"
+- "Add logging to utils.js" → files: ["utils.js"], instruction: "add logging functionality"`,
+      schema: z.object({
+        files: z.array(z.string()).describe("Array of file paths to edit"),
+        instruction: z.string().describe("Detailed instruction describing what changes to make")
+      })
+    }
+  );
+
+  const analyzeCodeTool = tool(
+    async ({ target, options = {} }) => {
+      try {
+        console.log(`🔍 Analyze workflow triggered for: ${target}`);
+        if (options.complexity) console.log('📊 Complexity analysis enabled');
+        if (options.dependencies) console.log('📦 Dependency analysis enabled');
+        
+        const workflowMessages = createAnalyzeWorkflowMessages(target, options);
+        
+        let response = '';
+        let isComplete = false;
+        
+        await agentFactory.stream(workflowMessages, {
+          onToken: (token) => {
+            response += token;
+          },
+          onComplete: (final) => {
+            response = final || response;
+            isComplete = true;
+          },
+          onError: (error) => {
+            console.error('Analyze workflow error:', error);
+            throw error;
+          }
+        }, threadId);
+        
+        // Wait for completion
+        let attempts = 0;
+        while (!isComplete && attempts < 100) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        console.log(`✅ Analysis completed for: ${target}`);
+        return `Code analysis complete for ${target}:\n\n${response}`;
+      } catch (error) {
+        const errorMessage = `Analysis workflow failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(errorMessage);
+        return errorMessage;
+      }
+    },
+    {
+      name: "analyze_code",
+      description: `Analyze code complexity, structure, dependencies, and quality.
+
+WHEN TO USE:
+- User wants to check code complexity or quality
+- User wants to analyze file or directory structure
+- User wants to review dependencies and imports  
+- User wants insights about codebase
+- User says: "analyze my code", "check complexity", "review dependencies"
+
+EXAMPLES:
+- "Analyze the complexity of utils.js" → target: "utils.js", options: {complexity: true}
+- "Check dependencies in src/" → target: "src/", options: {dependencies: true}`,
+      schema: z.object({
+        target: z.string().describe("File, directory, or code pattern to analyze"),
+        options: z.object({
+          complexity: z.boolean().optional().describe("Focus on complexity analysis"),
+          dependencies: z.boolean().optional().describe("Analyze dependencies and imports"),
+          format: z.string().optional().describe("Output format: text, json, or markdown")
+        }).optional().describe("Analysis options")
+      })
+    }
+  );
+
+  const explainConceptTool = tool(
+    async ({ target, options = {} }) => {
+      try {
+        console.log(`📚 Explain workflow triggered for: ${target}`);
+        if (options.concept) console.log(`💡 Explaining concept: ${options.concept}`);
+        if (options.level) console.log(`🎯 Level: ${options.level}`);
+        
+        const workflowMessages = createExplainWorkflowMessages(target, options);
+        
+        let response = '';
+        let isComplete = false;
+        
+        await agentFactory.stream(workflowMessages, {
+          onToken: (token) => {
+            response += token;
+          },
+          onComplete: (final) => {
+            response = final || response;
+            isComplete = true;
+          },
+          onError: (error) => {
+            console.error('Explain workflow error:', error);
+            throw error;
+          }
+        }, threadId);
+        
+        // Wait for completion
+        let attempts = 0;
+        while (!isComplete && attempts < 100) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        console.log(`✅ Explanation completed for: ${target}`);
+        return `Explanation for ${target}:\n\n${response}`;
+      } catch (error) {
+        const errorMessage = `Explanation workflow failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(errorMessage);
+        return errorMessage;
+      }
+    },
+    {
+      name: "explain_concept",
+      description: `Explain code concepts, functions, or programming topics.
+
+WHEN TO USE:
+- User wants to understand specific code or functions
+- User wants to learn programming concepts  
+- User wants explanations of complex logic
+- User needs educational assistance
+- User says: "explain this function", "how does async work", "what is this code doing"
+
+EXAMPLES:
+- "Explain how async/await works" → target: "async/await", options: {concept: "async/await", level: "intermediate"}
+- "Explain this function in utils.js" → target: "utils.js", options: {level: "beginner"}`,
+      schema: z.object({
+        target: z.string().describe("File path, function, or concept to explain"),
+        options: z.object({
+          concept: z.string().optional().describe("Specific programming concept to explain"),
+          level: z.string().optional().describe("Explanation level: beginner, intermediate, or advanced")
+        }).optional().describe("Explanation options")
+      })
+    }
+  );
+
+  return [editFilesTool, analyzeCodeTool, explainConceptTool];
+}

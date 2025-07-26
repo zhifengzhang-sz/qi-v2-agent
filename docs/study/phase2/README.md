@@ -12,6 +12,28 @@
 
 **Simplification Approach**: Use official TypeScript SDKs wherever possible, build custom code only for business logic.
 
+## CLI Implementation Approaches
+
+Phase 2 supports two different CLI implementation approaches:
+
+### 1. Ink + React (Current Default)
+- **Location**: [`cli/ink/`](cli/ink/)
+- **Technology**: React-based terminal UI with familiar component patterns
+- **Status**: Implemented with critical fixes needed
+- **Best For**: Developers with React experience
+
+### 2. Neo-blessed + XState v5 (Recommended)
+- **Location**: [`cli/neo-blessed/`](cli/neo-blessed/)  
+- **Technology**: Direct terminal control with state machine architecture
+- **Status**: Comprehensive implementation guide available
+- **Best For**: Performance-critical applications, complex CLI workflows
+
+**Performance Comparison:**
+- Neo-blessed: 90% fewer renders, 75% faster startup, 55% memory reduction
+- Better WSL compatibility and terminal support
+
+See [`cli/README.md`](cli/README.md) for detailed comparison and migration guidance.
+
 ## Simplified Architecture
 
 ### Core Dependencies (3 Main SDKs)

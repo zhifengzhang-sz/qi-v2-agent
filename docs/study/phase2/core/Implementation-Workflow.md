@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides step-by-step implementation instructions for building the Qi V2 Agent using TypeScript SDKs. Follow this workflow to go from empty project to working agent in 5-7 days.
+This guide provides step-by-step implementation instructions for building the qi-v2 agent using TypeScript SDKs. Follow this workflow to go from empty project to working agent in 5-7 days.
 
 **Core Principle**: Use official SDKs wherever possible. Custom code only for business logic.
 
@@ -50,7 +50,7 @@ src/
 import { ChatOllama } from '@langchain/ollama';
 
 async function main() {
-  console.log('🤖 Qi Agent V2 - Starting...');
+  console.log('🤖 qi-v2 agent - Starting...');
   
   // Test Ollama connection
   const model = new ChatOllama({
@@ -75,7 +75,7 @@ main().catch(console.error);
 bun run src/main.ts
 
 # Expected output:
-# 🤖 Qi Agent V2 - Starting...
+# 🤖 qi-v2 agent - Starting...
 # ✅ Agent Response: Hello! Yes, I'm working correctly.
 # 🎉 Foundation working!
 ```
@@ -119,7 +119,7 @@ export async function createQiAgent() {
 import { createQiAgent } from './agents/core-agent.js';
 
 async function main() {
-  console.log('🤖 Qi Agent V2 - Starting...');
+  console.log('🤖 qi-v2 agent - Starting...');
   
   const agent = await createQiAgent();
   
@@ -224,7 +224,7 @@ export async function createQiAgent() {
 import { createQiAgent } from './agents/core-agent.js';
 
 async function main() {
-  console.log('🤖 Qi Agent V2 - Starting with MCP...');
+  console.log('🤖 qi-v2 agent - Starting with MCP...');
   
   const { agent } = await createQiAgent();
   
@@ -396,7 +396,7 @@ import { loadConfig } from './config/loader.js';
 import { createQiAgent } from './agents/core-agent.js';
 
 async function main() {
-  console.log('🤖 Qi Agent V2 - Loading configuration...');
+  console.log('🤖 qi-v2 agent - Loading configuration...');
   
   const config = loadConfig();
   const agent = await createQiAgent(config);
@@ -475,7 +475,7 @@ export function App({ agent }: AppProps) {
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text color="cyan" bold>🤖 Qi Agent V2</Text>
+      <Text color="cyan" bold>🤖 qi-v2 agent</Text>
       <Text color="gray">Type your message and press Enter. Ctrl+C to exit.</Text>
       
       <Box flexDirection="column" marginY={1}>
@@ -514,7 +514,7 @@ import { createQiAgent } from './agents/core-agent.js';
 import { App } from './ui/app.js';
 
 async function main() {
-  console.log('🤖 Qi Agent V2 - Starting...');
+  console.log('🤖 qi-v2 agent - Starting...');
   
   const config = loadConfig();
   const agent = await createQiAgent(config);
@@ -800,7 +800,7 @@ console.log(`📦 Generated ${result.outputs.length} files`);
 ### Step 7.5: Documentation
 **File: `README.md`**
 ```markdown
-# Qi Agent V2
+# qi-v2 agent
 
 A local AI coding assistant built with TypeScript SDKs.
 

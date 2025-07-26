@@ -1,6 +1,6 @@
 import { render } from 'ink';
 import React from 'react';
-import type { QiAgentFactory } from '@qi/agent';
+import type { AgentFactory } from '@qi/agent';
 import { SimpleChatApp } from '../ui/SimpleChatApp.js';
 
 export interface ChatWorkflowOptions {
@@ -9,10 +9,10 @@ export interface ChatWorkflowOptions {
 }
 
 export class ChatWorkflow {
-  private agentFactory: QiAgentFactory;
+  private agentFactory: AgentFactory;
   private options: ChatWorkflowOptions;
 
-  constructor(agentFactory: QiAgentFactory, options: ChatWorkflowOptions = {}) {
+  constructor(agentFactory: AgentFactory, options: ChatWorkflowOptions = {}) {
     this.agentFactory = agentFactory;
     this.options = options;
   }

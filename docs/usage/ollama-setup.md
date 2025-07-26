@@ -91,7 +91,7 @@ bun --cwd app src/main.ts chat
 bun --cwd app src/main.ts chat --debug
 
 # If UI still doesn't appear, the welcome message should show:
-# "🤖 Qi Agent V2 - Ready!" 
+# "🤖 qi-v2 agent - Ready!" 
 # Type your message and press Enter even if you don't see a prompt
 ```
 

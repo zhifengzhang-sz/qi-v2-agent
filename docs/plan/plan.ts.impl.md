@@ -450,7 +450,7 @@ describe('Agent Integration Tests', () => {
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 
-export class QiAgentFactory {
+export class qi-v2 agentFactory {
   async createAgent(config: QiConfig) {
     // MCP integration with automatic tool loading
     const mcpClient = new MultiServerMCPClient({
@@ -617,12 +617,12 @@ export class TrustedServerManager {
 ### Unit Testing
 ```typescript
 // tests/unit/agent.test.ts
-import { QiAgentFactory } from '../../src/agent/factory';
+import { QiV2AgentFactory } } from '../../src/agent/factory';
 
-describe('QiAgentFactory', () => {
+describe('qi-v2 agentFactory', () => {
   it('creates agent with correct configuration', async () => {
     const config = { /* test config */ };
-    const factory = new QiAgentFactory();
+    const factory = new QiV2AgentFactory();
     const agent = await factory.createAgent(config);
     
     expect(agent).toBeDefined();

@@ -598,7 +598,7 @@ interface MCPServerConfig {
   port?: number;
 }
 
-interface QiAgentConfig {
+interface qi-v2 agentConfig {
   servers: Record<string, MCPServerConfig>;
   model: {
     provider: 'anthropic' | 'openai' | 'ollama';
@@ -616,7 +616,7 @@ interface QiAgentConfig {
 class ConfigManager {
   private configPath: string;
   
-  async loadConfig(): Promise<QiAgentConfig> {
+  async loadConfig(): Promise<qi-v2 agentConfig> {
     try {
       if (fs.existsSync(this.configPath)) {
         const content = await fs.promises.readFile(this.configPath, 'utf-8');
@@ -632,7 +632,7 @@ class ConfigManager {
     }
   }
   
-  private getDefaultConfig(): QiAgentConfig {
+  private getDefaultConfig(): qi-v2 agentConfig {
     return {
       servers: {
         'time-server': {

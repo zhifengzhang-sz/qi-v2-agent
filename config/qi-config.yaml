@@ -9,7 +9,7 @@ mcp:
     filesystem:
       transport: stdio
       command: "npx"
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
     
     # Example: Additional servers can be added here
     # git:

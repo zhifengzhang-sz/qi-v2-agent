@@ -26,5 +26,8 @@
     "bun-types": "^1.1.38",
     "typescript": "^5.6.3",
     "chalk": "^5.4.1"
+  },
+  "dependencies": {
+    "react-devtools-core": "^6.1.5"
   }
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a comprehensive guide for setting up the Qi V2 Agent project using Bun runtime with native TypeScript support. Based on Phase 1 analysis and 2025 toolchain research, this setup eliminates traditional Node.js complexity while providing superior performance.
+This document provides a comprehensive guide for setting up the qi-v2 agent project using Bun runtime with native TypeScript support. Based on Phase 1 analysis and 2025 toolchain research, this setup eliminates traditional Node.js complexity while providing superior performance.
 
 ## Bun Installation & Setup
 
@@ -275,7 +275,7 @@ qi-v2-agent/
 
 import { Command } from 'commander';
 import { version } from '../package.json';
-import { QiAgent } from './agent/factory.js';
+import { QiV2AgentFactory } from './agent/factory.js';
 import { ConfigManager } from './config/manager.js';
 import { logger } from './utils/logger.js';
 
@@ -301,7 +301,7 @@ program
       const configManager = new ConfigManager(options.config);
       const config = await configManager.load();
       
-      const agent = new QiAgent(config);
+      const agent = new QiV2AgentFactory(config);
       await agent.start();
       
       logger.info('Qi Agent started successfully');
@@ -437,7 +437,7 @@ export async function verifySetup(): Promise<boolean> {
     }}
   ];
 
-  logger.info('🔍 Verifying Qi V2 Agent setup...');
+  logger.info('🔍 Verifying qi-v2 agent setup...');
 
   let allPassed = true;
   for (const check of checks) {
@@ -472,7 +472,7 @@ if (import.meta.main) {
 bun run src/verify-setup.ts
 
 # Expected output:
-# 🔍 Verifying Qi V2 Agent setup...
+# 🔍 Verifying qi-v2 agent setup...
 # ✅ Bun Runtime
 # ✅ TypeScript Support  
 # ✅ Module Resolution
@@ -512,4 +512,4 @@ rm -rf node_modules bun.lockb
 bun install
 ```
 
-This T1 setup provides a solid foundation for the Qi V2 Agent with modern Bun runtime, native TypeScript support, and optimal performance configuration for the development workflow.
+This T1 setup provides a solid foundation for the qi-v2 agent with modern Bun runtime, native TypeScript support, and optimal performance configuration for the development workflow.

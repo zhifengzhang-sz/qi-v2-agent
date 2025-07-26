@@ -4,9 +4,9 @@ import { MemorySaver } from '@langchain/langgraph';
 import { OllamaLLM } from '../llm/ollama.js';
 import { MCPManager } from '../mcp/manager.js';
 import type { QiConfig } from '../config/schema.js';
-import type { AgentMessage, StreamingOptions, AgentResponse } from '../utils/types.js';
+import type { AgentMessage, StreamingOptions, AgentResponse, IAgentFactory } from '../utils/types.js';
 
-export class QiAgentFactory {
+export class ChatAgentFactory implements IAgentFactory {
   private config: QiConfig;
   private llm: OllamaLLM;
   private mcpManager: MCPManager;
@@ -20,7 +20,7 @@ export class QiAgentFactory {
   }
 
   async initialize(): Promise<void> {
-    console.log('🤖 Initializing Qi Agent...');
+    console.log('🤖 Initializing qi-v2 agent...');
 
     // Initialize memory if enabled
     if (this.config.memory.enabled) {
@@ -42,7 +42,7 @@ export class QiAgentFactory {
       llm: this.llm.getModel(),
       tools,
       ...(this.memorySaver && { checkpointSaver: this.memorySaver }),
-      systemMessage: `You are Qi Agent V2, a helpful AI coding assistant. 
+      messageModifier: `You are qi-v2 agent, a helpful AI coding assistant. 
 
 For conversational messages, respond naturally and helpfully.
 For tasks requiring file operations, use the available tools.
@@ -117,21 +117,39 @@ Always be concise and helpful in your responses.`
       }));
 
       // Smart routing: simple conversation vs tool requests
-      const needsTools = messages.some(msg => 
-        msg.content.toLowerCase().includes('file') ||
-        msg.content.toLowerCase().includes('directory') ||
-        msg.content.toLowerCase().includes('list') ||
-        msg.content.toLowerCase().includes('read') ||
-        msg.content.toLowerCase().includes('write') ||
-        msg.content.toLowerCase().includes('help me') ||
-        msg.content.toLowerCase().includes('can you')
-      );
+      const needsTools = messages.some(msg => {
+        const content = msg.content.toLowerCase();
+        
+        // File/directory operations that need tools
+        const fileOperations = content.includes('file ') || 
+                              content.includes('directory') ||
+                              content.includes('folder') ||
+                              content.includes('read file') ||
+                              content.includes('write file') ||
+                              content.includes('create file') ||
+                              content.includes('list files') ||
+                              content.includes('.js') ||
+                              content.includes('.ts') ||
+                              content.includes('.py') ||
+                              content.includes('.md');
+        
+        // Exclude programming requests that use "write" but mean code generation
+        const codeGeneration = content.includes('write a') ||
+                              content.includes('write some') ||
+                              content.includes('create a') ||
+                              content.includes('show me') ||
+                              content.includes('program') ||
+                              content.includes('function') ||
+                              content.includes('algorithm');
+        
+        return fileOperations && !codeGeneration;
+      });
       
       if (!needsTools) {
         console.log('💬 Simple conversation - using direct LLM');
         try {
           await this.llm.stream([
-            { role: 'system', content: 'You are Qi Agent V2, a helpful AI coding assistant. Respond naturally and helpfully.' },
+            { role: 'system', content: 'You are qi-v2 agent, a helpful AI coding assistant. Respond naturally and helpfully.' },
             ...langchainMessages
           ], options);
           return;
@@ -166,11 +184,11 @@ Always be concise and helpful in your responses.`
       // Add timeout as fallback, but try to complete naturally first
       const streamTimeout = setTimeout(() => {
         if (!streamCompleted) {
-          console.warn(`⚠️ Stream timeout after 5 seconds - completing with current response`);
+          console.warn(`⚠️ Stream timeout after 30 seconds - completing with current response`);
           streamCompleted = true;
           onComplete?.(fullResponse);
         }
-      }, 5000);
+      }, 30000); // Increased timeout for slow models
       
       try {
         for await (const chunk of stream) {

@@ -21,7 +21,7 @@ bunx @biomejs/biome --version  # Should show v1.9.4+
 
 ### Biome Configuration
 
-**`biome.json`** - Comprehensive configuration for Qi V2 Agent:
+**`biome.json`** - Comprehensive configuration for qi-v2 agent:
 ```json
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",

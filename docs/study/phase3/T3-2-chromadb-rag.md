@@ -419,16 +419,16 @@ export class RAGPipeline {
 }
 ```
 
-### Step 4: Integration with Existing QiAgentFactory
+### Step 4: Integration with Existing qi-v2 agentFactory
 
 **File: `lib/src/agent/factory.ts` (RAG Enhancement)**
 ```typescript
-// Add to existing QiAgentFactory class
+// Add to existing qi-v2 agentFactory class
 
 import { RAGPipeline } from '../rag/rag-pipeline.js';
 import { ContextManager } from '../rag/context-manager.js';
 
-export class QiAgentFactory {
+export class qi-v2 agentFactory {
   // ... existing properties ...
   private ragPipeline?: RAGPipeline;
   private contextManager?: ContextManager;

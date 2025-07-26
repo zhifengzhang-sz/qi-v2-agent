@@ -173,7 +173,7 @@ await using session = await sessionManager.createSession({ serverName });
 ### 1. Agent Factory Pattern
 ```typescript
 // Instead of custom ReAct implementation:
-class QiAgentFactory {
+class qi-v2 agentFactory {
   async createAgent(config: AgentConfig) {
     const mcpTools = await this.mcpClient.get_tools();
     return createReactAgent({

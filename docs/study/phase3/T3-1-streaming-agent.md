@@ -20,13 +20,13 @@ This guide implements enhanced LangGraph agent with real-time streaming capabili
 
 ## Implementation Strategy
 
-### Step 1: Extend Existing QiAgentFactory
+### Step 1: Extend Existing qi-v2 agentFactory
 
 **File: `lib/src/agent/factory.ts` (Enhancement)**
 ```typescript
-// Add to existing QiAgentFactory class
+// Add to existing qi-v2 agentFactory class
 
-export class QiAgentFactory {
+export class qi-v2 agentFactory {
   // ... existing properties ...
   private streamingModes = ['messages', 'values', 'updates', 'custom'] as const;
   private currentStreamMode: typeof this.streamingModes[number] = 'messages';
@@ -259,7 +259,7 @@ export function createCLI() {
     .option('--show-updates', 'Show internal state updates', false)
     .action(async (options) => {
       const config = await loadConfig();
-      const agentFactory = new QiAgentFactory(config);
+      const agentFactory = new QiV2AgentFactory(config);
       await agentFactory.initialize();
 
       // Use enhanced streaming with selected mode

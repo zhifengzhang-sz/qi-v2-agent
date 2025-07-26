@@ -845,16 +845,16 @@ export class ContextAssembler {
 }
 ```
 
-### Step 3: Integration with Existing QiAgentFactory
+### Step 3: Integration with Existing qi-v2 agentFactory
 
 **File: `lib/src/agent/factory.ts` (Context Enhancement)**
 ```typescript
-// Add to existing QiAgentFactory class
+// Add to existing qi-v2 agentFactory class
 
 import { SemanticSearchEngine, type SearchContext } from '../context/semantic-search-engine.js';
 import { ContextAssembler, type AssembledContext } from '../context/context-assembler.js';
 
-export class QiAgentFactory {
+export class qi-v2 agentFactory {
   // ... existing properties ...
   private semanticSearchEngine?: SemanticSearchEngine;
   private contextAssembler?: ContextAssembler;
@@ -1111,7 +1111,7 @@ export function createCLI() {
     .option('--advanced-context', 'Use advanced semantic context retrieval', false)
     .action(async (options) => {
       const config = await loadConfig();
-      const agentFactory = new QiAgentFactory(config);
+      const agentFactory = new QiV2AgentFactory(config);
       await agentFactory.initialize();
 
       // Use appropriate invocation method based on options
@@ -1141,7 +1141,7 @@ export function createCLI() {
         process.exit(1);
       }
 
-      const agentFactory = new QiAgentFactory(config);
+      const agentFactory = new QiV2AgentFactory(config);
       await agentFactory.initialize();
       
       console.log(`📚 Indexing codebase: ${path}`);

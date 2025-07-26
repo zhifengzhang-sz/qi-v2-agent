@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TextInput, Spinner } from '@inkjs/ui';
-import type { QiAgentFactory, AgentMessage } from '@qi/agent';
+import type { AgentFactory, AgentMessage } from '@qi/agent';
 
 interface ChatAppProps {
-  agentFactory: QiAgentFactory;
+  agentFactory: AgentFactory;
   threadId?: string;
   debug?: boolean;
   onExit: () => Promise<void>;
@@ -38,7 +38,7 @@ export function ChatApp({ agentFactory, threadId, debug, onExit }: ChatAppProps)
         {
           id: '0',
           role: 'system',
-          content: `🤖 Qi Agent V2 - Ready!\\n\\nModel: ${config.model.name}\\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\\n\\nType your message and press Enter. Press Ctrl+C to exit.`,
+          content: `🤖 qi-v2 agent - Ready!\\n\\nModel: ${config.model.name}\\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\\n\\nType your message and press Enter. Press Ctrl+C to exit.`,
           timestamp: new Date(),
         },
       ]);
@@ -167,7 +167,7 @@ export function ChatApp({ agentFactory, threadId, debug, onExit }: ChatAppProps)
       {/* Header */}
       <Box marginBottom={1}>
         <Text color="cyan" bold>
-          🤖 Qi Agent V2
+          🤖 qi-v2 agent
         </Text>
       </Box>
 

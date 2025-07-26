@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, Static } from 'ink';
-import type { QiAgentFactory, AgentMessage } from '@qi/agent';
+import type { IAgentFactory, AgentMessage } from '@qi/agent';
 
 interface SimpleChatAppProps {
-  agentFactory: QiAgentFactory;
+  agentFactory: IAgentFactory;
   threadId?: string;
   debug?: boolean;
   onExit: () => Promise<void>;
@@ -29,7 +29,7 @@ export function SimpleChatApp({ agentFactory, threadId, debug, onExit, initialMe
     const systemMessage = {
       id: '0',
       role: 'system' as const,
-      content: `🤖 Qi Agent V2 - Ready!\n\nModel: ${config.model.name}\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\n\n${initialMessages ? 'Starting workflow...' : 'Type your message and press Enter. Press Ctrl+C to exit.'}`,
+      content: `🤖 qi-v2 agent - Ready!\n\nModel: ${config.model.name}\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\n\n${initialMessages ? 'Starting workflow...' : 'Type your message and press Enter. Press Ctrl+C to exit.'}`,
       timestamp: new Date(),
     };
     
@@ -115,11 +115,22 @@ export function SimpleChatApp({ agentFactory, threadId, debug, onExit, initialMe
       return;
     }
 
-    if (key.backspace) {
+    // Handle Ctrl+Backspace (delete word) - must come before regular backspace
+    if (key.ctrl && key.backspace) {
+      setInput(prev => {
+        const words = prev.trim().split(/\s+/);
+        return words.length > 1 ? words.slice(0, -1).join(' ') + ' ' : '';
+      });
+      return;
+    }
+
+    // Handle both backspace and delete keys for single character deletion
+    if (key.backspace || key.delete) {
       setInput(prev => prev.slice(0, -1));
       return;
     }
 
+    // Only add input if it's not a control key
     if (input && !key.ctrl && !key.meta) {
       setInput(prev => prev + input);
     }
@@ -226,13 +237,175 @@ export function SimpleChatApp({ agentFactory, threadId, debug, onExit, initialMe
     }
   };
 
+  // Slash command registry
+  const slashCommands = useMemo(() => ({
+    help: {
+      description: 'Show available commands',
+      handler: () => {
+        const helpText = `Available slash commands:
+/help - Show this help message
+/exit, /quit - Exit the application
+/clear - Clear chat history
+/model - Show current model information
+/debug - Toggle debug mode
+/config - Show current configuration
+/reset - Reset conversation thread
+
+Tips:
+- Press Ctrl+C to exit at any time
+- Use backspace/delete to edit input
+- Use Ctrl+Backspace to delete words`;
+        
+        const systemMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: helpText,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, systemMessage]);
+      }
+    },
+    exit: {
+      description: 'Exit the application',
+      handler: () => onExit()
+    },
+    quit: {
+      description: 'Exit the application',
+      handler: () => onExit()
+    },
+    clear: {
+      description: 'Clear chat history',
+      handler: () => {
+        const config = agentFactory.getConfig();
+        const systemMessage: ChatMessage = {
+          id: '0',
+          role: 'system',
+          content: `🤖 qi-v2 agent - Ready!\n\nModel: ${config.model.name}\nThinking: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}\n\nChat history cleared. Type your message and press Enter.`,
+          timestamp: new Date(),
+        };
+        setMessages([systemMessage]);
+      }
+    },
+    model: {
+      description: 'Show current model information',
+      handler: () => {
+        const config = agentFactory.getConfig();
+        const modelInfo = `Current Model Configuration:
+• Name: ${config.model.name}
+• Temperature: ${config.model.temperature}
+• Base URL: ${config.model.baseUrl}
+• Thinking Mode: ${config.model.thinkingEnabled ? 'Enabled' : 'Disabled'}`;
+        
+        const systemMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: modelInfo,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, systemMessage]);
+      }
+    },
+    debug: {
+      description: 'Toggle debug mode',
+      handler: () => {
+        const newDebugState = !debug;
+        const systemMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: `Debug mode ${newDebugState ? 'enabled' : 'disabled'}. ${newDebugState ? 'Timestamps will be shown.' : 'Timestamps are hidden.'}`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, systemMessage]);
+        // Note: This would need to be passed up to parent component to actually change debug state
+      }
+    },
+    config: {
+      description: 'Show current configuration',
+      handler: () => {
+        const config = agentFactory.getConfig();
+        const configInfo = `Current Configuration:
+• Model: ${config.model.name} (${config.model.temperature} temp)
+• Memory: ${config.memory.enabled ? 'Enabled' : 'Disabled'}
+• UI Theme: ${config.ui.theme}
+• Timestamps: ${config.ui.showTimestamps ? 'Enabled' : 'Disabled'}
+• Progress Indicators: ${config.ui.progressIndicators ? 'Enabled' : 'Disabled'}`;
+        
+        const systemMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: configInfo,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, systemMessage]);
+      }
+    },
+    reset: {
+      description: 'Reset conversation thread',
+      handler: () => {
+        const systemMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: '🔄 Conversation thread reset. Previous context cleared.',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, systemMessage]);
+        // Note: This would reset the threadId in a full implementation
+      }
+    }
+  }), [agentFactory, debug, onExit]);
+
   const handleSubmit = async () => {
     if (!input.trim() || isLoading) return;
 
+    const trimmedInput = input.trim();
+    
+    // Check for slash commands
+    if (trimmedInput.startsWith('/')) {
+      const commandParts = trimmedInput.slice(1).split(' ');
+      const commandName = commandParts[0].toLowerCase();
+      const commandArgs = commandParts.slice(1);
+      
+      // Show user's command in chat
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: trimmedInput,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      
+      // Execute command
+      const command = slashCommands[commandName as keyof typeof slashCommands];
+      if (command) {
+        try {
+          command.handler();
+        } catch (error) {
+          const errorMessage: ChatMessage = {
+            id: Date.now().toString(),
+            role: 'system',
+            content: `❌ Command error: ${error instanceof Error ? error.message : String(error)}`,
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        }
+      } else {
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: `❌ Unknown command: ${commandName}. Type /help to see available commands.`,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+      return;
+    }
+
+    // Regular message processing
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: trimmedInput,
       timestamp: new Date(),
     };
 
@@ -342,7 +515,7 @@ export function SimpleChatApp({ agentFactory, threadId, debug, onExit, initialMe
     <Box flexDirection="column" padding={1}>
       {/* Header */}
       <Box marginBottom={1}>
-        <Text color="cyan" bold>🤖 Qi Agent V2</Text>
+        <Text color="cyan" bold>🤖 qi-v2 agent</Text>
       </Box>
 
       {/* Messages */}

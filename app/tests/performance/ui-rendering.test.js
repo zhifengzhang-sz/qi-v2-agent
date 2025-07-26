@@ -8,7 +8,7 @@ let messages = [
   {
     id: '0',
     role: 'system', 
-    content: '🤖 Qi Agent V2 - Ready!',
+    content: '🤖 qi-v2 agent - Ready!',
     timestamp: new Date(),
   }
 ];
