@@ -160,14 +160,46 @@
 - All workflows inherit 90% render reduction and streaming optimizations
 - First token responses maintain 12ms performance target
 
-## v-0.2.6 (Planned - Git Workflows)
+## v-0.2.6 (Completed - Architecture Design Documentation)
+**Complete C4 Framework Architecture Documentation**
+
+**Architecture Design Features:**
+- ✅ **Complete C4 Framework** - Container and component level architecture documentation
+- ✅ **Two-Container Architecture** - CLI Container (user interaction) + Smart Router Container (intelligence)
+- ✅ **Interface-Driven Design** - Comprehensive interface contracts for all 16 components
+- ✅ **Component Specifications** - Detailed interface contracts enabling substitutability and testing
+- ✅ **Migration Strategy** - Clear path from current monolithic to proposed interface-based architecture
+- ✅ **Design Principles** - Separation of concerns, dependency injection, testability guidelines
+
+**Documentation Structure:**
+- **`docs/design/README.md`** - Main design overview with C4 framework and design principles
+- **`docs/design/architecture/`** - Complete C4 hierarchy (container and component diagrams)
+- **`docs/design/containers/`** - Container interface contracts (CLI + Smart Router)
+- **`docs/design/components/`** - All 16 component interface contracts with detailed specifications
+
+**Key Interface Contracts:**
+- **CLI Container Components** (7): Command Parser, UI Renderer, Command Router, Static/Interactive/Workflow Handlers, Input Handler
+- **Smart Router Components** (9): Request Handler, Intent Analyzer, LLM Router, Tool Manager, Session Manager, Response Formatter, Error Handler, Config Manager, Health Monitor
+
+**Technical Foundation:**
+- **Interface-Driven Architecture** - Enable future refactoring, testing, and component substitution
+- **Dependency Injection Ready** - Clear component boundaries for IoC container integration
+- **Test Strategy Support** - Mock interfaces for comprehensive unit testing
+- **Performance Optimization** - Component isolation for targeted performance improvements
+
+**Implementation Guidance:**
+- **Migration Strategy** - Progressive refactoring from current monolithic to interface-based architecture
+- **Consistency Analysis** - 4.2/10 current alignment with clear improvement roadmap
+- **Development Workflow** - TDD-ready architecture with mockable components
+
+## v-0.2.7 (Planned - Git Workflows)
 **Phase 2: Git Integration Commands**
 - `qi commit` - AI-generated commit messages based on changes
 - `qi diff` - Intelligent change analysis and review
 - `qi review` - Code review assistance and quality analysis
 - Git MCP server integration for version control operations
 
-## v-0.2.7 (Planned - Quality Workflows)
+## v-0.2.8 (Planned - Quality Workflows)
 **Phase 2: Code Quality Commands**
 - `qi test` - Test generation and execution assistance
 - `qi refactor` - Code refactoring and improvement assistance

@@ -16,7 +16,8 @@ Local AI agent with conversational interface and extensible tool integration.
 - **[Ollama Setup Guide](docs/usage/ollama-setup.md)** - Complete setup and usage instructions
 
 ### Architecture
-- [Design Document](docs/architecture/design.md) - Complete system architecture
+- **[Design Documentation](docs/design/README.md)** - Complete C4 framework architecture with interface contracts
+- [Legacy Design Document](docs/architecture/design.md) - Original system architecture reference
 - [Development Plan](docs/plan/plan.study.md) - Implementation roadmap and technology analysis
 - **[Phase 1 Study](docs/study/phase1/README.md)** - LangGraph + MCP implementation analysis with TypeScript trivialization proof
 
@@ -45,7 +46,7 @@ git clone https://github.com/langchain-ai/langchain-mcp-adapters.git
 
 ## Current Status
 
-**v-0.3.0**: Phase 3 documentation complete. Comprehensive research and implementation guides for RAG system with ChromaDB, streaming responses, and context retrieval. All guides properly integrated with existing qi-v2 agent factory architecture, ready for implementation.
+**v-0.2.6**: Complete C4 framework architecture documentation with interface-driven design. Two-container architecture (CLI + Smart Router) with 16 component interface contracts. Ready for interface-based refactoring and enhanced testing strategies.
 
 ## Quick Start
 
