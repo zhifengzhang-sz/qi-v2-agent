@@ -1,19 +1,19 @@
-# Universal Agent Framework
+# Simplified Agent Framework
 
 ## Executive Summary
 
-This document defines a **domain-agnostic universal framework** for building intelligent AI agents. This framework provides:
+This document defines a **practical, simplified framework** for building intelligent AI agents based on opus4 review feedback. This framework provides:
 
-- **Universal Cognitive Patterns**: Abstract thinking patterns that work across any domain
-- **Domain Specialization Model**: Framework for mapping abstract patterns to domain-specific needs
-- **Technology Independence**: Pure abstractions with no technology dependencies
-- **Monolithic Simplicity**: Single process with clear component separation
-- **Flexible Implementation**: Support for any technology stack
+- **Direct Cognitive Modes**: No abstract patterns - direct mode-to-tool mapping
+- **Multi-Signal Pattern Detection**: Enhanced intent recognition with tool requirements
+- **Technology Independence**: Clean interfaces with practical implementations  
+- **Operational Focus**: Built-in retry logic, rate limiting, and cost tracking
+- **Unified Configuration**: Single config file instead of scattered settings
 
 ### Core Design Principle
-**Universal Patterns + Domain Specialization + Pluggable Implementations = Flexible AI Agents**
+**Direct Modes + Enhanced Detection + Practical Operations = Production-Ready Agents**
 
-The framework defines abstract cognitive patterns and interfaces that can be specialized for any domain (coding, legal, medical, research, etc.) using any technology stack.
+The framework uses direct cognitive modes (planning, coding, information, debugging, generic) with sophisticated pattern detection and essential operational features.
 
 ---
 
@@ -75,78 +75,144 @@ graph TB
     style TP fill:#ce93d8,stroke:#ba68c8,stroke-width:2px
 ```
 
-### 1.2 Framework Layers
+### 1.2 Simplified Architecture (4 Containers)
 
-| Layer | Purpose | Dependencies | Extensibility |
-|-------|---------|--------------|---------------|
-| **Universal Patterns** | Abstract cognitive patterns | None | Fixed core patterns |
-| **Domain Specialization** | Domain-specific mappings | Universal patterns | Unlimited domains |
-| **Abstract Interfaces** | Technology contracts | None | Multiple implementations |
-| **Concrete Implementations** | Technology-specific code | Abstract interfaces | Pluggable technologies |
+| Container | Purpose | Owns | Practical Focus |
+|-----------|---------|------|-----------------|
+| **Pattern Recognition** | Multi-signal mode detection | Intent analysis | Fast + accurate detection |
+| **Tool Container** | Tool execution with retries | Individual tool calls | Reliability + timeouts |
+| **Workflow Executor** | Orchestration + mode mapping | Tool chains + LLM calls | Simple execution patterns |
+| **Input Container** | Request handling | CLI/UI interface | User interaction |
 
-**Reference**: See [Agent Abstractions](./agent.abstractions.md) for complete interface definitions.
+**Key Change**: Smart Router container eliminated - its lookup table functionality merged into Workflow Executor.
 
 ---
 
-## 2. Cognitive Framework
+## 2. Direct Cognitive Modes
 
-### 2.1 Universal Cognitive Patterns
+### 2.1 Direct Mode System (No Abstract Patterns)
 
-The framework defines five abstract cognitive patterns that work across any domain:
+The framework uses **direct cognitive modes** with clear tool requirements:
 
 ```mermaid
 graph LR
-    Input[User Input] --> PM[Pattern Matcher]
+    Input[User Input] --> PM[Multi-Signal Detection]
     
-    PM --> Analytical[🧠 Analytical Pattern]
-    PM --> Creative[⚡ Creative Pattern]  
-    PM --> Informational[📚 Informational Pattern]
-    PM --> Problem[🔧 Problem-Solving Pattern]
-    PM --> Conversational[💬 Conversational Pattern]
+    PM --> Planning[📋 Planning Mode]
+    PM --> Coding[💻 Coding Mode]  
+    PM --> Information[📚 Information Mode]
+    PM --> Debugging[🔧 Debugging Mode]
+    PM --> Generic[💬 Generic Mode]
     
-    Analytical --> AW[Analysis Workflow]
-    Creative --> CW[Generation Workflow]
-    Informational --> IW[Explanation Workflow]
-    Problem --> PW[Resolution Workflow]
-    Conversational --> CoW[Dialog Workflow]
+    Planning --> PT[sequential-thinking]
+    Coding --> FT[filesystem]
+    Information --> ST[web-search]
+    Debugging --> FT2[filesystem + git]
+    Generic --> None[No required tools]
     
     style PM fill:#29b6f6,stroke:#1976d2,stroke-width:2px
-    style Analytical fill:#ce93d8,stroke:#9c27b0,stroke-width:2px
-    style Creative fill:#81c784,stroke:#388e3c,stroke-width:2px
-    style Informational fill:#64b5f6,stroke:#1976d2,stroke-width:2px
-    style Problem fill:#ffb74d,stroke:#f57c00,stroke-width:2px
-    style Conversational fill:#90a4ae,stroke:#546e7a,stroke-width:2px
+    style Planning fill:#ce93d8,stroke:#9c27b0,stroke-width:2px
+    style Coding fill:#81c784,stroke:#388e3c,stroke-width:2px
+    style Information fill:#64b5f6,stroke:#1976d2,stroke-width:2px
+    style Debugging fill:#ffb74d,stroke:#f57c00,stroke-width:2px
+    style Generic fill:#90a4ae,stroke:#546e7a,stroke-width:2px
 ```
 
-### 2.2 Abstract Pattern Definitions
+### 2.2 Mode-Tool Mapping (Direct)
 
-Each cognitive pattern is defined with domain-agnostic characteristics:
+Each mode has **specific tool requirements** - no abstract mappings:
 
-#### Analytical Pattern
-- **Purpose**: Deep analysis and structured reasoning
-- **Characteristics**: Methodical, thorough, structured, evidence-based
-- **Abstract Keywords**: analyze, review, examine, assess, evaluate
-- **Workflow Focus**: Breaking down complex problems systematically
+#### Planning Mode
+- **Required Tools**: `sequential-thinking`
+- **Optional Tools**: `web-search`, `memory`
+- **Forbidden Tools**: `filesystem` (no editing during planning)
+- **Triggers**: "plan", "architecture", "approach", "strategy"
 
-#### Creative Pattern
-- **Purpose**: Generation and synthesis of new content
-- **Characteristics**: Innovative, constructive, synthesis, ideation
-- **Abstract Keywords**: create, build, generate, design, develop
-- **Workflow Focus**: Creating and building new artifacts
+#### Coding Mode  
+- **Required Tools**: `filesystem`
+- **Optional Tools**: `git`, `memory`
+- **Forbidden Tools**: `sequential-thinking` (avoid analysis paralysis)
+- **Triggers**: "implement", "code", "write", file extensions (.js, .py, .ts)
 
-#### Informational Pattern
-- **Purpose**: Knowledge sharing and explanation
-- **Characteristics**: Educational, clarifying, comprehensive, accessible
-- **Abstract Keywords**: explain, help, what, how, why, understand
-- **Workflow Focus**: Educating and transferring understanding
+#### Information Mode
+- **Required Tools**: `web-search`
+- **Optional Tools**: `memory`
+- **Forbidden Tools**: `filesystem`, `git` (no modifications for Q&A)
+- **Triggers**: "what is", "explain", "how does", "documentation"
 
-#### Problem-Solving Pattern
-- **Purpose**: Issue identification and resolution
-- **Characteristics**: Diagnostic, solution-oriented, systematic, practical
-- **Abstract Keywords**: fix, solve, resolve, debug, troubleshoot
-- **Workflow Focus**: Diagnosing problems and providing solutions
+#### Debugging Mode
+- **Required Tools**: `filesystem`
+- **Recommended Tools**: `sequential-thinking`, `git`
+- **Optional Tools**: `web-search`, `memory`
+- **Triggers**: "error", "bug", "broken", "fix", "debug"
 
-#### Conversational Pattern
+#### Generic Mode
+- **Required Tools**: None
+- **Optional Tools**: `memory`
+- **Forbidden Tools**: `filesystem`, `git` (keep it safe)
+- **Triggers**: General conversation without specific tool needs
+
+### 2.3 Enhanced Multi-Signal Pattern Detection
+
+**Problem with Keyword-Based Detection**: Too loose and ambiguous (from opus4 review)
+```typescript
+// BAD: Ambiguous keyword matching
+"create a plan" → matches 'create' → Creative mode ❌ (should be Planning)
+"build an analysis" → matches both 'build' and 'analysis' → ??? 
+```
+
+**Solution**: Multi-signal detection with weighted scoring:
+
+#### Detection Signals (Weighted)
+
+1. **Tool Mention Signals** (Weight: 0.9)
+   - File extensions → Coding/Debugging modes
+   - "plan/architecture" → Planning mode
+   - "search/find" → Information mode
+
+2. **Action Verb Signals** (Weight: 0.8)
+   - "implement/code/write" → Coding mode
+   - "analyze/review/plan" → Planning mode
+   - "fix/debug/solve" → Debugging mode
+   - "explain/describe/what" → Information mode
+
+3. **Error Indicators** (Weight: 0.9)
+   - "error/exception/bug/crash" → Debugging mode
+   - "undefined/null/stack trace" → Debugging mode
+
+4. **Context Continuation** (Weight: 0.4)
+   - Previous mode influences next detection
+   - Transition patterns: Planning → Coding → Debugging
+
+#### Validation Rules
+
+- **File extension + "error"** → Debugging (not Coding)
+- **"Plan" + required tools check** → Planning (not Creative)
+- **Tool availability validation** → Ensure detected mode has required tools
+
+#### Example Classifications
+
+```typescript
+// Clear cases
+"Plan the architecture for a REST API" 
+→ Planning (signals: "plan", "architecture", needs sequential-thinking)
+
+"Fix the TypeError on line 42"
+→ Debugging (signals: "fix", "TypeError", "line", needs filesystem)
+
+"implement the user authentication function"
+→ Coding (signals: "implement", "function", needs filesystem)
+
+"What is dependency injection?"
+→ Information (signals: "what is", needs web-search)
+
+// Ambiguous cases resolved by tool requirements
+"Create a plan for the new feature"
+→ Planning (not Coding because "plan" requires sequential-thinking)
+
+"Analyze this error message"  
+→ Debugging (not Planning because "error" + filesystem tool needed)
+```
 - **Purpose**: General dialog and interaction
 - **Characteristics**: Responsive, contextual, adaptive, personable
 - **Abstract Keywords**: chat, discuss, talk, general

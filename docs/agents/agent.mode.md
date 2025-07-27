@@ -1,57 +1,402 @@
-# Agent Mode System
+# Enhanced Mode Detection System
 
 ## Overview
 
-This document provides detailed documentation for the cognitive mode system defined in the [universal agent architecture](./agent.md). The mode system enables intelligent agents to adapt their behavior based on the type of thinking required for different tasks.
+This document provides detailed documentation for the **enhanced multi-signal mode detection system** based on opus4 review feedback. The system replaces abstract cognitive patterns with direct modes and sophisticated pattern detection.
+
+### Key Changes from Original Design
+
+- **Removed**: Abstract cognitive patterns (over-engineered)
+- **Added**: Direct cognitive modes with tool requirements
+- **Enhanced**: Multi-signal pattern detection (not just keywords)
+- **Simplified**: Direct mode-to-tool mapping (no abstract layer)
 
 ### Core Concepts
 
-- **Cognitive Patterns**: Abstract thinking patterns that are universal across domains
-- **Domain Modes**: Domain-specific implementations of cognitive patterns
-- **Mode Detection**: Process of identifying which cognitive pattern applies to user input
-- **Context Management**: How mode decisions influence subsequent interactions
+- **Direct Cognitive Modes**: Planning, coding, information, debugging, generic
+- **Multi-Signal Detection**: Weighted analysis of multiple input signals
+- **Tool-Mode Mapping**: Each mode has specific tool requirements
+- **Context Awareness**: Previous mode influences detection
 
 ---
 
-## 1. Cognitive Pattern Framework
+## 1. Direct Cognitive Mode System
 
-### 1.1 Abstract Cognitive Patterns
-
-The framework defines five universal cognitive patterns that represent fundamental ways of thinking:
+### 1.1 Mode Definitions (No Abstract Patterns)
 
 ```typescript
-interface CognitivePattern {
-  name: string;
+type CognitiveMode = 'planning' | 'coding' | 'information' | 'debugging' | 'generic';
+
+interface ModeDefinition {
+  name: CognitiveMode;
   description: string;
-  purpose: string;
-  characteristics: string[];
-  abstractKeywords: string[];
-  contextWeight: number;
-  workflowFeatures: WorkflowFeature[];
+  requiredTools: string[];
+  optionalTools: string[];
+  forbiddenTools: string[];
+  triggers: string[];
+  typicalWorkflow: string[];
 }
 
-const COGNITIVE_PATTERNS: CognitivePattern[] = [
+const COGNITIVE_MODES: ModeDefinition[] = [
   {
-    name: 'analytical',
-    description: 'Deep analysis and structured reasoning',
-    purpose: 'Break down complex problems systematically',
-    characteristics: ['methodical', 'thorough', 'structured', 'evidence-based'],
-    abstractKeywords: ['analyze', 'review', 'examine', 'assess', 'evaluate'],
-    contextWeight: 0.8,
-    workflowFeatures: ['systematic-thinking', 'evidence-gathering', 'structured-output']
+    name: 'planning',
+    description: 'Architecture design and strategic analysis',
+    requiredTools: ['sequential-thinking'],
+    optionalTools: ['web-search', 'memory'],
+    forbiddenTools: ['filesystem'], // No editing during planning
+    triggers: ['plan', 'architecture', 'approach', 'strategy'],
+    typicalWorkflow: [
+      'sequential-thinking: break down problem',
+      'web-search: research best practices', 
+      'sequential-thinking: synthesize approach'
+    ]
   },
   {
-    name: 'creative',
-    description: 'Generation and synthesis of new content',
-    purpose: 'Create, build, and synthesize new artifacts',
-    characteristics: ['innovative', 'constructive', 'synthesis', 'ideation'],
-    abstractKeywords: ['create', 'build', 'generate', 'design', 'develop'],
-    contextWeight: 0.9,
-    workflowFeatures: ['content-generation', 'iterative-refinement', 'artifact-creation']
+    name: 'coding',
+    description: 'Direct implementation and code generation',
+    requiredTools: ['filesystem'],
+    optionalTools: ['git', 'memory'],
+    forbiddenTools: ['sequential-thinking'], // Avoid analysis paralysis
+    triggers: ['implement', 'code', 'write', '.js', '.py', '.ts'],
+    typicalWorkflow: [
+      'filesystem: read relevant files',
+      'memory: recall previous decisions',
+      'filesystem: write/modify code'
+    ]
   },
   {
-    name: 'informational',
-    description: 'Knowledge sharing and explanation',
+    name: 'information',
+    description: 'Knowledge retrieval and explanation',
+    requiredTools: ['web-search'],
+    optionalTools: ['memory'],
+    forbiddenTools: ['filesystem', 'git'], // No file modifications
+    triggers: ['what is', 'explain', 'how does', 'documentation'],
+    typicalWorkflow: [
+      'memory: check if previously answered',
+      'web-search: find relevant information'
+    ]
+  },
+  {
+    name: 'debugging',
+    description: 'Error analysis and problem resolution',
+    requiredTools: ['filesystem'],
+    optionalTools: ['sequential-thinking', 'git', 'web-search'],
+    forbiddenTools: [],
+    triggers: ['error', 'bug', 'broken', 'fix', 'debug'],
+    typicalWorkflow: [
+      'filesystem: read error logs/code',
+      'sequential-thinking: analyze problem',
+      'filesystem: implement fix'
+    ]
+  },
+  {
+    name: 'generic',
+    description: 'General conversation without specific tools',
+    requiredTools: [],
+    optionalTools: ['memory'],
+    forbiddenTools: ['filesystem', 'git'], // Keep it safe
+    triggers: ['general conversation'],
+    typicalWorkflow: ['memory: maintain conversation context']
+  }
+];
+```
+
+---
+
+## 2. Enhanced Multi-Signal Pattern Detection
+
+### 2.1 Problems with Keyword-Based Detection
+
+**Original Approach Issues** (from opus4 review):
+```typescript
+// BAD: Ambiguous keyword matching
+"create a plan" → matches 'create' → Creative mode ❌ (should be Planning)
+"build an analysis" → matches both 'build' and 'analysis' → ???
+"review my implementation" → matches both 'review' and 'implementation' → ???
+```
+
+**Root Problems**:
+- Single keywords are too ambiguous
+- No consideration of tool requirements
+- No context awareness
+- No validation against mode capabilities
+
+### 2.2 Multi-Signal Detection Algorithm
+
+**Approach**: Combine multiple weighted signals for accurate detection.
+
+```typescript
+interface DetectionSignal {
+  type: 'tool_mention' | 'action_verb' | 'artifact_mention' | 'error_indicator' | 'context_continuation';
+  pattern: string | RegExp;
+  modes: CognitiveMode[];
+  weight: number; // 0-1, higher = stronger signal
+}
+
+const DETECTION_SIGNALS: DetectionSignal[] = [
+  // Tool mention signals (highest weight)
+  {
+    type: 'tool_mention',
+    pattern: /\b(plan|planning|architecture|strategy|approach)\b/i,
+    modes: ['planning'],
+    weight: 0.9
+  },
+  {
+    type: 'tool_mention', 
+    pattern: /\b(file|\.js|\.py|\.ts|\.java|\.cpp)\b/i,
+    modes: ['coding', 'debugging'],
+    weight: 0.8
+  },
+  
+  // Action verb signals
+  {
+    type: 'action_verb',
+    pattern: /^(implement|code|write|create|build)\s/i,
+    modes: ['coding'],
+    weight: 0.8
+  },
+  {
+    type: 'action_verb',
+    pattern: /^(analyze|review|evaluate|assess|plan)\s/i,
+    modes: ['planning'],
+    weight: 0.8
+  },
+  {
+    type: 'action_verb',
+    pattern: /^(fix|debug|solve|resolve|troubleshoot)\s/i,
+    modes: ['debugging'],
+    weight: 0.8
+  },
+  {
+    type: 'action_verb',
+    pattern: /^(explain|describe|what|how|why|tell me)\s/i,
+    modes: ['information'],
+    weight: 0.7
+  },
+  
+  // Error indicators (very strong signal)
+  {
+    type: 'error_indicator',
+    pattern: /\b(error|exception|bug|crash|fail|broken)\b/i,
+    modes: ['debugging'],
+    weight: 0.9
+  },
+  {
+    type: 'error_indicator',
+    pattern: /\b(undefined|null|NaN|stack trace|line \d+)\b/i,
+    modes: ['debugging'],
+    weight: 0.8
+  },
+  
+  // Artifact mentions
+  {
+    type: 'artifact_mention',
+    pattern: /\b(function|class|component|module|api|endpoint)\b/i,
+    modes: ['coding'],
+    weight: 0.6
+  },
+  {
+    type: 'artifact_mention',
+    pattern: /\b(architecture|design|pattern|structure|diagram)\b/i,
+    modes: ['planning'],
+    weight: 0.6
+  }
+];
+```
+
+### 2.3 Detection Algorithm Implementation
+
+```typescript
+class EnhancedModeDetector {
+  async detectMode(input: string, context?: ProcessingContext): Promise<ModeDetectionResult> {
+    // 1. Multi-signal analysis
+    const signalScores = this.analyzeSignals(input);
+    
+    // 2. Tool requirement analysis  
+    const toolScores = this.analyzeToolRequirements(input);
+    
+    // 3. Context continuation analysis
+    const contextScore = this.analyzeContext(input, context);
+    
+    // 4. Combine scores with weights
+    const finalScores = this.combineScores(signalScores, toolScores, contextScore);
+    
+    // 5. Apply validation rules
+    const result = this.validateAndFinalize(finalScores, input);
+    
+    return result;
+  }
+  
+  private analyzeSignals(input: string): Map<CognitiveMode, number> {
+    const scores = new Map<CognitiveMode, number>();
+    
+    // Initialize all modes with 0
+    for (const mode of ['planning', 'coding', 'information', 'debugging', 'generic']) {
+      scores.set(mode as CognitiveMode, 0);
+    }
+    
+    // Check each signal
+    for (const signal of DETECTION_SIGNALS) {
+      const matches = typeof signal.pattern === 'string' 
+        ? input.toLowerCase().includes(signal.pattern.toLowerCase())
+        : signal.pattern.test(input);
+        
+      if (matches) {
+        for (const mode of signal.modes) {
+          const currentScore = scores.get(mode) || 0;
+          scores.set(mode, currentScore + signal.weight);
+        }
+      }
+    }
+    
+    return scores;
+  }
+  
+  private analyzeToolRequirements(input: string): Map<CognitiveMode, number> {
+    const scores = new Map<CognitiveMode, number>();
+    
+    // Check for tool triggers in input
+    for (const modeDefinition of COGNITIVE_MODES) {
+      for (const trigger of modeDefinition.triggers) {
+        if (input.toLowerCase().includes(trigger)) {
+          // Boost this mode significantly
+          const currentScore = scores.get(modeDefinition.name) || 0;
+          scores.set(modeDefinition.name, currentScore + 0.5);
+        }
+      }
+    }
+    
+    return scores;
+  }
+  
+  private combineScores(
+    signalScores: Map<CognitiveMode, number>,
+    toolScores: Map<CognitiveMode, number>, 
+    contextScores: Map<CognitiveMode, number>
+  ): Map<CognitiveMode, number> {
+    const combined = new Map<CognitiveMode, number>();
+    
+    for (const mode of ['planning', 'coding', 'information', 'debugging', 'generic']) {
+      const signal = signalScores.get(mode as CognitiveMode) || 0;
+      const tool = toolScores.get(mode as CognitiveMode) || 0;
+      const context = contextScores.get(mode as CognitiveMode) || 0;
+      
+      // Weighted combination
+      const total = (signal * 0.5) + (tool * 0.3) + (context * 0.2);
+      combined.set(mode as CognitiveMode, total);
+    }
+    
+    return combined;
+  }
+  
+  private validateAndFinalize(scores: Map<CognitiveMode, number>, input: string): ModeDetectionResult {
+    // Find highest scoring mode
+    let bestMode: CognitiveMode = 'generic';
+    let highestScore = 0;
+    
+    for (const [mode, score] of scores) {
+      if (score > highestScore) {
+        highestScore = score;
+        bestMode = mode;
+      }
+    }
+    
+    // Apply validation rules
+    if (bestMode === 'planning' && /\.(js|py|ts|java)/.test(input)) {
+      bestMode = 'coding'; // File extension overrides planning
+      highestScore = Math.min(highestScore, 0.8);
+    }
+    
+    if (bestMode === 'coding' && /\b(error|exception|broken|bug)\b/i.test(input)) {
+      bestMode = 'debugging'; // Error keywords override coding
+      highestScore = Math.min(highestScore, 0.8);
+    }
+    
+    // Normalize confidence to 0-1 range
+    const confidence = Math.min(highestScore, 1.0);
+    
+    return {
+      mode: bestMode,
+      confidence,
+      detectionMethod: confidence > 0.7 ? 'multi-signal' : 'fallback',
+      signals: this.getTriggeredSignals(input),
+      toolsRequired: this.getRequiredTools(bestMode)
+    };
+  }
+}
+```
+
+### 2.4 Example Classifications
+
+**Clear Cases**:
+```typescript
+"Plan the architecture for a REST API"
+→ Planning (signals: "plan", "architecture", requires sequential-thinking)
+
+"Fix the TypeError on line 42" 
+→ Debugging (signals: "fix", "TypeError", "line", requires filesystem)
+
+"implement the user authentication function"
+→ Coding (signals: "implement", "function", requires filesystem)
+
+"What is dependency injection?"
+→ Information (signals: "what is", requires web-search)
+```
+
+**Ambiguous Cases Resolved**:
+```typescript
+"Create a plan for the new feature"
+→ Planning (not Coding because "plan" requires sequential-thinking)
+
+"Analyze this error message"
+→ Debugging (not Planning because "error" + filesystem tool needed)
+
+"Review the implementation in auth.js"
+→ Debugging (file extension + "review" suggests code analysis)
+```
+
+---
+
+## 3. Context-Aware Detection
+
+### 3.1 Context Influence
+
+**Context Types**:
+- **Previous Mode**: What mode was active before
+- **Conversation History**: Pattern of recent interactions
+- **Available Tools**: Which tools are currently accessible
+- **User Preferences**: Learned user patterns
+
+### 3.2 Mode Transition Patterns
+
+**Common Transitions**:
+```typescript
+const TRANSITION_PATTERNS = {
+  planning: {
+    'now implement': 'coding',
+    'let\'s code': 'coding', 
+    'build this': 'coding'
+  },
+  coding: {
+    'now it\'s broken': 'debugging',
+    'getting an error': 'debugging',
+    'not working': 'debugging'
+  },
+  debugging: {
+    'fixed, now add': 'coding',
+    'working, let\'s plan': 'planning'
+  }
+};
+```
+
+**Context Boost Algorithm**:
+- If previous mode was 'planning' and input contains transition phrase → boost 'coding'
+- If in coding session and error mentioned → strong boost 'debugging'
+- If explaining complex topic → slight boost 'information' for follow-ups
+
+---
+
+This enhanced detection system provides much more accurate mode detection by considering multiple signals, tool requirements, and context, addressing all the issues identified in the opus4 review.
     purpose: 'Educate, clarify, and transfer understanding',
     characteristics: ['educational', 'clarifying', 'comprehensive', 'accessible'],
     abstractKeywords: ['explain', 'help', 'what', 'how', 'why', 'understand'],
