@@ -6,23 +6,23 @@ This directory contains C4 framework architecture documentation for the qi-v2-ag
 
 The documentation follows the C4 model's hierarchical approach:
 
-1. **[System Context](./system-context.md)** - How qi-v2-agent fits in the larger ecosystem (TODO)
-2. **[Container Diagram](./container-diagram.md)** - High-level containers and their interactions  
-3. **[Component Diagrams](./component-diagrams.md)** - Internal structure of each container
-4. **[Code Diagrams](./code-diagrams.md)** - Implementation-specific details (TODO)
+1. **[System Context](./system.context.md)** - How qi-v2-agent fits in the larger ecosystem (TODO)
+2. **[Container Diagram](./container.diagram.md)** - High-level containers and their interactions  
+3. **[Component Diagrams](./component.diagrams.md)** - Internal structure of each container
+4. **[Code Diagrams](./code.diagrams.md)** - Implementation-specific details (TODO)
 
 ## Quick Navigation
 
 ### For Product Owners / Stakeholders
-- **[System Context](./system-context.md)** - Understand what the system does and who uses it
+- **[System Context](./system.context.md)** - Understand what the system does and who uses it
 
 ### For Architects / Tech Leads  
-- **[Container Diagram](./container-diagram.md)** - Understand the major building blocks
-- **[Component Diagrams](./component-diagrams.md)** - Understand internal structure
+- **[Container Diagram](./container.diagram.md)** - Understand the major building blocks
+- **[Component Diagrams](./component.diagrams.md)** - Understand internal structure
 
 ### For Developers
-- **[Component Diagrams](./component-diagrams.md)** - Understand component interactions
-- **[Code Diagrams](./code-diagrams.md)** - Understand current implementation
+- **[Component Diagrams](./component.diagrams.md)** - Understand component interactions
+- **[Code Diagrams](./code.diagrams.md)** - Understand current implementation
 
 ## Architecture Summary
 
