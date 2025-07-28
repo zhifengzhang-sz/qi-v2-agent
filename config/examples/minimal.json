@@ -1,0 +1,18 @@
+{
+  "agent": {
+    "name": "qi-v2-agent-minimal",
+    "environment": "development"
+  },
+  "model": {
+    "provider": "ollama",
+    "defaultModel": "qwen2.5:7b"
+  },
+  "mcpServers": [
+    {
+      "name": "memory",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"],
+      "optionalFor": ["generic"]
+    }
+  ]
+}

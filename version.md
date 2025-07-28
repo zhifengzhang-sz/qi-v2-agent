@@ -171,11 +171,18 @@
 - ✅ **Migration Strategy** - Clear path from current monolithic to proposed interface-based architecture
 - ✅ **Design Principles** - Separation of concerns, dependency injection, testability guidelines
 
-**Documentation Structure:**
-- **`docs/design/README.md`** - Main design overview with C4 framework and design principles
-- **`docs/design/architecture/`** - Complete C4 hierarchy (container and component diagrams)
-- **`docs/design/containers/`** - Container interface contracts (CLI + Smart Router)
-- **`docs/design/components/`** - All 16 component interface contracts with detailed specifications
+**Documentation Structure (V1 - Legacy):**
+- **`docs/design/README.md`** - V1 design overview with C4 framework and design principles
+- **`docs/design/architecture/`** - V1 C4 hierarchy (container and component diagrams)
+- **`docs/design/containers/`** - V1 container interface contracts (CLI + Smart Router)
+- **`docs/design/components/`** - V1 component interface contracts
+
+**Current Documentation Structure:**
+- **`docs/agents/`** - Current agent framework documentation
+- **`docs/agents/agent.md`** - Abstract cognitive patterns and domain specialization  
+- **`docs/agents/agent.impl.md`** - Main implementation guide
+- **`docs/agents/agent.impl.corrected.md`** - Production corrections and enhancements
+- **`docs/agents/impl/`** - Implementation experience documentation
 
 **Key Interface Contracts:**
 - **CLI Container Components** (7): Command Parser, UI Renderer, Command Router, Static/Interactive/Workflow Handlers, Input Handler

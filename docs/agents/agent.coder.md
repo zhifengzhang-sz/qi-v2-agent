@@ -2,14 +2,14 @@
 
 ## Overview
 
-This document demonstrates how to specialize the **[Universal Agent Framework](./agent.md)** for software development using the **[concrete implementations](./agent.impl.md)** of the **[abstract interfaces](./agent.abstractions.md)**. The coding agent serves as a reference implementation showing how any domain can leverage the 3-layer architecture.
+This document demonstrates how to specialize the **[Agent Framework](./agent.md)** for software development using the **[concrete implementations](./agent.impl.md)** of the **[abstract interfaces](./agent.abstractions.md)**. The coding agent serves as a reference implementation showing how any domain can leverage the 3-layer architecture.
 
 ### 3-Layer Architecture Implementation
 
 ```mermaid
 graph TB
-    subgraph "Layer 1: Universal Patterns"
-        UP[Universal Cognitive Patterns]
+    subgraph "Layer 1: Abstract Patterns"
+        UP[Abstract Cognitive Patterns]
         AI[Abstract Interfaces]
     end
     
@@ -63,9 +63,9 @@ The coding agent uses the implementations from **[agent.impl.md](./agent.impl.md
 import { createUniversalAgent } from '../impl/setup.js';
 import { CODING_DOMAIN_CONFIGURATION } from './coding-domain-config.js';
 import { CODING_MCP_SERVERS } from './coding-mcp-config.js';
-import type { IUniversalAgent } from '../abstractions/interfaces.js';
+import type { IAgent } from '../abstractions/interfaces.js';
 
-export async function createCodingAgent(): Promise<IUniversalAgent> {
+export async function createCodingAgent(): Promise<IAgent> {
   return createUniversalAgent({
     domain: CODING_DOMAIN_CONFIGURATION,
     patternMatcher: {
@@ -131,11 +131,11 @@ export async function createCodingAgent(): Promise<IUniversalAgent> {
 
 ### 2.1 Abstract Pattern Mapping
 
-The coding domain maps the [universal cognitive patterns](./agent.md#cognitive-framework) to development-specific modes:
+The coding domain maps the [abstract cognitive patterns](./agent.md#cognitive-framework) to development-specific modes:
 
 ```mermaid
 graph LR
-    subgraph "Universal Patterns"
+    subgraph "Abstract Patterns"
         A[🧠 Analytical]
         C[⚡ Creative]
         I[📚 Informational]
@@ -359,7 +359,7 @@ async function streamingExample() {
 
 The coding agent demonstrates how the 3-layer architecture enables flexibility:
 
-- **Layer 1 (Abstractions)**: Universal patterns work for any development workflow
+- **Layer 1 (Abstractions)**: Abstract patterns work for any development workflow
 - **Layer 2 (Implementations)**: Could swap LangGraph for alternative workflow engines
 - **Layer 3 (Domain)**: Could create legal, medical, or research agents using same foundation
 
@@ -399,16 +399,16 @@ The architecture supports gradual technology migration:
 
 The coding domain agent demonstrates the power of the 3-layer architecture:
 
-- **✅ Abstract Patterns**: Universal cognitive patterns provide consistent behavior
+- **✅ Abstract Patterns**: Cognitive patterns provide consistent behavior
 - **✅ Concrete Implementations**: LangChain/LangGraph/MCP provide robust capabilities  
 - **✅ Domain Specialization**: Coding-specific tools and workflows for development tasks
 - **✅ Technology Flexibility**: Components can be swapped without affecting other layers
 - **✅ Extensible Design**: New patterns, tools, and capabilities easily added
 
-This reference implementation shows how any domain can leverage the universal framework while maintaining full control over technology choices and domain-specific behavior.
+This reference implementation shows how any domain can leverage the agent framework while maintaining full control over technology choices and domain-specific behavior.
 
 **Framework References**:
-- **[Universal Framework](./agent.md)** - Core patterns and architecture
+- **[Agent Framework](./agent.md)** - Core patterns and architecture
 - **[Abstract Interfaces](./agent.abstractions.md)** - Technology-agnostic contracts
 - **[Concrete Implementations](./agent.impl.md)** - LangChain/LangGraph/MCP implementations
 - **[Mode System](./agent.mode.md)** - Pattern detection and cognitive modes

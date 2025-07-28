@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the pure abstract interfaces for the universal agent framework. These interfaces are **technology-agnostic** and contain no dependencies on specific packages, frameworks, or implementations.
+This document defines the pure abstract interfaces for the agent framework. These interfaces are **technology-agnostic** and contain no dependencies on specific packages, frameworks, or implementations.
 
 The abstractions serve as contracts that can be implemented using any technology stack while maintaining consistent behavior across different domains and use cases.
 
@@ -373,7 +373,7 @@ interface IMemoryProvider {
 
 ---
 
-### 6. Universal Agent Abstractions
+### 6. Agent Abstractions
 
 #### 6.1 Agent Factory Interface
 
@@ -415,7 +415,7 @@ interface AgentResponse {
   readonly metadata: ReadonlyMap<string, unknown>;
 }
 
-interface IUniversalAgent {
+interface IAgent {
   initialize(): Promise<void>;
   process(request: AgentRequest): Promise<AgentResponse>;
   stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk>;
@@ -454,7 +454,7 @@ interface ComponentHealth {
 
 ## Abstract Cognitive Patterns
 
-### Universal Pattern Definitions
+### Abstract Pattern Definitions
 
 ```typescript
 const ABSTRACT_COGNITIVE_PATTERNS: readonly CognitivePattern[] = [
@@ -511,7 +511,7 @@ const ABSTRACT_COGNITIVE_PATTERNS: readonly CognitivePattern[] = [
 - **Pluggable Architecture**: Any technology can implement these abstractions
 
 ### 2. Domain Agnostic
-- **Universal Patterns**: Cognitive patterns work across all domains
+- **Abstract Patterns**: Cognitive patterns work across all domains
 - **Flexible Specialization**: Domains map abstract patterns to specific needs
 - **Consistent Behavior**: Same interfaces across different domains
 

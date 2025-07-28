@@ -4,95 +4,103 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-qi-v2 agent is a local AI coding assistant providing Claude Code-like functionality with local LLM support. The project implements a unified chat interface with natural language file operations, code analysis, and workflow automation using a two-container architecture with interface-driven design principles.
+qi-v2 agent is a practical local AI coding assistant providing Claude Code-like functionality with local LLM support. The project implements an **abstract pattern-based cognitive system** with domain specialization, multi-signal pattern detection, and operational reliability using a simplified, production-ready architecture.
 
 ## Quick Start
 
 - **Runtime**: Node.js 18+ with Bun for package management
-- **Main Interface**: `bun --cwd app src/main.ts unified` for chat interface
-- **Configuration**: `config/qi-config.yaml` for model and MCP server settings
+- **Main Interface**: `bun --cwd app src/main.ts unified` for practical agent chat interface
+- **Configuration**: Unified YAML configuration system with environment variable support
 - **Build**: Run `bun --cwd lib build && bun --cwd app build` after changes
 
-## Architecture
+## Architecture Overview
 
-### Design Philosophy (C4 Framework)
-The project follows interface-driven design with two main containers:
+### Practical Agent Architecture
+
+The project implements a straightforward, production-ready architecture based on **opus4 review corrections**:
 
 ```
-CLI Container ← → Smart Router Container
-(User Interaction)   (AI Intelligence)
+User Input → Pattern Detection → Mode Validation → Workflow Execution → Response
+             (Multi-Signal)     (Tool Safety)    (Direct Orchestration)
 ```
 
-### Current vs. Proposed Architecture
+### Core Components
 
-**Current Implementation (Functional)**:
-```
-User → CLI Commands → AgentFactory → Smart Router → (Direct LLM | LangGraph + Tools) → Response
-```
+**Detection Layer**:
+- **Multi-Signal Pattern Matcher**: Weighted analysis replacing keyword-based detection
+- **Mode Validator**: Tool availability and safety validation
+- **Context Tracker**: Conversation continuity and session management
 
-**Proposed Design (Interface-Driven)**:
-```
-User → CLI Container → Smart Router Container → Response
-       (9 Components)   (9 Components)
-```
+**Execution Layer**:
+- **Tool Executor**: Production-ready MCP tool execution with retry/timeout
+- **Workflow Orchestrator**: Simple orchestration absorbing Smart Router functionality
+- **Operational Handler**: Rate limiting, circuit breakers, cost tracking
 
-- **CLI Container**: Command parsing, UI rendering, input handling, workflow execution
-- **Smart Router Container**: Request processing, intent analysis, LLM integration, tool orchestration
+**Agent Layer**:
+- **Practical Agent**: Main coordinator with streaming and error handling
+- **Agent Factory**: Simplified creation with development/production modes
+- **Unified Configuration**: Single YAML config with environment variable support
+
+### Domain-Specific Modes (from Abstract Patterns)
+- **Planning**: Strategic analysis with sequential-thinking tools (from analytical pattern)
+- **Coding**: Implementation with filesystem and git tools (from creative pattern)
+- **Information**: Knowledge sharing with web-search tools (from informational pattern)
+- **Debugging**: Problem resolution with comprehensive tool access (from problem-solving pattern)
+- **Generic**: Safe default mode for conversational interactions (from conversational pattern)
 
 ### Core Principles
-- **Smart Routing as Intelligence**: All user input flows through intelligent routing decisions
-- **Progressive Enhancement**: Static → Interactive → Workflow commands with increasing AI capability
-- **Interface-First Design**: Every component designed for substitutability and testability
+- **Practical Over Abstract**: Direct implementation without over-engineering
+- **Operational Reliability**: Rate limiting, retries, circuit breakers, monitoring
 - **Local Privacy**: All processing local-only with no external data transmission
+- **Production Ready**: Comprehensive error handling and operational features
 
 ### Technology Stack
-- **TypeScript** with Ink React for terminal UI
-- **LangGraph + LangChain** for agent orchestration
+- **TypeScript** with direct interfaces and Zod validation
+- **Multi-Signal Detection** replacing abstract cognitive patterns
+- **MCP Protocol** for standardized tool integration
 - **Ollama** for local LLM execution
-- **MCP servers** for tool integration
-- **Zod** for schema validation
-- **Commander.js** for CLI argument parsing
+- **Operational Services** for production reliability
 
 ## Documentation References
 
 ### For Architecture Understanding (PRIORITY)
-- **[NEW] Design Documentation**: `docs/design/` - Complete C4 framework architecture with interface contracts
-  - **Architecture Overview**: `docs/design/architecture/` - C4 diagrams and system design
-  - **Container Contracts**: `docs/design/containers/` - CLI and Smart Router interface specifications  
-  - **Component Contracts**: `docs/design/components/` - 18 detailed component interface contracts
-- **Design Principles**: `docs/design/README.md` - Interface-driven design philosophy and migration strategy
+- **[CURRENT] Corrected Agent Documentation**: `docs/agents/` - Practical agent framework
+  - **Agent Overview**: `docs/agents/agent.md` - Abstract patterns with domain specialization and tool requirements
+  - **Operational Features**: `docs/agents/operational-concerns.md` - Production reliability features
+  - **Unified Configuration**: `docs/agents/unified-configuration.md` - Single YAML config system
+  - **Architecture Reviews**: `docs/agents/reviews/opus4.md` - Critical corrections removing over-engineering
 
 ### For Implementation Work
-- **Current Issue**: `docs/study/phase2/core/impl.note.md` - Critical bugs and fixes
-- **Fix Guide**: `docs/study/phase2/cli/ink/unified-chat-fixed-impl-guide.md` - Complete implementation blueprint
-- **Alternative Approach**: `docs/study/phase2/cli/neo-blessed/neo-blessed-xstate-impl-guide.md` - Recommended high-performance approach
-- **Technology Info**: Use `.claude/commands/knowledge.phase2.md` command for latest tech updates
+- **Core Interfaces**: `lib/src/core/` - Direct, practical interfaces
+- **Detection Layer**: `lib/src/detection/` - Multi-signal pattern detection and validation
+- **Execution Layer**: `lib/src/execution/` - Production tools and workflow orchestration
+- **Agent Layer**: `lib/src/agent/` - Main agent implementation and factory
 
-### For Legacy Context
-- **Phase 1**: `docs/study/phase1/` - Architecture and reference analysis
-- **Phase 2**: `docs/study/phase2/` - MVP implementation (historical reference)
-- **Phase 3**: `docs/study/phase3/` - Feature development planning
+### For Legacy Context (Historical)
+- **Previous Design**: `docs/design/` - Over-engineered C4 framework (replaced)
+- **Phase Studies**: `docs/study/` - Historical documentation (reference only)
 
 ## Current Status
 
 ### Architecture Maturity
-- **Design Completeness**: ✅ Complete C4 framework with 18 component interface contracts
-- **Implementation Status**: ⚠️ Functional but monolithic (Consistency Score: 4.2/10)
-- **Migration Strategy**: ✅ Defined 4-phase evolution path to interface-driven architecture
+- **Design Completeness**: ✅ Complete practical agent framework based on opus4 corrections
+- **Implementation Status**: ✅ All core components implemented with operational reliability
+- **Migration Strategy**: ✅ Ready to replace legacy monolithic implementation
 
-### Working Components (Current Implementation)
-- ✅ CLI infrastructure and commands (`app/src/cli/commands.ts`)
-- ✅ Smart routing and intent detection (`lib/src/agent/factory.ts`)
-- ✅ LangGraph agent initialization
-- ✅ MCP server integration (`lib/src/mcp/`)
-- ✅ Terminal UI with streaming (`app/src/ui/SimpleChatApp.tsx`)
+### Working Components (Practical Agent Framework)
+- ✅ **Core Interfaces**: Abstract patterns with domain specialization and clear tool requirements (`lib/src/core/`)
+- ✅ **Multi-Signal Pattern Detection**: Weighted analysis replacing keyword matching (`lib/src/detection/`)
+- ✅ **Production Tool Execution**: MCP integration with retry/timeout/monitoring (`lib/src/execution/`)
+- ✅ **Workflow Orchestration**: Simple orchestration absorbing Smart Router functionality
+- ✅ **Operational Services**: Rate limiting, circuit breakers, cost tracking
+- ✅ **Practical Agent**: Main coordinator with streaming and comprehensive error handling
+- ✅ **Unified Configuration**: Single YAML config with environment variable support
+- ✅ **Agent Factory**: Development/production modes with mock providers for testing
 
-### Architecture Gaps (vs. Design)
-- ❌ **Missing Container Abstractions**: No formal CLI/Smart Router interfaces
-- ❌ **Missing Component Interfaces**: Monolithic `AgentFactory` instead of separated components
-- ❌ **No Request Validation**: Security and data integrity concerns
-- ❌ **No Session Management**: Limited conversation persistence
-- ❌ **No Performance Monitoring**: No metrics or observability
+### Next Implementation Phases  
+- 🔄 **Phase 5**: Application layer integration (update CLI/UI to use practical agent)
+- 🔄 **Phase 6**: Legacy replacement and comprehensive testing
+- 🔄 **Phase 7**: Production deployment and monitoring
 
 ### Key Commands
 ```bash
@@ -108,29 +116,31 @@ bun --cwd app src/main.ts servers --list           # List MCP servers
 ## Development Guidelines
 
 ### Before Making Changes
-1. **Read design docs** from `docs/design/` to understand target architecture
-2. **Check component contracts** in `docs/design/components/` for interface specifications
-3. **Review implementation gaps** to understand current vs. proposed architecture
-4. **Use `/knowledge-phase2`** command for technology information (legacy)
+1. **Read agent docs** from `docs/agents/` to understand practical architecture
+2. **Check opus4 reviews** in `docs/agents/reviews/` for architectural corrections
+3. **Review implementation** in `lib/src/` to understand current system
+4. **Use unified configuration** for consistent configuration management
 
-### Architecture Evolution Strategy
-1. **Phase 1**: Extract interfaces from existing monoliths (`IAgentFactory` → `ISmartRouter`)
-2. **Phase 2**: Implement container contracts with structured error handling
-3. **Phase 3**: Add missing components (RequestHandler, ConversationManager, SessionManager)
-4. **Phase 4**: Full interface implementation with comprehensive testing
+### Architecture Principles
+1. **Direct Implementation**: Use concrete cognitive modes, avoid abstract patterns
+2. **Operational Reliability**: Include rate limiting, retries, circuit breakers
+3. **Multi-Signal Detection**: Replace keyword matching with weighted analysis
+4. **Unified Configuration**: Single YAML file with environment variable support
 
 ### Testing Strategy
-1. **Interface Compliance**: New components must implement defined interface contracts
-2. **Functional Testing**: Verify core workflows (edit, analyze, explain commands)
-3. **Integration Testing**: Test container communication and error handling
-4. **Performance Testing**: Monitor metrics against design requirements
+1. **Mode Detection**: Verify multi-signal pattern matcher accuracy
+2. **Tool Validation**: Ensure tool-mode restrictions work correctly
+3. **Operational Features**: Test rate limiting, retries, circuit breakers
+4. **Workflow Orchestration**: Verify direct mode-to-workflow execution
 
 ### File Structure (Current)
-- `lib/src/` - Smart Router Container implementation (monolithic `AgentFactory`)
-- `app/src/` - CLI Container implementation (commands, UI, workflows)
-- `config/` - YAML configuration files with Zod validation
-- `docs/design/` - **NEW**: Complete interface-driven architecture specification
-- `docs/study/` - **LEGACY**: Historical implementation documentation
+- `lib/src/core/` - Direct interfaces and cognitive modes
+- `lib/src/detection/` - Multi-signal pattern detection and validation
+- `lib/src/execution/` - Production tool execution and workflow orchestration
+- `lib/src/agent/` - Main agent implementation and factory
+- `app/src/` - CLI application layer (to be updated)
+- `docs/agents/` - **CURRENT**: Practical agent architecture documentation
+- `docs/design/` - **LEGACY**: Over-engineered architecture (replaced)
 
 ## Security Notes
 
@@ -143,14 +153,14 @@ bun --cwd app src/main.ts servers --list           # List MCP servers
 
 ## Migration Guidance
 
-**For New Development**: Follow interface contracts in `docs/design/components/` to ensure compatibility with target architecture.
+**For New Development**: Follow the practical agent architecture in `docs/agents/` with abstract patterns, domain specialization, and operational reliability.
 
-**For Refactoring**: Reference `docs/design/README.md` for migration strategy from current monolithic implementation to interface-driven design.
+**For Integration**: Use the agent factory to create development or production agent instances with unified configuration.
 
-**Implementation Priority**: Focus on extracting interfaces and implementing container contracts before adding new features.
+**Implementation Priority**: The practical agent framework is complete and ready to replace the legacy monolithic implementation.
 
-**Consistency Score**: Current implementation has 4.2/10 consistency with design. Target is 9.0+ through systematic interface adoption.
+**Architecture Status**: Implementation is complete and consistent with opus4 corrected design principles.
 
 ---
 
-**Important**: This project is transitioning from functional prototype to production-ready architecture. Always consult `docs/design/` for target architecture and interface specifications before making changes.
+**Important**: This project implements a practical, production-ready agent framework. Always consult `docs/agents/` for current architecture and `docs/agents/reviews/opus4.md` for design corrections.

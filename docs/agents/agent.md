@@ -4,28 +4,35 @@
 
 This document defines a **practical, simplified framework** for building intelligent AI agents based on opus4 review feedback. This framework provides:
 
-- **Direct Cognitive Modes**: No abstract patterns - direct mode-to-tool mapping
+- **Abstract Patterns with Domain Specialization**: Abstract patterns mapped to domain-specific modes
 - **Multi-Signal Pattern Detection**: Enhanced intent recognition with tool requirements
 - **Technology Independence**: Clean interfaces with practical implementations  
 - **Operational Focus**: Built-in retry logic, rate limiting, and cost tracking
-- **Unified Configuration**: Single config file instead of scattered settings
+- **Single Configuration**: One config file instead of scattered settings
 
 ### Core Design Principle
-**Direct Modes + Enhanced Detection + Practical Operations = Production-Ready Agents**
+**Abstract Patterns + Domain Specialization + Practical Operations = Production-Ready Agents**
 
-The framework uses direct cognitive modes (planning, coding, information, debugging, generic) with sophisticated pattern detection and essential operational features.
+The framework uses abstract patterns (analytical, creative, informational, problem-solving, conversational) that domain implementations specialize into concrete modes (planning, coding, debugging) with sophisticated pattern detection and essential operational features.
+
+### Architecture Principle
+**Abstract interfaces provide stable protocols that concrete implementations specialize for specific domains. This enables:**
+- **Technology Independence**: Same abstract patterns work with any implementation
+- **Domain Flexibility**: Software domains map `creative` → `coding`, design domains map `creative` → `design`  
+- **Implementation Swapping**: Change technologies without breaking the abstract layer
+- **Cross-Domain Reuse**: Abstract patterns apply universally across all domains
 
 ---
 
 ## 1. Architecture Overview
 
-### 1.1 Universal Agent Model
+### 1.1 Agent Model
 
 ```mermaid
 graph TB
     subgraph "Agent Framework"
         UI[Interface Layer]
-        UAF[Universal Agent Factory]
+        UAF[Agent Factory]
         PM[Pattern Matcher]
         WE[Workflow Engine]
         MP[Model Provider]
@@ -88,77 +95,95 @@ graph TB
 
 ---
 
-## 2. Direct Cognitive Modes
+## 2. Abstract Patterns and Domain Specialization
 
-### 2.1 Direct Mode System (No Abstract Patterns)
+### 2.1 Abstract Pattern System
 
-The framework uses **direct cognitive modes** with clear tool requirements:
+The framework uses **abstract patterns** that are specialized by domain implementations:
 
 ```mermaid
 graph LR
     Input[User Input] --> PM[Multi-Signal Detection]
     
-    PM --> Planning[📋 Planning Mode]
-    PM --> Coding[💻 Coding Mode]  
-    PM --> Information[📚 Information Mode]
-    PM --> Debugging[🔧 Debugging Mode]
-    PM --> Generic[💬 Generic Mode]
+    PM --> Analytical[📋 Analytical Pattern]
+    PM --> Creative[💻 Creative Pattern]  
+    PM --> Information[📚 Informational Pattern]
+    PM --> ProblemSolving[🔧 Problem-Solving Pattern]
+    PM --> Conversational[💬 Conversational Pattern]
     
-    Planning --> PT[sequential-thinking]
-    Coding --> FT[filesystem]
-    Information --> ST[web-search]
-    Debugging --> FT2[filesystem + git]
-    Generic --> None[No required tools]
+    Analytical --> Domain1[Domain: Planning/Research/Analysis]
+    Creative --> Domain2[Domain: Coding/Design/Writing]
+    Information --> Domain3[Domain: Documentation/Q&A/Help]
+    ProblemSolving --> Domain4[Domain: Debugging/Support/Troubleshooting]
+    Conversational --> Domain5[Domain: Chat/Discussion/General]
     
     style PM fill:#29b6f6,stroke:#1976d2,stroke-width:2px
-    style Planning fill:#ce93d8,stroke:#9c27b0,stroke-width:2px
-    style Coding fill:#81c784,stroke:#388e3c,stroke-width:2px
+    style Analytical fill:#ce93d8,stroke:#9c27b0,stroke-width:2px
+    style Creative fill:#81c784,stroke:#388e3c,stroke-width:2px
     style Information fill:#64b5f6,stroke:#1976d2,stroke-width:2px
-    style Debugging fill:#ffb74d,stroke:#f57c00,stroke-width:2px
-    style Generic fill:#90a4ae,stroke:#546e7a,stroke-width:2px
+    style ProblemSolving fill:#ffb74d,stroke:#f57c00,stroke-width:2px
+    style Conversational fill:#90a4ae,stroke:#546e7a,stroke-width:2px
 ```
 
-### 2.2 Mode-Tool Mapping (Direct)
+### 2.2 Abstract-to-Domain Mapping
 
-Each mode has **specific tool requirements** - no abstract mappings:
+Each abstract pattern maps to **domain-specific modes** with appropriate tools:
 
-#### Planning Mode
-- **Required Tools**: `sequential-thinking`
-- **Optional Tools**: `web-search`, `memory`
-- **Forbidden Tools**: `filesystem` (no editing during planning)
-- **Triggers**: "plan", "architecture", "approach", "strategy"
+#### Software Development Domain Example
+- **Analytical Pattern** → `planning` mode
+  - Tools: `sequential-thinking`, `web-search`
+  - Keywords: "plan", "architecture", "approach", "strategy"
+  
+- **Creative Pattern** → `coding` mode
+  - Tools: `filesystem`, `git`
+  - Keywords: "implement", "code", "write", file extensions (.js, .py, .ts)
 
-#### Coding Mode  
-- **Required Tools**: `filesystem`
-- **Optional Tools**: `git`, `memory`
-- **Forbidden Tools**: `sequential-thinking` (avoid analysis paralysis)
-- **Triggers**: "implement", "code", "write", file extensions (.js, .py, .ts)
+- **Problem-Solving Pattern** → `debugging` mode
+  - Tools: `filesystem`, `git`, `sequential-thinking`
+  - Keywords: "error", "bug", "broken", "fix", "debug"
 
-#### Information Mode
-- **Required Tools**: `web-search`
-- **Optional Tools**: `memory`
-- **Forbidden Tools**: `filesystem`, `git` (no modifications for Q&A)
-- **Triggers**: "what is", "explain", "how does", "documentation"
+- **Informational Pattern** → `documentation` mode
+  - Tools: `web-search`
+  - Keywords: "what is", "explain", "how does", "documentation"
 
-#### Debugging Mode
-- **Required Tools**: `filesystem`
-- **Recommended Tools**: `sequential-thinking`, `git`
-- **Optional Tools**: `web-search`, `memory`
-- **Triggers**: "error", "bug", "broken", "fix", "debug"
+- **Conversational Pattern** → `generic` mode
+  - Tools: minimal
+  - Keywords: General conversation without specific tool needs
 
-#### Generic Mode
-- **Required Tools**: None
-- **Optional Tools**: `memory`
-- **Forbidden Tools**: `filesystem`, `git` (keep it safe)
-- **Triggers**: General conversation without specific tool needs
+### 2.3 Implementation Example
 
-### 2.3 Enhanced Multi-Signal Pattern Detection
+See `lib/src/impl/setup.ts` for the concrete implementation of this mapping:
 
-**Problem with Keyword-Based Detection**: Too loose and ambiguous (from opus4 review)
 ```typescript
-// BAD: Ambiguous keyword matching
-"create a plan" → matches 'create' → Creative mode ❌ (should be Planning)
-"build an analysis" → matches both 'build' and 'analysis' → ??? 
+// Abstract pattern → Domain-specific mode mapping
+const CODING_DOMAIN_CONFIG: DomainConfiguration = {
+  domain: 'coding',
+  patterns: new Map([
+    ['analytical', {
+      abstractPattern: 'analytical',      // ← Abstract layer
+      domainName: 'planning',             // ← Concrete domain mode
+      domainKeywords: ['architecture', 'design', 'plan'],
+      domainTools: ['sequential-thinking', 'web-search']
+    }],
+    ['creative', {
+      abstractPattern: 'creative',        // ← Abstract layer  
+      domainName: 'coding',               // ← Concrete domain mode
+      domainKeywords: ['implement', 'code', 'write'],
+      domainTools: ['filesystem', 'git']
+    }]
+  ])
+};
+```
+
+This demonstrates how the **same abstract patterns** can be specialized differently across domains while maintaining the stable abstract protocol.
+
+### 2.4 Enhanced Multi-Signal Pattern Detection
+
+**Problem with Simple Keyword Matching**: Too loose and ambiguous (from opus4 review)
+```typescript
+// IMPROVED: Multi-signal detection with context
+"create a plan" → analytical pattern (planning context) ✅
+"build an analysis" → analytical pattern (analysis context) ✅
 ```
 
 **Solution**: Multi-signal detection with weighted scoring:
@@ -195,30 +220,26 @@ Each mode has **specific tool requirements** - no abstract mappings:
 ```typescript
 // Clear cases
 "Plan the architecture for a REST API" 
-→ Planning (signals: "plan", "architecture", needs sequential-thinking)
+→ Analytical Pattern → Planning Mode (signals: "plan", "architecture")
 
 "Fix the TypeError on line 42"
-→ Debugging (signals: "fix", "TypeError", "line", needs filesystem)
+→ Problem-Solving Pattern → Debugging Mode (signals: "fix", "TypeError", "error")
 
 "implement the user authentication function"
-→ Coding (signals: "implement", "function", needs filesystem)
+→ Creative Pattern → Coding Mode (signals: "implement", "function")
 
 "What is dependency injection?"
-→ Information (signals: "what is", needs web-search)
+→ Informational Pattern → Documentation Mode (signals: "what is")
 
-// Ambiguous cases resolved by tool requirements
+// Ambiguous cases resolved by multi-signal analysis
 "Create a plan for the new feature"
-→ Planning (not Coding because "plan" requires sequential-thinking)
+→ Analytical Pattern → Planning Mode (context: "plan" outweighs "create")
 
 "Analyze this error message"  
-→ Debugging (not Planning because "error" + filesystem tool needed)
+→ Problem-Solving Pattern → Debugging Mode (error context + analysis)
 ```
-- **Purpose**: General dialog and interaction
-- **Characteristics**: Responsive, contextual, adaptive, personable
-- **Abstract Keywords**: chat, discuss, talk, general
-- **Workflow Focus**: Maintaining natural conversation flow
 
-### 2.3 Domain Specialization Model
+## 3. Domain Specialization Model
 
 Each domain maps abstract patterns to domain-specific modes:
 
@@ -250,11 +271,11 @@ const DOMAIN_SPECIALIZATION_EXAMPLES = {
 
 ## 3. Framework Components
 
-### 3.1 Universal Agent Factory
+### 3.1 Agent Factory
 
 The central orchestrator that coordinates all framework components:
 
-**Abstract Interface**: `IUniversalAgent` (see [agent.abstractions.md](./agent.abstractions.md))
+**Abstract Interface**: `IAgent` (see [agent.abstractions.md](./agent.abstractions.md))
 
 **Key Responsibilities**:
 - Pattern detection coordination
@@ -263,7 +284,7 @@ The central orchestrator that coordinates all framework components:
 - Domain configuration management
 - Session and context management
 
-**Technology Independence**: The Universal Agent Factory depends only on abstract interfaces, allowing any implementation technology.
+**Technology Independence**: The Agent Factory depends only on abstract interfaces, allowing any implementation technology.
 
 ### 3.2 Pattern Matching System
 
@@ -281,7 +302,7 @@ The central orchestrator that coordinates all framework components:
 
 **Abstract Interface**: `IWorkflowEngine`
 
-**Universal Workflow Pattern**:
+**Abstract Workflow Pattern**:
 ```mermaid
 graph LR
     Start([Start]) --> Input[Process Input]
@@ -346,7 +367,7 @@ graph LR
 
 ### 4.1 Creating Domain-Specific Agents
 
-To specialize the universal framework for a specific domain:
+To specialize the framework for a specific domain:
 
 1. **Define Domain Configuration**
    ```typescript
@@ -440,7 +461,7 @@ domain_config:
 ### 5.2 Configuration Composition
 
 Configurations are composed in layers:
-1. **Universal defaults** - Base framework settings
+1. **Framework defaults** - Base framework settings
 2. **Implementation defaults** - Technology-specific settings  
 3. **Domain defaults** - Domain-specific settings
 4. **User overrides** - Runtime customizations
@@ -510,7 +531,7 @@ The framework can be extended with new abstract cognitive patterns:
    - Performance characteristics
 
 2. **Update Framework Interfaces**
-   - Add pattern to universal pattern definitions
+   - Add pattern to abstract pattern definitions
    - Update pattern matcher to recognize new pattern
    - Define workflow customizations
    - Document usage guidelines
@@ -530,7 +551,7 @@ New abstract interfaces can be added to extend framework capabilities:
    - Performance requirements
    - Configuration options
 
-2. **Update Universal Agent Factory**
+2. **Update Agent Factory**
    - Integrate new interface into orchestration
    - Define interaction patterns with existing interfaces
    - Handle initialization and cleanup
@@ -607,7 +628,7 @@ Each domain can implement additional security measures:
 
 ## 10. Testing and Quality Assurance
 
-### 10.1 Universal Testing Framework
+### 10.1 Testing Framework
 
 **Interface Testing**:
 - All implementations must pass interface compliance tests
@@ -630,7 +651,7 @@ Each domain can implement additional security measures:
 ### 10.2 Domain-Specific Testing
 
 **Pattern Mapping Validation**:
-- Verify domain patterns map correctly to universal patterns
+- Verify domain patterns map correctly to abstract patterns
 - Test domain-specific tool integration
 - Validate domain workflows produce expected results
 - Ensure domain configuration loads correctly
@@ -645,16 +666,16 @@ Each domain can implement additional security measures:
 
 ## Summary
 
-This universal agent framework provides a solid foundation for building intelligent agents across any domain while maintaining:
+This agent framework provides a solid foundation for building intelligent agents across any domain while maintaining:
 
 - **Technology Independence**: Pure abstractions enable any implementation choice
-- **Domain Flexibility**: Universal patterns work across all domains  
+- **Domain Flexibility**: Abstract patterns work across all domains  
 - **Monolithic Simplicity**: Single process reduces operational complexity
 - **Extensible Design**: New patterns, tools, and capabilities can be added
 - **Consistent Quality**: Standardized interfaces ensure reliable behavior
 
 The framework separates concerns clearly:
-- **Universal patterns and interfaces** (this document + [agent.abstractions.md](./agent.abstractions.md))
+- **Abstract patterns and interfaces** (this document + [agent.abstractions.md](./agent.abstractions.md))
 - **Technology implementations** ([agent.impl.md](./agent.impl.md))
 - **Domain specializations** ([agent.coder.md](./agent.coder.md), future domain docs)
 

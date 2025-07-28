@@ -2,27 +2,28 @@
 
 ## Overview
 
-This document provides detailed documentation for the **enhanced multi-signal mode detection system** based on opus4 review feedback. The system replaces abstract cognitive patterns with direct modes and sophisticated pattern detection.
+This document provides detailed documentation for the **enhanced multi-signal mode detection system** based on opus4 review feedback. The system enhances pattern detection through multi-signal analysis while maintaining abstract cognitive patterns as the foundation.
 
 ### Key Changes from Original Design
 
-- **Removed**: Abstract cognitive patterns (over-engineered)
-- **Added**: Direct cognitive modes with tool requirements
-- **Enhanced**: Multi-signal pattern detection (not just keywords)
-- **Simplified**: Direct mode-to-tool mapping (no abstract layer)
+- **Maintained**: Abstract cognitive patterns as foundation
+- **Added**: Enhanced multi-signal pattern detection with tool requirements
+- **Enhanced**: Pattern detection accuracy through weighted signal analysis
+- **Improved**: Domain specialization mapping (abstract patterns → domain modes → tools)
 
 ### Core Concepts
 
-- **Direct Cognitive Modes**: Planning, coding, information, debugging, generic
+- **Abstract Cognitive Patterns**: Analytical, creative, informational, problem-solving, conversational
+- **Domain-Specific Modes**: Planning, coding, information, debugging, generic (mapped from abstract patterns)
 - **Multi-Signal Detection**: Weighted analysis of multiple input signals
-- **Tool-Mode Mapping**: Each mode has specific tool requirements
+- **Tool-Mode Mapping**: Each domain mode has specific tool requirements
 - **Context Awareness**: Previous mode influences detection
 
 ---
 
-## 1. Direct Cognitive Mode System
+## 1. Domain-Specific Mode System
 
-### 1.1 Mode Definitions (No Abstract Patterns)
+### 1.1 Mode Definitions (Mapped from Abstract Patterns)
 
 ```typescript
 type CognitiveMode = 'planning' | 'coding' | 'information' | 'debugging' | 'generic';

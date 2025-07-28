@@ -20,7 +20,8 @@
     "servers:test": "bun --cwd app src/main.ts servers --test --config ../config/qi-config.yaml",
     "config:show": "bun --cwd app src/main.ts config --show ../config/qi-config.yaml",
     "config:validate": "bun --cwd app src/main.ts config --validate ../config/qi-config.yaml",
-    "check": "bun run typecheck && bun run lint && bun run test"
+    "check": "bun run typecheck && bun run lint && bun run test",
+    "check:lib": "bun run --cwd lib type-check && bun run --cwd lib lint"
   },
   "devDependencies": {
     "bun-types": "^1.1.38",
