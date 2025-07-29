@@ -4,23 +4,23 @@
 
 This document defines a **practical, simplified framework** for building intelligent AI agents based on opus4 review feedback. This framework provides:
 
-- **Abstract Patterns with Domain Specialization**: Abstract patterns mapped to domain-specific modes
-- **Multi-Signal Pattern Detection**: Enhanced intent recognition with tool requirements
+- **Three-Type Input Classification**: Clean separation of commands, prompts, and workflows
+- **Workflow Identification**: Extract workflow modes and node structures from complex inputs
 - **Technology Independence**: Clean interfaces with practical implementations  
 - **Operational Focus**: Built-in retry logic, rate limiting, and cost tracking
 - **Single Configuration**: One config file instead of scattered settings
 
 ### Core Design Principle
-**Abstract Patterns + Domain Specialization + Practical Operations = Production-Ready Agents**
+**Command/Prompt/Workflow Classification + Workflow Node Extraction + Practical Operations = Production-Ready Agents**
 
-The framework uses abstract patterns (analytical, creative, informational, problem-solving, conversational) that domain implementations specialize into concrete modes (planning, coding, debugging) with sophisticated pattern detection and essential operational features.
+The framework uses a simple three-type classification system that distinguishes between system commands, simple prompts, and complex workflows that require orchestrated execution steps.
 
 ### Architecture Principle
 **Abstract interfaces provide stable protocols that concrete implementations specialize for specific domains. This enables:**
-- **Technology Independence**: Same abstract patterns work with any implementation
-- **Domain Flexibility**: Software domains map `creative` → `coding`, design domains map `creative` → `design`  
+- **Technology Independence**: Same classification system works with any implementation
+- **Domain Flexibility**: Different domains define their own workflow modes and node types
 - **Implementation Swapping**: Change technologies without breaking the abstract layer
-- **Cross-Domain Reuse**: Abstract patterns apply universally across all domains
+- **Workflow Reuse**: Common workflow patterns can be shared across domains
 
 ---
 
@@ -95,87 +95,130 @@ graph TB
 
 ---
 
-## 2. Abstract Patterns and Domain Specialization
+## 2. Three-Type Input Classification System
 
-### 2.1 Abstract Pattern System
+### 2.1 Input Classification Overview
 
-The framework uses **abstract patterns** that are specialized by domain implementations:
+The framework uses a **three-type classification system** that handles all user inputs:
 
 ```mermaid
 graph LR
-    Input[User Input] --> PM[Multi-Signal Detection]
+    Input[User Input] --> PatternRecognizer[Pattern Recognizer<br/>Three-Type Classification]
     
-    PM --> Analytical[📋 Analytical Pattern]
-    PM --> Creative[💻 Creative Pattern]  
-    PM --> Information[📚 Informational Pattern]
-    PM --> ProblemSolving[🔧 Problem-Solving Pattern]
-    PM --> Conversational[💬 Conversational Pattern]
+    PatternRecognizer --> Command[🔧 Command]
+    PatternRecognizer --> Prompt[💬 Prompt]  
+    PatternRecognizer --> Workflow[⚙️ Workflow]
     
-    Analytical --> Domain1[Domain: Planning/Research/Analysis]
-    Creative --> Domain2[Domain: Coding/Design/Writing]
-    Information --> Domain3[Domain: Documentation/Q&A/Help]
-    ProblemSolving --> Domain4[Domain: Debugging/Support/Troubleshooting]
-    Conversational --> Domain5[Domain: Chat/Discussion/General]
+    Command --> CommandHandler[Command Handler<br/>Abstract Interface]
+    CommandHandler --> ConcreteCommand[Concrete Implementation<br/>Outside lib/src]
     
-    style PM fill:#29b6f6,stroke:#1976d2,stroke-width:2px
-    style Analytical fill:#ce93d8,stroke:#9c27b0,stroke-width:2px
-    style Creative fill:#81c784,stroke:#388e3c,stroke-width:2px
-    style Information fill:#64b5f6,stroke:#1976d2,stroke-width:2px
-    style ProblemSolving fill:#ffb74d,stroke:#f57c00,stroke-width:2px
-    style Conversational fill:#90a4ae,stroke:#546e7a,stroke-width:2px
+    Prompt --> PromptHandler[Prompt Handler]
+    PromptHandler --> PromptManager[Prompt Manager<br/>Configuration + Templates]
+    PromptManager --> LLM[LLM Provider<br/>Model Interaction]
+    
+    Workflow --> WorkflowExtractor[Workflow Extractor<br/>Text → Workflow Spec]
+    WorkflowExtractor --> WorkflowSpec[Workflow Specification]
+    WorkflowSpec --> WorkflowEngine[Workflow Engine<br/>Orchestrated Execution]
+    
+    style PatternRecognizer fill:#29b6f6,stroke:#1976d2,stroke-width:2px
+    style Command fill:#ff5722,stroke:#d84315,stroke-width:2px
+    style Prompt fill:#4caf50,stroke:#388e3c,stroke-width:2px
+    style Workflow fill:#9c27b0,stroke:#7b1fa2,stroke-width:2px
+    style CommandHandler fill:#ffc107,stroke:#ff8f00,stroke-width:2px
+    style PromptManager fill:#8bc34a,stroke:#689f38,stroke-width:2px
+    style WorkflowSpec fill:#e91e63,stroke:#c2185b,stroke-width:2px
 ```
 
-### 2.2 Abstract-to-Domain Mapping
+### 2.2 Classification Types Detail
 
-Each abstract pattern maps to **domain-specific modes** with appropriate tools:
+#### 2.2.1 Command Type
+**Pattern**: Starts with `/` prefix  
+**Flow**: Pattern Recognizer → Command Handler (Abstract) → Concrete Implementation
+**Handler**: Abstract command handler interface with concrete implementations outside lib/src
+**Examples**:
+```
+/help           → Show available commands
+/status         → System status
+/config         → Configuration management
+/reset          → Reset session
+```
 
-#### Software Development Domain Example
-- **Analytical Pattern** → `planning` mode
-  - Tools: `sequential-thinking`, `web-search`
-  - Keywords: "plan", "architecture", "approach", "strategy"
-  
-- **Creative Pattern** → `coding` mode
-  - Tools: `filesystem`, `git`
-  - Keywords: "implement", "code", "write", file extensions (.js, .py, .ts)
+#### 2.2.2 Prompt Type  
+**Pattern**: Simple conversational input  
+**Flow**: Pattern Recognizer → Prompt Handler → Prompt Manager → LLM Provider
+**Handler**: Prompt handler coordinates with prompt manager for configuration and templates
+**Examples**:
+```
+"Hi"                           → Simple greeting
+"What is recursion?"           → Information request
+"Thanks for the help"          → Acknowledgment
+"How are you today?"           → Casual conversation
+```
 
-- **Problem-Solving Pattern** → `debugging` mode
-  - Tools: `filesystem`, `git`, `sequential-thinking`
-  - Keywords: "error", "bug", "broken", "fix", "debug"
+#### 2.2.3 Workflow Type
+**Pattern**: Complex task requiring orchestration  
+**Flow**: Pattern Recognizer → Workflow Extractor → Workflow Specification → Workflow Engine
+**Handler**: Workflow extractor converts text to workflow spec, then workflow engine executes
+**Examples**:
+```
+"Fix the bug in auth.js"                    → debugging workflow
+"Refactor this code to use async/await"     → editing workflow  
+"Plan the architecture for a REST API"     → planning workflow
+"Add error handling to the login function"  → enhancement workflow
+```
 
-- **Informational Pattern** → `documentation` mode
-  - Tools: `web-search`
-  - Keywords: "what is", "explain", "how does", "documentation"
+### 2.3 Workflow Identification Process
 
-- **Conversational Pattern** → `generic` mode
-  - Tools: minimal
-  - Keywords: General conversation without specific tool needs
+For **workflow type** inputs, the system performs two-stage identification:
 
-### 2.3 Implementation Example
-
-See `lib/src/impl/setup.ts` for the concrete implementation of this mapping:
+#### Stage 1: Workflow Mode Detection
+Identify the type of workflow needed:
 
 ```typescript
-// Abstract pattern → Domain-specific mode mapping
-const CODING_DOMAIN_CONFIG: DomainConfiguration = {
-  domain: 'coding',
-  patterns: new Map([
-    ['analytical', {
-      abstractPattern: 'analytical',      // ← Abstract layer
-      domainName: 'planning',             // ← Concrete domain mode
-      domainKeywords: ['architecture', 'design', 'plan'],
-      domainTools: ['sequential-thinking', 'web-search']
-    }],
-    ['creative', {
-      abstractPattern: 'creative',        // ← Abstract layer  
-      domainName: 'coding',               // ← Concrete domain mode
-      domainKeywords: ['implement', 'code', 'write'],
-      domainTools: ['filesystem', 'git']
-    }]
-  ])
+// Example workflow modes for software development domain
+const WORKFLOW_MODES = {
+  'editing': {
+    description: 'Modify existing code files',
+    keywords: ['refactor', 'modify', 'change', 'update', 'edit'],
+    commonNodes: ['read_file', 'analyze_code', 'modify_code', 'test_changes']
+  },
+  'debugging': {
+    description: 'Fix errors and issues',
+    keywords: ['fix', 'debug', 'error', 'bug', 'broken'],
+    commonNodes: ['analyze_error', 'identify_cause', 'implement_fix', 'verify_fix']
+  },
+  'planning': {
+    description: 'Design and architecture work',
+    keywords: ['plan', 'design', 'architecture', 'structure'],
+    commonNodes: ['analyze_requirements', 'research_patterns', 'create_design', 'document']
+  }
 };
 ```
 
-This demonstrates how the **same abstract patterns** can be specialized differently across domains while maintaining the stable abstract protocol.
+#### Stage 2: Workflow Node Extraction  
+Extract the specific execution steps needed:
+
+```typescript
+// Example: "Fix the TypeError in auth.js" → debugging workflow
+const workflowSpec = {
+  mode: 'debugging',
+  nodes: [
+    { id: 'read_file', params: { file: 'auth.js' } },
+    { id: 'analyze_error', params: { errorType: 'TypeError' } },
+    { id: 'identify_root_cause', params: {} },
+    { id: 'implement_fix', params: {} },
+    { id: 'test_fix', params: {} },
+    { id: 'verify_solution', params: {} }
+  ],
+  edges: [
+    { from: 'read_file', to: 'analyze_error' },
+    { from: 'analyze_error', to: 'identify_root_cause' },
+    { from: 'identify_root_cause', to: 'implement_fix' },
+    { from: 'implement_fix', to: 'test_fix' },
+    { from: 'test_fix', to: 'verify_solution' }
+  ]
+};
+```
 
 ### 2.4 Enhanced Multi-Signal Pattern Detection
 
@@ -286,47 +329,94 @@ The central orchestrator that coordinates all framework components:
 
 **Technology Independence**: The Agent Factory depends only on abstract interfaces, allowing any implementation technology.
 
-### 3.2 Pattern Matching System
+### 3.2 Pattern Recognizer (Three-Type Classification)
 
-**Abstract Interface**: `IPatternMatcher`
+**Abstract Interface**: `IPatternRecognizer` (formerly `IInputClassifier`)
 
 **Core Functions**:
-- Analyze user input to detect cognitive patterns
-- Apply domain-specific pattern mappings
-- Provide confidence scoring for pattern matches
-- Support both rule-based and AI-based detection
+- Analyze input text to determine classification type
+- Route to appropriate handler based on pattern
+- Provide confidence scoring for classifications
+- Support rule-based pattern recognition with AI fallback
 
-**Reference**: See [Agent Mode System](./agent.mode.md) for detailed pattern matching documentation.
+**Classification Process**:
+1. **Command Detection**: Simple regex for `/` prefix → Route to Command Handler
+2. **Prompt vs Workflow**: Complexity analysis → Route to Prompt Handler or Workflow Extractor
+3. **Confidence Scoring**: High confidence for clear patterns, fallback for ambiguous cases
 
-### 3.3 Workflow Orchestration
+### 3.3 Command Handler System
 
-**Abstract Interface**: `IWorkflowEngine`
+**Abstract Interface**: `ICommandHandler`
 
-**Abstract Workflow Pattern**:
+**Architecture**:
+- **Abstract layer** in lib/src provides interface contract
+- **Concrete implementations** outside lib/src for specific domains
+- **Plugin system** allows dynamic command registration
+
+**Core Functions**:
+- Parse command syntax and parameters
+- Validate command permissions and context
+- Route to appropriate concrete command implementation
+- Provide help and error messaging
+
+### 3.4 Prompt Processing Pipeline
+
+**Components**: `IPromptHandler` → `IPromptManager` → `IModelProvider`
+
+**Prompt Handler**:
+- Receives prompt-type inputs from Pattern Recognizer
+- Coordinates with Prompt Manager for processing
+- Handles response formatting and streaming
+
+**Prompt Manager**:
+- Loads prompt templates and configuration
+- Applies context and personalization
+- Manages model selection and parameters
+- Handles prompt engineering and optimization
+
+### 3.5 Workflow Processing System
+
+**Components**: `IWorkflowExtractor` → `WorkflowSpec` → `IWorkflowEngine`
+
+**Workflow Extractor**:
+- Converts natural language text into structured workflow specifications
+- Identifies required tools, dependencies, and execution order
+- Supports both template-based and AI-based extraction methods
+
+**Workflow Specification**:
+- Structured representation of the workflow to be executed
+- Defines nodes, edges, parameters, and execution constraints
+- Technology-agnostic format consumed by workflow engines
+
+**Workflow Engine**:
+- Executes workflow specifications with proper orchestration
+- Manages tool calls, state transitions, and error handling
+- Provides streaming execution with progress updates
+
+### 3.6 Configuration Management System
+
+**Abstract Interface**: `IConfigurationManager`
+
+**Core Functions**:
+- Load and parse qi-config.yaml configuration file
+- Resolve environment variable interpolation (${VAR} syntax)
+- Provide configuration injection to all framework components
+- Support layered configuration: defaults → domain → user overrides
+
+**Configuration Flow**:
 ```mermaid
 graph LR
-    Start([Start]) --> Input[Process Input]
-    Input --> Context[Enrich Context]
-    Context --> Tools[Execute Tools]
-    Tools --> Reasoning[Reasoning Phase]
-    Reasoning --> Synthesis[Synthesize Results]
-    Synthesis --> Output[Format Output]
-    Output --> End([End])
+    ConfigFile[qi-config.yaml] --> ConfigManager[Configuration Manager]
+    EnvVars[Environment Variables] --> ConfigManager
+    ConfigManager --> PromptManager[Prompt Manager Config]
+    ConfigManager --> ModelProvider[Model Provider Config]
+    ConfigManager --> ToolProvider[Tool Provider Config]
+    ConfigManager --> WorkflowEngine[Workflow Engine Config]
     
-    style Start fill:#4caf50,stroke:#388e3c,stroke-width:2px
-    style End fill:#f44336,stroke:#d32f2f,stroke-width:2px
-    style Input fill:#2196f3,stroke:#1976d2,stroke-width:2px
-    style Context fill:#ff9800,stroke:#f57c00,stroke-width:2px
-    style Tools fill:#9c27b0,stroke:#7b1fa2,stroke-width:2px
-    style Reasoning fill:#e91e63,stroke:#c2185b,stroke-width:2px
-    style Synthesis fill:#009688,stroke:#00796b,stroke-width:2px
-    style Output fill:#795548,stroke:#5d4037,stroke-width:2px
+    style ConfigManager fill:#ffc107,stroke:#ff8f00,stroke-width:2px
 ```
 
-**Pattern-Specific Customizations**:
-- Each cognitive pattern can customize the universal workflow
-- Domain specializations can add domain-specific processing steps
-- Workflow nodes are composable and reusable across patterns
+**Architecture Principle**: All components receive configuration through dependency injection, eliminating hardcoded values and enabling runtime configuration changes.
 
 ### 3.4 Model Provider System
 

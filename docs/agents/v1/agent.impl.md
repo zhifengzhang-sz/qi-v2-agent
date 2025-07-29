@@ -18,7 +18,7 @@ This document provides concrete implementations of the abstract interfaces defin
 
 | Abstract Interface | Implementation Technology | Key Libraries |
 |-------------------|--------------------------|---------------|
-| `IPatternMatcher` | Rule-based + LangChain LLM fallback | `@langchain/core`, `@langchain/community` |
+| `IPatternRecognizer` | Rule-based + LangChain LLM fallback | `@langchain/core`, `@langchain/community` |
 | `IWorkflowEngine` | LangGraph StateGraph | `@langchain/langgraph` |
 | `IModelProvider` | LangChain model abstractions | `@langchain/core`, `@langchain/community` |
 | `IToolProvider` | MCP SDK with LangChain tools | `@modelcontextprotocol/sdk` |
@@ -42,7 +42,7 @@ import type {
   PatternDetectionResult 
 } from '../abstractions/interfaces.js';
 
-export class LangChainPatternMatcher implements IPatternMatcher {
+export class LangChainPatternRecognizer implements IPatternRecognizer {
   private patterns: readonly CognitivePattern[];
   private fallbackLLM?: ChatOllama;
   private fallbackPrompt?: PromptTemplate;
@@ -1454,12 +1454,15 @@ interface MCPServerConfig {
 
 ## 5. Agent Implementation
 
-### 5.1 Agent Factory
+### 5.1 Three-Type Classification Agent
 
 ```typescript
-// lib/src/impl/agent.ts
+// lib/src/impl/three-type-agent.ts
 import type {
   IAgent,
+  IInputClassifier,
+  ICommandHandler,  
+  IWorkflowExtractor,
   IPatternMatcher,
   IWorkflowEngine,
   IModelProvider,
@@ -1471,11 +1474,18 @@ import type {
   AgentStreamChunk,
   DomainConfiguration,
   CognitivePattern,
-  HealthCheckResult
+  HealthCheckResult,
+  InputClassificationResult,
+  CommandRequest,
+  ModelRequest,
+  WorkflowExtractionResult
 } from '../abstractions/interfaces.js';
 
-export class Agent implements IAgent {
-  private patternMatcher: IPatternMatcher;
+export class ThreeTypeAgent implements IAgent {
+  private inputClassifier: IInputClassifier;
+  private commandHandler: ICommandHandler;
+  private workflowExtractor: IWorkflowExtractor;
+  private patternMatcher: IPatternMatcher;  // For backward compatibility with workflow engine
   private workflowEngine: IWorkflowEngine;
   private modelProvider: IModelProvider;
   private toolProvider: IToolProvider;
@@ -1484,7 +1494,10 @@ export class Agent implements IAgent {
   private isInitialized = false;
 
   constructor(config: AgentConfiguration) {
-    this.patternMatcher = config.patternMatcher;
+    this.inputClassifier = config.inputClassifier;
+    this.commandHandler = config.commandHandler;
+    this.workflowExtractor = config.workflowExtractor;
+    this.patternMatcher = config.patternMatcher;  // Kept for backward compatibility
     this.workflowEngine = config.workflowEngine;
     this.modelProvider = config.modelProvider;
     this.toolProvider = config.toolProvider;
@@ -1494,25 +1507,20 @@ export class Agent implements IAgent {
 
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.warn('Agent already initialized');
+      console.warn('Three-type agent already initialized');
       return;
     }
 
-    console.log('🤖 Initializing Agent...');
+    console.log('🤖 Initializing Three-Type Classification Agent...');
 
     try {
-      // Initialize all components
+      // Initialize components if needed
       await this.initializeComponents();
       
-      // Precompile workflows for all patterns
-      const patterns = Array.from(this.domainConfig.patterns.values())
-        .map(mode => ({ name: mode.abstractPattern } as CognitivePattern));
-      await this.workflowEngine.precompileWorkflows(patterns);
-      
       this.isInitialized = true;
-      console.log('✅ Agent initialized successfully');
+      console.log('✅ Three-type agent initialized successfully');
     } catch (error) {
-      console.error('❌ Agent initialization failed:', error);
+      console.error('❌ Three-type agent initialization failed:', error);
       throw error;
     }
   }
@@ -1523,41 +1531,23 @@ export class Agent implements IAgent {
     const startTime = Date.now();
     
     try {
-      // Detect cognitive pattern
-      const patternResult = await this.patternMatcher.detectPattern(
-        request.input,
+      // CORRECT ARCHITECTURE: Input Classification FIRST
+      const classification = await this.inputClassifier.classifyInput(
+        request.input, 
         request.context
       );
 
-      // Get or create workflow for the pattern
-      let workflow = this.workflowEngine.getCompiledWorkflow(patternResult.pattern.name);
-      if (!workflow) {
-        workflow = this.workflowEngine.createWorkflow(patternResult.pattern);
+      // Route based on input type
+      switch (classification.type) {
+        case 'command':
+          return await this.handleCommand(request, classification, startTime);
+        case 'prompt':
+          return await this.handlePrompt(request, classification, startTime);
+        case 'workflow':
+          return await this.handleWorkflow(request, classification, startTime);
+        default:
+          throw new Error(`Unknown input type: ${classification.type}`);
       }
-
-      // Create initial workflow state
-      const initialState = this.createInitialState(request, patternResult.pattern);
-
-      // Execute workflow
-      const result = await this.workflowEngine.execute(workflow, initialState);
-
-      // Save to memory if enabled
-      if (this.memoryProvider && request.options?.sessionId) {
-        await this.saveToMemory(request, result, request.options.sessionId);
-      }
-
-      return {
-        content: result.finalState.output,
-        pattern: patternResult.pattern,
-        toolsUsed: result.finalState.toolResults.map(tr => tr.toolName),
-        performance: result.performance,
-        metadata: new Map([
-          ['totalTime', Date.now() - startTime],
-          ['patternConfidence', patternResult.confidence],
-          ['detectionMethod', patternResult.detectionMethod],
-          ['executionPath', result.executionPath]
-        ])
-      };
     } catch (error) {
       throw new Error(
         `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`
@@ -1569,54 +1559,36 @@ export class Agent implements IAgent {
     this.ensureInitialized();
 
     try {
-      // Detect cognitive pattern
-      const patternResult = await this.patternMatcher.detectPattern(
+      // CORRECT ARCHITECTURE: Input Classification FIRST
+      const classification = await this.inputClassifier.classifyInput(
         request.input,
         request.context
       );
 
       yield {
         content: '',
-        pattern: patternResult.pattern,
-        currentStage: 'pattern-detection',
+        inputType: classification.type,
+        currentStage: 'input-classification',
         isComplete: false
       };
 
-      // Get or create workflow for the pattern
-      let workflow = this.workflowEngine.getCompiledWorkflow(patternResult.pattern.name);
-      if (!workflow) {
-        workflow = this.workflowEngine.createWorkflow(patternResult.pattern);
-      }
-
-      // Create initial workflow state
-      const initialState = this.createInitialState(request, patternResult.pattern);
-
-      yield {
-        content: '',
-        pattern: patternResult.pattern,
-        currentStage: 'workflow-execution',
-        isComplete: false
-      };
-
-      // Stream workflow execution
-      for await (const chunk of this.workflowEngine.stream(workflow, initialState)) {
-        yield {
-          content: chunk.state.output,
-          pattern: patternResult.pattern,
-          currentStage: chunk.nodeId,
-          isComplete: chunk.isComplete,
-          error: chunk.error
-        };
-
-        if (chunk.error) {
-          return; // Stop streaming on error
-        }
+      // Route based on input type
+      switch (classification.type) {
+        case 'command':
+          yield* this.streamCommand(request, classification);
+          break;
+        case 'prompt':
+          yield* this.streamPrompt(request, classification);
+          break;
+        case 'workflow':
+          yield* this.streamWorkflow(request, classification);
+          break;
       }
 
       // Final completion chunk
       yield {
         content: '',
-        pattern: patternResult.pattern,
+        inputType: classification.type,
         currentStage: 'completed',
         isComplete: true
       };
@@ -1630,12 +1602,278 @@ export class Agent implements IAgent {
     }
   }
 
+  // ============================================================================
+  // Three-Type Handler Methods
+  // ============================================================================
+
+  private async handleCommand(
+    request: AgentRequest, 
+    classification: InputClassificationResult, 
+    startTime: number
+  ): Promise<AgentResponse> {
+    const commandName = this.extractCommandName(request.input);
+    const parameters = this.parseCommandParameters(request.input);
+    
+    const commandRequest = {
+      commandName,
+      parameters,
+      rawInput: request.input,
+      context: request.context
+    };
+
+    const result = await this.commandHandler.executeCommand(commandRequest);
+    
+    return {
+      success: result.status === 'success',
+      content: result.content,
+      inputType: 'command',
+      toolsUsed: [],
+      performance: {
+        totalTime: Date.now() - startTime,
+        nodeExecutionTimes: new Map([['command', Date.now() - startTime]]),
+        toolExecutionTime: 0,
+        reasoningTime: 0
+      },
+      metadata: new Map<string, unknown>([
+        ['totalTime', Date.now() - startTime],
+        ['commandName', commandName],
+        ['commandStatus', result.status],
+        ['classificationConfidence', classification.confidence],
+        ['detectionMethod', classification.detectionMethod]
+      ]),
+      error: result.status !== 'success' ? result.content : undefined
+    };
+  }
+
+  private async handlePrompt(
+    request: AgentRequest,
+    classification: InputClassificationResult,
+    startTime: number
+  ): Promise<AgentResponse> {
+    // Direct LLM processing for simple prompts - NO pattern detection needed
+    const modelRequest: ModelRequest = {
+      messages: [{ role: 'user', content: request.input, metadata: new Map() }],
+      configuration: {
+        providerId: 'ollama',
+        modelId: 'qwen2.5-coder:7b',
+        parameters: {
+          temperature: 0.7,
+          maxTokens: 2048
+        },
+        capabilities: {
+          supportsStreaming: true,
+          supportsToolCalling: false,
+          supportsSystemMessages: true,
+          maxContextLength: 4096,
+          supportedMessageTypes: ['user', 'assistant']
+        }
+      },
+      context: new Map(Object.entries(request.context?.environmentContext || {}))
+    };
+
+    const result = await this.modelProvider.invoke(modelRequest);
+
+    return {
+      success: true,
+      content: result.content,
+      inputType: 'prompt',
+      toolsUsed: [],
+      performance: {
+        totalTime: Date.now() - startTime,
+        nodeExecutionTimes: new Map([['llm-processing', Date.now() - startTime]]),
+        toolExecutionTime: 0,
+        reasoningTime: Date.now() - startTime
+      },
+      metadata: new Map<string, unknown>([
+        ['totalTime', Date.now() - startTime],
+        ['tokenUsage', result.usage],
+        ['finishReason', result.finishReason],
+        ['classificationConfidence', classification.confidence],
+        ['detectionMethod', classification.detectionMethod]
+      ])
+    };
+  }
+
+  private async handleWorkflow(
+    request: AgentRequest,
+    classification: InputClassificationResult,
+    startTime: number
+  ): Promise<AgentResponse> {
+    // Extract workflow specification
+    const workflowResult = await this.workflowExtractor.extractWorkflow(
+      request.input, 
+      request.context
+    );
+
+    // HERE is where pattern recognition happens for workflows
+    // Convert workflow mode to cognitive pattern
+    const pattern = this.createPatternFromWorkflowMode(workflowResult.mode);
+    
+    // Get or create workflow for the pattern
+    let workflow = this.workflowEngine.getCompiledWorkflow(pattern.name);
+    if (!workflow) {
+      workflow = this.workflowEngine.createWorkflow(pattern);
+    }
+
+    // Create initial workflow state
+    const initialState = this.createInitialState(request, pattern);
+
+    // Execute workflow
+    const result = await this.workflowEngine.execute(workflow, initialState);
+
+    // Save to memory if available
+    if (this.memoryProvider && request.options?.sessionId) {
+      await this.saveToMemory(request, result, request.options.sessionId);
+    }
+
+    return {
+      success: true,
+      content: result.finalState.output,
+      inputType: 'workflow',
+      workflowMode: workflowResult.mode,
+      toolsUsed: result.finalState.toolResults.map(tr => tr.toolName),
+      performance: result.performance,
+      metadata: new Map<string, unknown>([
+        ['totalTime', Date.now() - startTime],
+        ['classificationConfidence', classification.confidence],
+        ['workflowExtractionConfidence', workflowResult.confidence],
+        ['detectionMethod', classification.detectionMethod],
+        ['extractionMethod', workflowResult.extractionMethod],
+        ['executionPath', result.executionPath]
+      ])
+    };
+  }
+
+  // ============================================================================
+  // Stream Handlers
+  // ============================================================================
+
+  private async *streamCommand(
+    request: AgentRequest,
+    classification: InputClassificationResult
+  ): AsyncIterableIterator<AgentStreamChunk> {
+    yield {
+      content: 'Executing command...',
+      inputType: 'command',
+      currentStage: 'command-execution',
+      isComplete: false
+    };
+
+    const result = await this.handleCommand(request, classification, Date.now());
+    
+    yield {
+      content: result.content,
+      inputType: 'command',
+      currentStage: 'command-completed',
+      isComplete: true
+    };
+  }
+
+  private async *streamPrompt(
+    request: AgentRequest,
+    classification: InputClassificationResult
+  ): AsyncIterableIterator<AgentStreamChunk> {
+    yield {
+      content: '',
+      inputType: 'prompt',
+      currentStage: 'llm-processing',
+      isComplete: false
+    };
+
+    const result = await this.handlePrompt(request, classification, Date.now());
+    
+    yield {
+      content: result.content,
+      inputType: 'prompt',
+      currentStage: 'llm-completed',
+      isComplete: true
+    };
+  }
+
+  private async *streamWorkflow(
+    request: AgentRequest,
+    classification: InputClassificationResult
+  ): AsyncIterableIterator<AgentStreamChunk> {
+    yield {
+      content: '',
+      inputType: 'workflow',
+      currentStage: 'workflow-extraction',
+      isComplete: false
+    };
+
+    try {
+      // Extract workflow
+      const workflowResult = await this.workflowExtractor.extractWorkflow(
+        request.input, 
+        request.context
+      );
+
+      // Pattern recognition happens HERE for workflows
+      const pattern = this.createPatternFromWorkflowMode(workflowResult.mode);
+      
+      yield {
+        content: `Extracted workflow pattern: ${pattern.name}`,
+        inputType: 'workflow',
+        workflowMode: workflowResult.mode,
+        currentStage: 'workflow-execution',
+        isComplete: false
+      };
+
+      // Create and stream workflow execution
+      let workflow = this.workflowEngine.getCompiledWorkflow(pattern.name);
+      if (!workflow) {
+        workflow = this.workflowEngine.createWorkflow(pattern);
+      }
+
+      const initialState = this.createInitialState(request, pattern);
+      
+      for await (const chunk of this.workflowEngine.stream(workflow, initialState)) {
+        yield {
+          content: chunk.state.output,
+          inputType: 'workflow',
+          workflowMode: workflowResult.mode,
+          currentStage: chunk.nodeId,
+          isComplete: chunk.isComplete,
+          error: chunk.error ? chunk.error.error : undefined
+        };
+
+        if (chunk.error) {
+          return;
+        }
+      }
+    } catch (error) {
+      yield {
+        content: '',
+        inputType: 'workflow',
+        currentStage: 'error',
+        isComplete: true,
+        error: error instanceof Error ? error : new Error(String(error))
+      };
+    }
+  }
+
+  // ============================================================================
+  // Interface Methods
+  // ============================================================================
+
   getDomainConfiguration(): DomainConfiguration {
     return this.domainConfig;
   }
 
+  getSupportedInputTypes(): readonly string[] {
+    return this.inputClassifier.getSupportedTypes();
+  }
+
+  getAvailableCommands(): readonly CommandDefinition[] {
+    return this.commandHandler.getAvailableCommands();
+  }
+
+  getSupportedWorkflowModes(): readonly WorkflowMode[] {
+    return this.workflowExtractor.getSupportedModes();
+  }
+
   getAvailablePatterns(): readonly CognitivePattern[] {
-    return this.patternMatcher.getAvailablePatterns();
+    return this.patternMatcher.getAvailablePatterns();  
   }
 
   async getAvailableTools(): Promise<readonly ToolDefinition[]> {
@@ -1646,27 +1884,64 @@ export class Agent implements IAgent {
     const components = new Map<string, ComponentHealth>();
     let overallStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
 
-    // Check pattern matcher
+    // Check input classifier
     try {
-      const testResult = await this.patternMatcher.detectPattern('test input');
-      components.set('patternMatcher', {
+      const startTime = Date.now();
+      const testResult = await this.inputClassifier.classifyInput('test input');
+      const latency = Date.now() - startTime;
+      
+      components.set('inputClassifier', {
         status: 'healthy',
-        latency: 0,
-        details: `Detected pattern: ${testResult.pattern.name}`
+        latency,
+        details: `Classified as: ${testResult.type} (${testResult.confidence.toFixed(2)})`
       });
     } catch (error) {
-      components.set('patternMatcher', {
+      components.set('inputClassifier', {
         status: 'unhealthy',
         details: error instanceof Error ? error.message : String(error)
       });
       overallStatus = 'unhealthy';
     }
 
+    // Check command handler
+    try {
+      const commands = this.commandHandler.getAvailableCommands();
+      components.set('commandHandler', {
+        status: 'healthy',
+        details: `${commands.length} commands available`
+      });
+    } catch (error) {
+      components.set('commandHandler', {
+        status: 'degraded',
+        details: error instanceof Error ? error.message : String(error)
+      });
+      if (overallStatus === 'healthy') overallStatus = 'degraded';
+    }
+
+    // Check workflow extractor
+    try {
+      const modes = this.workflowExtractor.getSupportedModes();
+      components.set('workflowExtractor', {
+        status: 'healthy',
+        details: `${modes.length} workflow modes supported`
+      });
+    } catch (error) {
+      components.set('workflowExtractor', {
+        status: 'degraded',
+        details: error instanceof Error ? error.message : String(error)
+      });
+      if (overallStatus === 'healthy') overallStatus = 'degraded';
+    }
+
     // Check model provider
     try {
+      const startTime = Date.now();
       const models = await this.modelProvider.getAvailableModels();
+      const latency = Date.now() - startTime;
+      
       components.set('modelProvider', {
         status: 'healthy',
+        latency,
         details: `${models.length} models available`
       });
     } catch (error) {
@@ -1677,23 +1952,6 @@ export class Agent implements IAgent {
       overallStatus = 'unhealthy';
     }
 
-    // Check tool provider
-    try {
-      const tools = await this.toolProvider.getAvailableTools();
-      components.set('toolProvider', {
-        status: 'healthy',
-        details: `${tools.length} tools available`
-      });
-    } catch (error) {
-      components.set('toolProvider', {
-        status: 'degraded',
-        details: error instanceof Error ? error.message : String(error)
-      });
-      if (overallStatus === 'healthy') {
-        overallStatus = 'degraded';
-      }
-    }
-
     return {
       status: overallStatus,
       components,
@@ -1702,37 +1960,89 @@ export class Agent implements IAgent {
   }
 
   async cleanup(): Promise<void> {
-    console.log('🧹 Cleaning up Agent...');
-
+    console.log('🧹 Cleaning up Three-Type Agent...');
+    
     try {
-      // Cleanup tool provider (MCP connections)
-      if ('cleanup' in this.toolProvider) {
-        await (this.toolProvider as any).cleanup();
-      }
-
       // Cleanup memory provider
       if (this.memoryProvider) {
         await this.memoryProvider.cleanup();
       }
 
       this.isInitialized = false;
-      console.log('✅ Agent cleanup complete');
+      console.log('✅ Three-type agent cleanup complete');
     } catch (error) {
-      console.error('❌ Agent cleanup failed:', error);
+      console.error('❌ Three-type agent cleanup failed:', error);
       throw error;
     }
   }
 
+  // ============================================================================
+  // Helper Methods
+  // ============================================================================
+
   private async initializeComponents(): Promise<void> {
-    // All components are already initialized by their constructors
-    // This method can be used for any additional setup if needed
-    console.log('🔧 All components initialized');
+    // Components are initialized by their constructors
+    console.log('🔧 Three-type classification components initialized');
   }
 
   private ensureInitialized(): void {
     if (!this.isInitialized) {
-      throw new Error('Agent not initialized. Call initialize() first.');
+      throw new Error('Three-type agent not initialized. Call initialize() first.');
     }
+  }
+
+  private extractCommandName(input: string): string {
+    const match = input.trim().match(/^\/(\w+)/);
+    return match ? match[1] : 'unknown';
+  }
+
+  private parseCommandParameters(input: string): Map<string, unknown> {
+    const parameters = new Map<string, unknown>();
+    
+    // Simple parameter parsing
+    const parts = input.trim().split(/\s+/);
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i];
+      if (part.startsWith('--')) {
+        const key = part.substring(2);
+        if (i + 1 < parts.length && !parts[i + 1].startsWith('--')) {
+          parameters.set(key, parts[i + 1]);
+          i++; // Skip next part as it's the value
+        } else {
+          parameters.set(key, true); // Boolean flag
+        }
+      }
+    }
+    
+    return parameters;
+  }
+
+  private createPatternFromWorkflowMode(mode: string): CognitivePattern {
+    // Map workflow modes to cognitive patterns for backward compatibility
+    const modeToPatternMap: Record<string, string> = {
+      'editing': 'creative',
+      'debugging': 'problem-solving', 
+      'planning': 'analytical',
+      'creation': 'creative'
+    };
+
+    const patternName = modeToPatternMap[mode] || 'conversational';
+    const patterns = this.patternMatcher.getAvailablePatterns();
+    const pattern = patterns.find(p => p.name === patternName);
+    
+    if (!pattern) {
+      // Fallback pattern
+      return {
+        name: patternName,
+        description: `Generated pattern for ${mode} workflow`,
+        purpose: `Handle ${mode} tasks`,
+        characteristics: [mode],
+        abstractKeywords: [mode],
+        contextWeight: 0.7
+      };
+    }
+    
+    return pattern;
   }
 
   private createInitialState(request: AgentRequest, pattern: CognitivePattern): WorkflowState {
@@ -1742,7 +2052,7 @@ export class Agent implements IAgent {
       domain: this.domainConfig.domain,
       context: new Map(Object.entries(request.context?.environmentContext || {})),
       toolResults: [],
-      reasoning: '',
+      reasoningOutput: '',
       output: '',
       metadata: {
         startTime: Date.now(),
@@ -1754,13 +2064,13 @@ export class Agent implements IAgent {
 
   private async saveToMemory(
     request: AgentRequest,
-    result: WorkflowResult,
+    result: any,
     sessionId: string
   ): Promise<void> {
     if (!this.memoryProvider) return;
 
     // Save conversation state
-    const conversationState = {
+    const conversationState: ConversationState = {
       sessionId,
       messages: [
         { role: 'user' as const, content: request.input, metadata: new Map() },
@@ -1774,15 +2084,15 @@ export class Agent implements IAgent {
     await this.memoryProvider.saveConversationState(conversationState);
 
     // Add processing event
-    const event = {
+    const event: ProcessingEvent = {
       eventId: `event-${Date.now()}`,
       sessionId,
       timestamp: new Date(),
       type: 'workflow_execution' as const,
-      data: new Map([
+      data: new Map<string, unknown>([
         ['pattern', result.finalState.pattern.name],
         ['executionTime', result.performance.totalTime],
-        ['toolsUsed', result.finalState.toolResults.map(tr => tr.toolName)]
+        ['toolsUsed', result.finalState.toolResults.map((tr: any) => tr.toolName)]
       ])
     };
 
@@ -1791,122 +2101,127 @@ export class Agent implements IAgent {
 }
 ```
 
----
-
-## 6. Integration Example
-
-### 6.1 Complete Implementation Setup
+### 5.2 Agent Factory
 
 ```typescript
-// lib/src/impl/setup.ts
-import { LangChainPatternMatcher } from './langchain-pattern-matcher.js';
+// lib/src/impl/agent-factory.ts  
+import type {
+  AgentConfiguration,
+  IInputClassifier,
+  ICommandHandler,
+  IWorkflowExtractor,
+  IPatternMatcher,
+  IWorkflowEngine,
+  IModelProvider,
+  IToolProvider,
+  IMemoryProvider
+} from '../abstractions/interfaces.js';
+
+import { InputClassifier } from './input-classifier.js';
+import { CommandHandler } from './command-handler.js';
+import { WorkflowExtractor } from './workflow-extractor.js';
+import { PatternMatcher } from './pattern-matcher.js';
 import { LangGraphWorkflowEngine } from './langgraph-workflow-engine.js';
-import { LangChainModelProvider } from './langchain-model-provider.js';
+import { OllamaModelProvider } from './ollama-model-provider.js';
 import { MCPToolProvider } from './mcp-tool-provider.js';
-import { Agent } from './agent.js';
-import { ABSTRACT_COGNITIVE_PATTERNS } from '../abstractions/patterns.js';
+import { ThreeTypeAgent } from './three-type-agent.js';
 
-export async function createAgent(config: SetupConfig): Promise<Agent> {
-  console.log('🚀 Setting up Agent with concrete implementations...');
+export class AgentFactory {
+  static createDevelopmentAgent(config: {
+    domain: DomainConfiguration;
+    ollamaEndpoint?: string;
+    mcpServers?: MCPServerConfig[];
+  }): ThreeTypeAgent {
+    // Create all required components
+    const inputClassifier = new InputClassifier({
+      commandPrefix: '/',
+      promptIndicators: ['hi', 'hello', 'what', 'how', 'explain'],
+      workflowIndicators: ['fix', 'create', 'build', 'analyze']
+    });
 
-  // Initialize Pattern Matcher
-  const patternMatcher = new LangChainPatternMatcher({
-    patterns: ABSTRACT_COGNITIVE_PATTERNS,
-    confidenceThreshold: config.patternMatcher.confidenceThreshold,
-    enableLLMFallback: config.patternMatcher.enableLLMFallback,
-    llmEndpoint: config.patternMatcher.llmEndpoint,
-    fallbackModel: config.patternMatcher.fallbackModel
-  });
+    const commandHandler = new CommandHandler();
+    const workflowExtractor = new WorkflowExtractor();
+    const patternMatcher = new PatternMatcher();
+    
+    const workflowEngine = new LangGraphWorkflowEngine();
+    
+    const modelProvider = new OllamaModelProvider({
+      baseUrl: config.ollamaEndpoint || 'http://localhost:11434',
+      defaultModel: 'qwen2.5-coder:7b'
+    });
+    
+    const toolProvider = new MCPToolProvider({
+      servers: config.mcpServers || [],
+      patternToolMapping: []
+    });
 
-  // Initialize Workflow Engine
-  const workflowEngine = new LangGraphWorkflowEngine({
-    enableCheckpointing: config.workflowEngine.enableCheckpointing,
-    maxExecutionTime: config.workflowEngine.maxExecutionTime,
-    enableStreaming: config.workflowEngine.enableStreaming
-  });
+    // Create agent configuration
+    const agentConfig: AgentConfiguration = {
+      domain: config.domain,
+      inputClassifier,
+      commandHandler,
+      workflowExtractor,
+      patternMatcher,
+      workflowEngine,
+      modelProvider,
+      toolProvider,
+      // memoryProvider is optional
+    };
 
-  // Initialize Model Provider
-  const modelProvider = new LangChainModelProvider({
-    models: config.modelProvider.models,
-    defaultProvider: config.modelProvider.defaultProvider,
-    defaultModel: config.modelProvider.defaultModel
-  });
+    return new ThreeTypeAgent(agentConfig);
+  }
 
-  // Initialize Tool Provider
-  const toolProvider = new MCPToolProvider({
-    servers: config.toolProvider.servers,
-    patternToolMapping: config.toolProvider.patternToolMapping
-  });
-
-  // Create Agent
-  const agent = new Agent({
-    domain: config.domain,
-    patternMatcher,
-    workflowEngine,
-    modelProvider,
-    toolProvider
-    // memoryProvider optional
-  });
-
-  // Initialize the agent
-  await agent.initialize();
-
-  console.log('✅ Agent setup complete');
-  return agent;
-}
-
-interface SetupConfig {
-  domain: DomainConfiguration;
-  patternMatcher: {
-    confidenceThreshold: number;
-    enableLLMFallback: boolean;
-    llmEndpoint?: string;
-    fallbackModel?: string;
-  };
-  workflowEngine: {
-    enableCheckpointing: boolean;
-    maxExecutionTime: number;
-    enableStreaming: boolean;
-  };
-  modelProvider: {
-    models: readonly ModelConfiguration[];
-    defaultProvider: string;
-    defaultModel: string;
-  };
-  toolProvider: {
-    servers: readonly MCPServerConfig[];
-    patternToolMapping: readonly [string, string[]][];
-  };
+  static createProductionAgent(config: {
+    domain: DomainConfiguration;
+    ollamaEndpoint?: string;
+    mcpServers?: MCPServerConfig[];
+    memoryProvider?: IMemoryProvider;
+  }): ThreeTypeAgent {
+    // Production version with memory provider and enhanced configuration
+    const agent = this.createDevelopmentAgent(config);
+    
+    // Add production-specific enhancements
+    if (config.memoryProvider) {
+      (agent as any).memoryProvider = config.memoryProvider;
+    }
+    
+    return agent;
+  }
 }
 ```
 
 ---
 
-## Summary
+## Key Architecture Changes
 
-This implementation demonstrates how to build the agent framework using modern AI technologies while maintaining full compliance with the abstract interfaces. Key benefits of this approach:
+### 1. Three-Type Classification First
+The corrected implementation shows:
+- **Input Classification FIRST**: `inputClassifier.classifyInput()` determines input type
+- **Routing Based on Type**: Commands, prompts, and workflows handled differently
+- **Pattern Recognition Only for Workflows**: Complex tasks get pattern-based orchestration
 
-### ✅ Technology Implementation Benefits
+### 2. Simplified Processing Paths
+- **Commands**: Direct execution via command handler (no patterns needed)
+- **Prompts**: Direct LLM processing via model provider (no patterns needed)  
+- **Workflows**: Pattern recognition → workflow extraction → workflow engine
 
-1. **LangGraph Workflows**: Robust state management and workflow orchestration
-2. **LangChain Models**: Mature model abstractions with extensive provider support  
-3. **MCP Tools**: Standardized tool integration with strong ecosystem
-4. **TypeScript**: Full type safety and modern development experience
+### 3. Clear Separation of Concerns
+- **Input Classifier**: Determines command/prompt/workflow
+- **Command Handler**: Executes system commands
+- **Model Provider**: Handles simple conversational responses
+- **Workflow Engine**: Orchestrates complex multi-step tasks with patterns
 
-### ✅ Architecture Compliance
+This architecture correctly implements the three-type classification system where pattern recognition is reserved for complex workflows, while simple inputs get direct, efficient processing.
 
-1. **Interface Adherence**: All implementations strictly follow abstract contracts
-2. **Substitutability**: Any component can be replaced with alternative implementations
-3. **Technology Independence**: Framework remains usable with different technology choices
-4. **Domain Agnostic**: Implementations work across any domain specialization
+---
 
-### ✅ Production Readiness
+**Implementation Status**: ✅ **Major Update Complete**  
+**Architecture**: Three-Type Classification with correct input routing  
+**Key Fix**: Pattern recognition only happens for workflows, not all inputs  
 
-1. **Error Handling**: Comprehensive error handling and graceful degradation
-2. **Performance**: Caching, streaming, and optimization built-in
-3. **Monitoring**: Health checks and performance metrics
-4. **Scalability**: Async operations and resource management
+The implementation guide now correctly shows the three-type classification architecture where:
+1. **Input classification happens first** (not pattern detection)
+2. **Commands and prompts get direct handling** (no pattern detection needed)
+3. **Workflows use pattern recognition** for complex orchestration
 
-This implementation layer provides the bridge between the abstract framework and concrete AI technologies, enabling powerful, flexible, and maintainable AI agent systems.
-
-**Next Steps**: See [agent.coder.md](./agent.coder.md) for domain-specific specialization examples using these implementations.
+This aligns with the current implementation in `lib/src/impl/three-type-agent.ts` and the abstract interfaces in `docs/agents/v1/agent.abstractions.md`.

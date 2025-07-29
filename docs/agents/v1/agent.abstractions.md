@@ -44,27 +44,222 @@ interface DomainConfiguration {
 }
 ```
 
-#### 1.3 Pattern Detection
+#### 1.3 Pattern Recognition (Three-Type System)
 
 ```typescript
 interface ProcessingContext {
   readonly threadId?: string;
-  readonly currentPattern?: string;
+  readonly sessionId?: string;
+  readonly currentInputType?: 'command' | 'prompt' | 'workflow';
   readonly userHistory?: readonly ProcessingEvent[];
   readonly environmentContext?: ReadonlyMap<string, unknown>;
 }
 
-interface PatternDetectionResult {
-  readonly pattern: CognitivePattern;
+interface PatternRecognitionResult {
+  readonly type: 'command' | 'prompt' | 'workflow';
   readonly confidence: number;
-  readonly detectionMethod: 'rule-based' | 'llm-based' | 'hybrid';
+  readonly detectionMethod: 'rule-based' | 'complexity-analysis' | 'hybrid';
   readonly metadata: ReadonlyMap<string, unknown>;
 }
 
-interface IPatternMatcher {
-  detectPattern(input: string, context?: ProcessingContext): Promise<PatternDetectionResult>;
-  getAvailablePatterns(): readonly CognitivePattern[];
-  updatePatternConfiguration(patterns: readonly CognitivePattern[]): void;
+interface IPatternRecognizer {
+  recognizePattern(input: string, context?: ProcessingContext): Promise<PatternRecognitionResult>;
+  getSupportedTypes(): readonly string[];
+  updateRecognitionRules(config: PatternRecognitionConfig): void;
+}
+
+interface PatternRecognitionConfig {
+  readonly commandPrefix: string;
+  readonly promptIndicators: readonly string[];
+  readonly workflowIndicators: readonly string[];
+  readonly confidenceThresholds: ReadonlyMap<string, number>;
+}
+```
+
+#### 1.4 Command Handler Abstractions
+
+```typescript
+interface CommandDefinition {
+  readonly name: string;
+  readonly description: string;
+  readonly usage: string;
+  readonly category: string;
+  readonly parameters: readonly CommandParameter[];
+  readonly aliases?: readonly string[];
+}
+
+interface CommandParameter {
+  readonly name: string;
+  readonly description: string;
+  readonly type: 'string' | 'number' | 'boolean' | 'array';
+  readonly required: boolean;
+  readonly defaultValue?: unknown;
+  readonly validation?: CommandParameterValidation;
+}
+
+interface CommandParameterValidation {
+  readonly pattern?: string;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly allowedValues?: readonly unknown[];
+}
+
+interface CommandRequest {
+  readonly commandName: string;
+  readonly parameters: ReadonlyMap<string, unknown>;
+  readonly rawInput: string;
+  readonly context?: ProcessingContext;
+}
+
+interface CommandResult {
+  readonly status: 'success' | 'error' | 'help' | 'not_found';
+  readonly content: string;
+  readonly data?: unknown;
+  readonly suggestions?: readonly string[];
+  readonly metadata: ReadonlyMap<string, unknown>;
+}
+
+interface ICommandHandler {
+  getAvailableCommands(): readonly CommandDefinition[];
+  executeCommand(request: CommandRequest): Promise<CommandResult>;
+  validateCommand(commandName: string, parameters: ReadonlyMap<string, unknown>): Promise<boolean>;
+  registerCommand(definition: CommandDefinition, handler: CommandExecutor): void;
+  unregisterCommand(commandName: string): void;
+}
+
+type CommandExecutor = (request: CommandRequest) => Promise<CommandResult>;
+```
+
+#### 1.5 Workflow Extractor Abstractions
+
+```typescript
+interface WorkflowMode {
+  readonly name: string;
+  readonly description: string;
+  readonly category: string;
+  readonly keywords: readonly string[];
+  readonly commonNodes: readonly string[];
+  readonly requiredTools: readonly string[];
+}
+
+interface WorkflowExtractionResult {
+  readonly mode: string;
+  readonly workflowSpec: WorkflowSpec;
+  readonly confidence: number;
+  readonly extractionMethod: 'template-based' | 'llm-based' | 'hybrid';
+  readonly metadata: ReadonlyMap<string, unknown>;
+}
+
+interface WorkflowSpec {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly nodes: readonly WorkflowNodeSpec[];
+  readonly edges: readonly WorkflowEdgeSpec[];
+  readonly parameters: ReadonlyMap<string, unknown>;
+}
+
+interface WorkflowNodeSpec {
+  readonly id: string;
+  readonly name: string;
+  readonly type: 'input' | 'processing' | 'tool' | 'reasoning' | 'output' | 'decision';
+  readonly parameters: ReadonlyMap<string, unknown>;
+  readonly requiredTools?: readonly string[];
+  readonly conditions?: readonly WorkflowConditionSpec[];
+}
+
+interface WorkflowEdgeSpec {
+  readonly from: string;
+  readonly to: string;
+  readonly condition?: WorkflowConditionSpec;
+  readonly priority?: number;
+}
+
+interface WorkflowConditionSpec {
+  readonly type: 'always' | 'success' | 'error' | 'custom';
+  readonly expression?: string;
+  readonly parameters?: ReadonlyMap<string, unknown>;
+}
+
+interface IWorkflowExtractor {
+  extractWorkflow(input: string, context?: ProcessingContext): Promise<WorkflowExtractionResult>;
+  getSupportedModes(): readonly WorkflowMode[];
+  validateWorkflowSpec(spec: WorkflowSpec): Promise<boolean>;
+  getWorkflowTemplates(mode: string): Promise<readonly WorkflowSpec[]>;
+}
+```
+
+#### 1.6 Prompt Processing Abstractions
+
+```typescript
+interface PromptRequest {
+  readonly input: string;
+  readonly context?: ProcessingContext;
+  readonly templateId?: string;
+  readonly parameters?: ReadonlyMap<string, unknown>;
+}
+
+interface PromptResponse {
+  readonly content: string;
+  readonly templateUsed?: string;
+  readonly modelUsed: string;
+  readonly usage?: TokenUsage;
+  readonly metadata: ReadonlyMap<string, unknown>;
+}
+
+interface IPromptHandler {
+  handlePrompt(request: PromptRequest): Promise<PromptResponse>;
+  streamPrompt(request: PromptRequest): AsyncIterableIterator<PromptStreamChunk>;
+  getSupportedTemplates(): readonly string[];
+}
+
+interface PromptStreamChunk {
+  readonly content: string;
+  readonly isComplete: boolean;
+  readonly metadata?: ReadonlyMap<string, unknown>;
+}
+
+interface PromptTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly template: string;
+  readonly parameters: readonly string[];
+  readonly description: string;
+}
+
+interface IPromptManager {
+  loadTemplate(templateId: string): Promise<PromptTemplate>;
+  renderTemplate(templateId: string, parameters: ReadonlyMap<string, unknown>): Promise<string>;
+  getAvailableTemplates(): readonly PromptTemplate[];
+  selectModel(context: ProcessingContext): Promise<ModelConfiguration>;
+}
+```
+
+#### 1.7 Configuration Management Abstractions
+
+```typescript
+interface ConfigurationSection {
+  readonly [key: string]: unknown;
+}
+
+interface AgentConfiguration {
+  readonly agent: {
+    readonly name: string;
+    readonly version: string;
+    readonly environment: string;
+  };
+  readonly models: ConfigurationSection;
+  readonly tools: ConfigurationSection;
+  readonly memory: ConfigurationSection;
+  readonly ui: ConfigurationSection;
+}
+
+interface IConfigurationManager {
+  loadConfiguration(configPath: string): Promise<AgentConfiguration>;
+  getSection<T extends ConfigurationSection>(sectionName: string): T;
+  resolveEnvironmentVariables(config: ConfigurationSection): ConfigurationSection;
+  validateConfiguration(config: AgentConfiguration): boolean;
+  watchConfiguration(callback: (config: AgentConfiguration) => void): void;
 }
 ```
 
@@ -378,12 +573,17 @@ interface IMemoryProvider {
 #### 6.1 Agent Factory Interface
 
 ```typescript
-interface AgentConfiguration {
+interface AgentComponentConfiguration {
   readonly domain: DomainConfiguration;
-  readonly patternMatcher: IPatternMatcher;
+  readonly patternRecognizer: IPatternRecognizer;
+  readonly commandHandler: ICommandHandler;
+  readonly promptHandler: IPromptHandler;
+  readonly promptManager: IPromptManager;
+  readonly workflowExtractor: IWorkflowExtractor;
   readonly workflowEngine: IWorkflowEngine;
   readonly modelProvider: IModelProvider;
   readonly toolProvider: IToolProvider;
+  readonly configurationManager: IConfigurationManager;
   readonly memoryProvider?: IMemoryProvider;
 }
 
@@ -409,7 +609,8 @@ interface RetryPolicy {
 
 interface AgentResponse {
   readonly content: string;
-  readonly pattern: CognitivePattern;
+  readonly inputType: 'command' | 'prompt' | 'workflow';
+  readonly workflowMode?: string;
   readonly toolsUsed: readonly string[];
   readonly performance: WorkflowPerformance;
   readonly metadata: ReadonlyMap<string, unknown>;
@@ -421,7 +622,9 @@ interface IAgent {
   stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk>;
   
   getDomainConfiguration(): DomainConfiguration;
-  getAvailablePatterns(): readonly CognitivePattern[];
+  getSupportedInputTypes(): readonly string[];
+  getAvailableCommands(): readonly CommandDefinition[];
+  getSupportedWorkflowModes(): readonly WorkflowMode[];
   getAvailableTools(): Promise<readonly ToolDefinition[]>;
   
   healthCheck(): Promise<HealthCheckResult>;
@@ -430,7 +633,8 @@ interface IAgent {
 
 interface AgentStreamChunk {
   readonly content: string;
-  readonly pattern?: CognitivePattern;
+  readonly inputType?: 'command' | 'prompt' | 'workflow';
+  readonly workflowMode?: string;
   readonly currentStage?: string;
   readonly isComplete: boolean;
   readonly error?: Error;
