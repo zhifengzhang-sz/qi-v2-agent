@@ -285,6 +285,38 @@ This is the primary issue with WSL2 ↔ Windows Ollama connectivity.
    ollama serve
    ```
 
+**Problem**: Ollama auto-starts with `127.0.0.1:11434` instead of `0.0.0.0:11434`
+
+**Root Cause**: Windows Ollama installer creates auto-starting background service/process that ignores environment variables
+
+**Solutions**:
+1. **Force stop auto-started service** (immediate fix):
+   ```powershell
+   # Stop all Ollama processes completely
+   Get-Process ollama* | Stop-Process -Force
+   
+   # Wait a moment, then start with correct binding
+   $env:OLLAMA_HOST="0.0.0.0:11434"
+   ollama serve
+   ```
+
+2. **Disable auto-start** (permanent fix):
+   ```powershell
+   # Check and stop Ollama service
+   Get-Service ollama* -ErrorAction SilentlyContinue
+   Stop-Service ollama -ErrorAction SilentlyContinue
+   Set-Service ollama -StartupType Disabled -ErrorAction SilentlyContinue
+   
+   # Also disable from Windows startup programs:
+   # Task Manager → Startup tab → Disable Ollama
+   ```
+
+3. **Verify correct binding**:
+   ```powershell
+   # Should show 0.0.0.0:11434, not 127.0.0.1:11434
+   netstat -ano | findstr 11434
+   ```
+
 **Problem**: `curl: (7) Failed to connect` after Windows restart
 
 **Solutions**:

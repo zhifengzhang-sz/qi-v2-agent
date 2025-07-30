@@ -7,6 +7,7 @@ import { StateGraph, CompiledGraph, Annotation, START, END } from '@langchain/la
 import { MemorySaver } from '@langchain/langgraph';
 import type { 
   IWorkflowEngine,
+  IToolProvider,
   CognitivePattern,
   ExecutableWorkflow,
   WorkflowState,
@@ -16,7 +17,7 @@ import type {
   WorkflowNode,
   WorkflowEdge,
   ToolResult
-} from '../core/interfaces.js';
+} from '../../core/interfaces.js';
 
 // Proper LangGraph State Annotation following the documented API patterns
 const WorkflowStateAnnotation = Annotation.Root({
@@ -34,7 +35,7 @@ const WorkflowStateAnnotation = Annotation.Root({
     reducer: (current, update) => current.concat(update),
     default: () => []
   }),
-  reasoning: Annotation<string>,
+  reasoningOutput: Annotation<string>,
   output: Annotation<string>,
   metadata: Annotation<{
     startTime: number;
@@ -56,9 +57,11 @@ type LangGraphState = typeof WorkflowStateAnnotation.State;
 export class LangGraphWorkflowEngine implements IWorkflowEngine {
   private compiledWorkflows = new Map<string, any>();
   private memorySaver: MemorySaver;
+  private toolProvider?: IToolProvider;
 
   constructor(config: LangGraphWorkflowConfig = {}) {
     this.memorySaver = new MemorySaver();
+    this.toolProvider = config.toolProvider;
   }
 
   createWorkflow(
@@ -255,23 +258,99 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
   };
 
   private executeToolsNode = async (state: LangGraphState) => {
-    const newToolResult = {
-      toolName: `${state.patternName}-tool`,
-      status: 'success' as const,
-      data: `Tool execution for ${state.patternName} pattern`,
-      executionTime: 100,
-      metadata: { pattern: state.patternName }
-    };
+    // Real tool execution implementation
+    const toolResults: any[] = [];
+    const toolStartTime = Date.now();
+    
+    try {
+      // Get pattern-specific tools from tool provider
+      if (this.toolProvider) {
+        const pattern = { name: state.patternName } as CognitivePattern;
+        const availableTools = await this.toolProvider.getAvailableTools(pattern);
+        
+        // Execute relevant tools based on pattern and input
+        for (const tool of availableTools.slice(0, 3)) { // Limit to 3 tools for performance
+          try {
+            const toolRequest = {
+              toolName: tool.name,
+              parameters: new Map([
+                ['input', state.input],
+                ['pattern', state.patternName]
+              ]),
+              context: new Map([
+                ['executionContext', JSON.stringify(state.context)],
+                ['domain', state.domain],
+                ['patternName', state.patternName]
+              ]),
+              executionOptions: {
+                timeout: tool.capabilities.maxExecutionTime,
+                retryCount: 1
+              }
+            };
+            
+            const result = await this.toolProvider.executeTool(toolRequest);
+            toolResults.push({
+              toolName: result.toolName,
+              status: result.status,
+              data: result.data,
+              executionTime: result.executionTime,
+              metadata: Object.fromEntries(result.metadata)
+            });
+          } catch (error) {
+            toolResults.push({
+              toolName: tool.name,
+              status: 'error',
+              data: null,
+              executionTime: Date.now() - toolStartTime,
+              metadata: { 
+                error: error instanceof Error ? error.message : String(error),
+                pattern: state.patternName
+              }
+            });
+          }
+        }
+      }
+      
+      // Handle no-tools case gracefully without creating fake results
+      if (toolResults.length === 0) {
+        console.warn(`No tools available for pattern '${state.patternName}' - workflow will proceed without tool execution`);
+        
+        // Add metadata to state indicating no tools were executed
+        const noToolsMetadata = {
+          toolsSkipped: true,
+          reason: 'no-tools-available',
+          pattern: state.patternName,
+          timestamp: Date.now()
+        };
+        
+        // Return empty toolResults array - don't create fake data
+        // The workflow engine should handle this gracefully in downstream nodes
+      }
+    } catch (error) {
+      // Error fallback
+      toolResults.push({
+        toolName: 'error-handler',
+        status: 'error',
+        data: null,
+        executionTime: Date.now() - toolStartTime,
+        metadata: { 
+          error: error instanceof Error ? error.message : String(error),
+          pattern: state.patternName
+        }
+      });
+    }
     
     return {
-      toolResults: [newToolResult],
+      toolResults,
       metadata: {
         startTime: state.metadata.startTime,
         currentStage: 'executeTools',
-        processingSteps: [...state.metadata.processingSteps, 'tools-executed'],
+        processingSteps: [...state.metadata.processingSteps, toolResults.length > 0 ? 'tools-executed' : 'tools-skipped'],
         performance: {
           ...state.metadata.performance,
-          toolExecutionTime: newToolResult.executionTime
+          toolExecutionTime: toolResults.reduce((sum, tr) => sum + tr.executionTime, 0),
+          toolsExecuted: toolResults.length,
+          hasToolResults: toolResults.length > 0
         }
       }
     };
@@ -280,29 +359,34 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
   private reasoningNode = async (state: LangGraphState) => {
     const reasoningStartTime = Date.now();
     
-    // Pattern-specific reasoning
+    // Pattern-specific reasoning - handle cases with and without tools
     let reasoning = '';
+    const hasTools = state.toolResults.length > 0;
+    const toolInfo = hasTools 
+      ? `Tools used: ${state.toolResults.map(tr => tr.toolName).join(', ')}`
+      : 'No tools available - proceeding with pattern-based reasoning';
+    
     switch (state.patternName) {
       case 'analytical':
-        reasoning = `Systematic analysis of: ${state.input}\nContext keys: ${Object.keys(state.context).join(', ')}\nTools used: ${state.toolResults.map(tr => tr.toolName).join(', ')}`;
+        reasoning = `Systematic analysis of: ${state.input}\nContext keys: ${Object.keys(state.context).join(', ')}\n${toolInfo}`;
         break;
       case 'creative':
-        reasoning = `Creative synthesis for: ${state.input}\nGenerating innovative solutions based on available context and tools.`;
+        reasoning = `Creative synthesis for: ${state.input}\nGenerating innovative solutions based on available context${hasTools ? ' and tool results' : ' (no tools available)'}.`;
         break;
       case 'problem-solving':
-        reasoning = `Problem diagnosis: ${state.input}\nAnalyzing issues and formulating solutions.`;
+        reasoning = `Problem diagnosis: ${state.input}\nAnalyzing issues and formulating solutions${hasTools ? ' with tool assistance' : ' using pattern-based analysis'}.`;
         break;
       case 'informational':
-        reasoning = `Knowledge synthesis for: ${state.input}\nStructuring educational content for clear understanding.`;
+        reasoning = `Knowledge synthesis for: ${state.input}\nStructuring educational content for clear understanding${hasTools ? ' with research tools' : ' using available knowledge'}.`;
         break;
       default:
-        reasoning = `Processing ${state.patternName} pattern for: ${state.input}`;
+        reasoning = `Processing ${state.patternName} pattern for: ${state.input}\n${toolInfo}`;
     }
     
     const reasoningTime = Date.now() - reasoningStartTime;
     
     return {
-      reasoning,
+      reasoningOutput: reasoning,
       metadata: {
         startTime: state.metadata.startTime,
         currentStage: 'reasoning',
@@ -316,14 +400,16 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
   };
 
   private synthesizeResultsNode = async (state: LangGraphState) => {
-    // Combine reasoning with tool results
-    let synthesis = state.reasoning;
+    // Combine reasoning with tool results (if available)
+    let synthesis = state.reasoningOutput;
     
     if (state.toolResults.length > 0) {
       synthesis += '\n\n🔧 Tool Results:\n';
       synthesis += state.toolResults.map(result => 
         `• ${result.toolName}: ${result.status} (${result.executionTime}ms)`
       ).join('\n');
+    } else {
+      synthesis += '\n\n⚠️ No tools were executed for this workflow - results based on pattern analysis only.';
     }
 
     // Add context insights
@@ -523,7 +609,7 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
         executionTime: tr.executionTime,
         metadata: Object.fromEntries(tr.metadata || new Map())
       })),
-      reasoning: state.reasoning,
+      reasoningOutput: state.reasoningOutput,
       output: state.output,
       metadata: {
         startTime: state.metadata.startTime,
@@ -547,7 +633,7 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
         executionTime: tr.executionTime,
         metadata: new Map(Object.entries(tr.metadata || {}))
       })),
-      reasoning: state.reasoning || '',
+      reasoningOutput: state.reasoningOutput || '',
       output: state.output || '',
       metadata: {
         startTime: state.metadata?.startTime || Date.now(),
@@ -559,8 +645,49 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
   }
 
   private getCurrentNodeFromChunk(chunk: any): string {
-    // Extract current node from LangGraph chunk
-    return chunk.__priv_stream_writer?.name || 'unknown';
+    // Extract current node from LangGraph chunk using proper 2025 API
+    // LangGraph streams provide metadata about the current node
+    if (chunk.metadata?.node) {
+      return chunk.metadata.node;
+    }
+    
+    // Alternative: check for node name in config
+    if (chunk.config?.configurable?.node) {
+      return chunk.config.configurable.node;
+    }
+    
+    // Check if it's a node event with explicit node name
+    if (chunk.event === 'on_chain_start' && chunk.name) {
+      return chunk.name;
+    }
+    
+    // For state updates, infer from state changes
+    if (chunk.input && typeof chunk.input === 'object') {
+      const metadata = chunk.input.metadata;
+      if (metadata?.currentStage) {
+        return metadata.currentStage;
+      }
+    }
+    
+    // Enhanced fallback using LangGraph's internal tracking
+    if (chunk.tags && Array.isArray(chunk.tags)) {
+      const nodeTag = chunk.tags.find((tag: string) => tag.startsWith('node:'));
+      if (nodeTag) {
+        return nodeTag.substring(5); // Remove 'node:' prefix
+      }
+    }
+    
+    // Check for state annotation hints
+    if (chunk.patternName) {
+      // Infer node from pattern and processing stage
+      const stage = chunk.metadata?.currentStage;
+      if (stage) {
+        return `${chunk.patternName}-${stage}`;
+      }
+      return chunk.patternName;
+    }
+    
+    return 'workflow-node';
   }
 
   private isStreamComplete(chunk: any): boolean {
@@ -705,6 +832,7 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
 }
 
 export interface LangGraphWorkflowConfig {
+  toolProvider?: IToolProvider;
   enableCheckpointing?: boolean;
   maxExecutionTime?: number;
   enableStreaming?: boolean;

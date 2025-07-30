@@ -19,7 +19,7 @@ import type {
   ToolResult,
   ToolStreamChunk,
   CognitivePattern
-} from '../core/interfaces.js';
+} from '../../core/interfaces.js';
 
 export class MCPToolProvider implements IToolProvider {
   private clients = new Map<string, Client>();

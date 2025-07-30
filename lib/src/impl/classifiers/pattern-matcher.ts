@@ -10,18 +10,20 @@ import type {
   CognitivePattern, 
   ProcessingContext, 
   PatternDetectionResult 
-} from '../core/interfaces.js';
+} from '../../core/interfaces.js';
 
-export class PatternMatcher implements IPatternMatcher {
+export class MultiSignalPatternMatcher implements IPatternMatcher {
   private patterns: readonly CognitivePattern[];
   private fallbackLLM?: ChatOllama;
   private fallbackPrompt?: PromptTemplate;
   private confidenceThreshold: number;
   private cache = new Map<string, PatternDetectionResult>();
+  private signalMappings: SignalMappingConfig;
 
-  constructor(config: PatternMatcherConfig) {
+  constructor(config: MultiSignalPatternMatcherConfig) {
     this.patterns = config.patterns;
     this.confidenceThreshold = config.confidenceThreshold;
+    this.signalMappings = config.signalMappings || this.getDefaultSignalMappings();
     
     if (config.enableLLMFallback) {
       this.initializeFallbackLLM(config);
@@ -153,29 +155,13 @@ export class PatternMatcher implements IPatternMatcher {
   }
 
   private calculateToolSignalScore(input: string, pattern: CognitivePattern): number {
-    const toolSignals = {
-      analytical: ['plan', 'architecture', 'approach', 'strategy', 'design'],
-      creative: ['create', 'build', 'generate', 'implement', 'develop'],
-      'problem-solving': ['fix', 'debug', 'error', 'bug', 'solve', 'troubleshoot'],
-      informational: ['explain', 'what', 'how', 'why', 'help', 'documentation'],
-      conversational: []
-    };
-
-    const signals = toolSignals[pattern.name as keyof typeof toolSignals] || [];
+    const signals = this.signalMappings.toolSignals.get(pattern.name) || [];
     const matches = signals.filter(signal => input.includes(signal)).length;
     return signals.length > 0 ? matches / signals.length : 0;
   }
 
   private calculateActionVerbScore(input: string, pattern: CognitivePattern): number {
-    const actionVerbs = {
-      analytical: ['analyze', 'review', 'examine', 'assess', 'evaluate', 'plan'],
-      creative: ['create', 'build', 'generate', 'design', 'develop', 'implement'],
-      'problem-solving': ['fix', 'solve', 'resolve', 'debug', 'troubleshoot', 'repair'],
-      informational: ['explain', 'describe', 'teach', 'show', 'help', 'clarify'],
-      conversational: ['chat', 'discuss', 'talk', 'converse']
-    };
-
-    const verbs = actionVerbs[pattern.name as keyof typeof actionVerbs] || [];
+    const verbs = this.signalMappings.actionVerbs.get(pattern.name) || [];
     const matches = verbs.filter(verb => input.includes(verb)).length;
     return verbs.length > 0 ? matches / verbs.length : 0;
   }
@@ -183,11 +169,7 @@ export class PatternMatcher implements IPatternMatcher {
   private calculateErrorIndicatorScore(input: string, pattern: CognitivePattern): number {
     if (pattern.name !== 'problem-solving') return 0;
 
-    const errorIndicators = [
-      'error', 'exception', 'bug', 'crash', 'fail', 'broken',
-      'undefined', 'null', 'stack trace', 'timeout', '404', '500'
-    ];
-
+    const errorIndicators = this.signalMappings.errorIndicators || [];
     const matches = errorIndicators.filter(indicator => input.includes(indicator)).length;
     return matches > 0 ? Math.min(matches / 3, 1.0) : 0; // Cap at 1.0, boost for multiple error terms
   }
@@ -349,7 +331,7 @@ export class PatternMatcher implements IPatternMatcher {
     return this.multiSignalDetection(input, context);
   }
 
-  private initializeFallbackLLM(config: PatternMatcherConfig): void {
+  private initializeFallbackLLM(config: MultiSignalPatternMatcherConfig): void {
     this.fallbackLLM = new ChatOllama({
       baseUrl: config.llmEndpoint || 'http://localhost:11434',
       model: config.fallbackModel || 'qwen2.5:7b',
@@ -377,12 +359,42 @@ If uncertain, choose the most likely pattern and provide your confidence level.
     const contextKey = context?.currentPattern || 'none';
     return `${input.slice(0, 100)}:${contextKey}`;
   }
+
+  private getDefaultSignalMappings(): SignalMappingConfig {
+    return {
+      toolSignals: new Map([
+        ['analytical', ['plan', 'architecture', 'approach', 'strategy', 'design']],
+        ['creative', ['create', 'build', 'generate', 'implement', 'develop']],
+        ['problem-solving', ['fix', 'debug', 'error', 'bug', 'solve', 'troubleshoot']],
+        ['informational', ['explain', 'what', 'how', 'why', 'help', 'documentation']],
+        ['conversational', []]
+      ]),
+      actionVerbs: new Map([
+        ['analytical', ['analyze', 'review', 'examine', 'assess', 'evaluate', 'plan']],
+        ['creative', ['create', 'build', 'generate', 'design', 'develop', 'implement']],
+        ['problem-solving', ['fix', 'solve', 'resolve', 'debug', 'troubleshoot', 'repair']],
+        ['informational', ['explain', 'describe', 'teach', 'show', 'help', 'clarify']],
+        ['conversational', ['chat', 'discuss', 'talk', 'converse']]
+      ]),
+      errorIndicators: [
+        'error', 'exception', 'bug', 'crash', 'fail', 'broken',
+        'undefined', 'null', 'stack trace', 'timeout', '404', '500'
+      ]
+    };
+  }
 }
 
-export interface PatternMatcherConfig {
+export interface MultiSignalPatternMatcherConfig {
   patterns: readonly CognitivePattern[];
   confidenceThreshold: number;
   enableLLMFallback: boolean;
   llmEndpoint?: string;
   fallbackModel?: string;
+  signalMappings?: SignalMappingConfig;
+}
+
+export interface SignalMappingConfig {
+  toolSignals: Map<string, string[]>;
+  actionVerbs: Map<string, string[]>;
+  errorIndicators: string[];
 }

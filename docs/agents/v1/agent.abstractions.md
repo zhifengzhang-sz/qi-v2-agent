@@ -162,7 +162,7 @@ interface WorkflowSpec {
 interface WorkflowNodeSpec {
   readonly id: string;
   readonly name: string;
-  readonly type: 'input' | 'processing' | 'tool' | 'reasoning' | 'output' | 'decision';
+  readonly type: 'input' | 'processing' | 'tool' | 'reasoning' | 'output' | 'decision' | 'validation';
   readonly parameters: ReadonlyMap<string, unknown>;
   readonly requiredTools?: readonly string[];
   readonly conditions?: readonly WorkflowConditionSpec[];
@@ -191,6 +191,20 @@ interface IWorkflowExtractor {
 
 #### 1.6 Prompt Processing Abstractions
 
+The prompt processing system follows a clear separation of concerns between handling and management:
+
+**IPromptHandler** (Processing Layer):
+- Takes input text and processes it for the model
+- Handles template rendering and application  
+- Manages input preprocessing and formatting
+- Orchestrates the prompt-to-model flow
+
+**IPromptManager** (System Layer):
+- Manages template storage and retrieval
+- Handles model selection logic based on context
+- Provides system-level prompt configuration
+- Maintains template inventory and metadata
+
 ```typescript
 interface PromptRequest {
   readonly input: string;
@@ -210,6 +224,7 @@ interface PromptResponse {
 interface IPromptHandler {
   handlePrompt(request: PromptRequest): Promise<PromptResponse>;
   streamPrompt(request: PromptRequest): AsyncIterableIterator<PromptStreamChunk>;
+  renderTemplate(template: PromptTemplate, parameters: ReadonlyMap<string, unknown>): Promise<string>;
   getSupportedTemplates(): readonly string[];
 }
 
@@ -229,9 +244,9 @@ interface PromptTemplate {
 
 interface IPromptManager {
   loadTemplate(templateId: string): Promise<PromptTemplate>;
-  renderTemplate(templateId: string, parameters: ReadonlyMap<string, unknown>): Promise<string>;
   getAvailableTemplates(): readonly PromptTemplate[];
-  selectModel(context: ProcessingContext): Promise<ModelConfiguration>;
+  getModelConfiguration(providerId: string, modelId: string): Promise<ModelConfiguration>;
+  getAvailableModels(providerId?: string): Promise<readonly ModelConfiguration[]>;
 }
 ```
 
@@ -298,7 +313,7 @@ interface ExecutableWorkflow {
 interface WorkflowNode {
   readonly id: string;
   readonly name: string;
-  readonly type: 'input' | 'processing' | 'tool' | 'reasoning' | 'output';
+  readonly type: 'input' | 'processing' | 'tool' | 'reasoning' | 'output' | 'decision' | 'validation';
   readonly handler: WorkflowNodeHandler;
 }
 
@@ -751,6 +766,109 @@ const ABSTRACT_COGNITIVE_PATTERNS: readonly CognitivePattern[] = [
 2. Use dependency injection to provide implementations
 3. Write tests against interfaces to ensure implementation compatibility
 4. Design for substitutability of different implementations
+
+---
+
+## Enhanced Workflow Node Taxonomy
+
+### Comprehensive Node Type Definitions
+
+The workflow node taxonomy has been enhanced based on research from BPMN standards, LangGraph 2025 patterns, and production implementation experience:
+
+```typescript
+type WorkflowNodeType = 
+  | 'input'           // Data entry, input processing, parameter extraction
+  | 'reasoning'       // Analysis, planning, LLM-based cognitive processing
+  | 'tool'           // External tool execution, API calls, system operations
+  | 'processing'     // Data transformation, synthesis, computational tasks
+  | 'output'         // Result formatting, response generation, data export
+  | 'decision'       // Conditional branching, routing logic, control flow
+  | 'validation'     // Result verification, quality checks, compliance testing
+```
+
+### Node Type Categories and Use Cases
+
+#### 1. **Input Nodes** (`'input'`)
+- **Purpose**: Entry points for data and parameters
+- **Examples**: User input processing, file reading, parameter extraction
+- **LangGraph Mapping**: Entry nodes in StateGraph
+- **Characteristics**: No dependencies, initialize workflow state
+
+#### 2. **Reasoning Nodes** (`'reasoning'`)
+- **Purpose**: Cognitive processing using LLMs or analytical algorithms
+- **Examples**: Analysis, planning, decision making, context enrichment
+- **LangGraph Mapping**: LLM nodes with reasoning capabilities
+- **Characteristics**: High computational cost, stateful processing
+
+#### 3. **Tool Nodes** (`'tool'`)
+- **Purpose**: External system integration and tool execution
+- **Examples**: API calls, database queries, file operations, MCP tool execution
+- **LangGraph Mapping**: Tool nodes with ToolNode integration  
+- **Characteristics**: May require timeouts, retries, error handling
+
+#### 4. **Processing Nodes** (`'processing'`)
+- **Purpose**: Data transformation and computational tasks
+- **Examples**: Data synthesis, format conversion, algorithmic processing
+- **LangGraph Mapping**: Function nodes for data manipulation
+- **Characteristics**: Deterministic operations, high throughput
+
+#### 5. **Output Nodes** (`'output'`)
+- **Purpose**: Final result generation and formatting
+- **Examples**: Response formatting, report generation, data export
+- **LangGraph Mapping**: Terminal nodes before END state
+- **Characteristics**: Finalize workflow results, prepare user responses
+
+#### 6. **Decision Nodes** (`'decision'`)
+- **Purpose**: Conditional logic and workflow routing
+- **Examples**: Branching logic, condition evaluation, path selection
+- **LangGraph Mapping**: Conditional edges and routing functions
+- **Characteristics**: Control flow determination, boolean logic
+
+#### 7. **Validation Nodes** (`'validation'`)
+- **Purpose**: Quality assurance and result verification
+- **Examples**: Output validation, compliance checking, error detection
+- **LangGraph Mapping**: Verification nodes with potential loops
+- **Characteristics**: Quality gates, may trigger rework loops
+
+### Implementation Guidelines
+
+#### Semantic Name Mapping
+For intuitive development, implementations may use semantic names that map to official types:
+
+| Semantic Name | Official Type | Rationale |
+|--------------|---------------|-----------|
+| `'analysis'` | `'reasoning'` | Analytical thinking using LLMs |
+| `'execution'` | `'processing'` | Task execution and data processing |
+| `'planning'` | `'reasoning'` | Strategic planning and decision making |
+| `'research'` | `'tool'` | Information gathering via tools |
+| `'synthesis'` | `'processing'` | Result combination and formatting |
+
+#### Best Practices
+
+1. **Single Responsibility**: Each node should have one clear purpose
+2. **State Management**: Use proper reducers for stateful operations
+3. **Error Handling**: Implement timeouts and retries for tool nodes
+4. **Validation Loops**: Allow validation nodes to trigger rework
+5. **Performance**: Consider computational cost for reasoning nodes
+
+### Integration with Modern Frameworks
+
+#### LangGraph StateGraph Integration
+```typescript
+// Example node implementation following enhanced taxonomy
+workflow.addNode('analysis', reasoningNode);      // reasoning type
+workflow.addNode('execution', processingNode);    // processing type  
+workflow.addNode('validation', validationNode);   // validation type
+```
+
+#### BPMN Compatibility
+The enhanced taxonomy aligns with BPMN 2.0 standards:
+- **Activities** → `processing`, `reasoning`, `tool`
+- **Gateways** → `decision`
+- **Events** → `input`, `output`
+- **Quality Gates** → `validation`
+
+This enhanced taxonomy provides a comprehensive foundation for building sophisticated AI agent workflows while maintaining compatibility with established standards and modern frameworks.
 
 ---
 
