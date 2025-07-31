@@ -3,8 +3,7 @@
 // Uses LangChain structured output with Zod schemas for accurate input classification
 // Provides much higher accuracy than rule-based methods with reliable confidence scores
 
-import { ChatOllama } from '@langchain/ollama';
-import { z } from 'zod';
+import { createOllamaStructuredWrapper, type OllamaStructuredWrapper } from '../../llm/index.js';
 import type {
   IClassificationMethod,
   ClassificationResult,
@@ -12,28 +11,48 @@ import type {
   ProcessingContext
 } from '../abstractions/index.js';
 
-// Zod schema for LLM classification output
-const ClassificationSchema = z.object({
-  type: z.enum(['command', 'prompt', 'workflow']).describe('The input type classification'),
-  confidence: z.number().min(0).max(1).describe('Confidence score from 0.0 to 1.0'),
-  reasoning: z.string().describe('Brief explanation of why this classification was chosen'),
-  indicators: z.array(z.string()).describe('Key indicators that led to this classification'),
-  extracted_data: z.record(z.string(), z.unknown()).describe('Any extracted data from the input')
-});
+// Schema for LLM classification output (using JSON Schema instead of Zod)
+const ClassificationSchema = {
+  type: "object",
+  properties: {
+    type: { 
+      type: "string", 
+      enum: ["command", "prompt", "workflow"],
+      description: "The input type classification"
+    },
+    confidence: { 
+      type: "number", 
+      minimum: 0, 
+      maximum: 1,
+      description: "Confidence score from 0.0 to 1.0"
+    },
+    reasoning: { 
+      type: "string",
+      description: "Brief explanation of why this classification was chosen"
+    },
+    indicators: { 
+      type: "array", 
+      items: { type: "string" },
+      description: "Key indicators that led to this classification"
+    },
+    extracted_data: { 
+      type: "object",
+      description: "Any extracted data from the input"
+    }
+  },
+  required: ["type", "confidence", "reasoning", "indicators", "extracted_data"]
+};
 
 export class LLMClassificationMethod implements IClassificationMethod {
-  private model: ChatOllama;
-  private structuredModel: any;
+  private wrapper: OllamaStructuredWrapper;
 
   constructor(config: LLMClassificationConfig) {
-    this.model = new ChatOllama({
-      baseUrl: config.baseUrl || 'http://localhost:11434',
-      model: config.modelId || 'qwen2.5:7b',
-      temperature: 0.1, // Low temperature for consistent classification
+    // Use working OllamaStructuredWrapper instead of broken ChatOllama
+    this.wrapper = createOllamaStructuredWrapper({
+      model: config.modelId || 'qwen2.5-coder:7b',
+      baseURL: config.baseUrl || 'http://172.18.144.1:11434',
+      temperature: 0.1 // Low temperature for consistent classification
     });
-
-    // Bind structured output schema
-    this.structuredModel = this.model.withStructuredOutput(ClassificationSchema);
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
@@ -41,18 +60,20 @@ export class LLMClassificationMethod implements IClassificationMethod {
     
     try {
       const prompt = this.buildClassificationPrompt(input, context);
-      const result = await this.structuredModel.invoke(prompt);
+      
+      // Use the working OllamaStructuredWrapper instead of broken ChatOllama
+      const result = await this.wrapper.generateStructured(prompt, ClassificationSchema);
       
       return {
         type: result.type,
         confidence: result.confidence,
         method: 'llm-based',
         reasoning: result.reasoning,
-        extractedData: new Map(Object.entries(result.extracted_data)),
+        extractedData: new Map(Object.entries(result.extracted_data || {})),
         metadata: new Map([
-          ['model', 'qwen2.5:7b'],
+          ['model', 'ollama-structured-wrapper'],
           ['latency', (Date.now() - startTime).toString()],
-          ['indicators', JSON.stringify(result.indicators)],
+          ['indicators', JSON.stringify(result.indicators || [])],
           ['prompt_tokens', this.estimateTokens(prompt).toString()],
           ['timestamp', new Date().toISOString()]
         ])
@@ -88,14 +109,8 @@ export class LLMClassificationMethod implements IClassificationMethod {
 
   async isAvailable(): Promise<boolean> {
     try {
-      // Real availability check - test connection to Ollama server
-      // Note: ChatOllama doesn't expose basePath, using constructor baseUrl
-      const baseUrl = 'http://localhost:11434'; // Default Ollama endpoint
-      const response = await fetch(`${baseUrl}/api/tags`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
-      return response.ok;
+      // Use the wrapper's availability check
+      return await this.wrapper.isAvailable();
     } catch (error) {
       // Server not available or connection failed
       return false;

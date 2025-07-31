@@ -5,6 +5,8 @@
  * Provides passive data store - no automatic notifications.
  */
 
+// No qicore imports - agent layer should not see them
+
 /**
  * Application configuration
  */
@@ -16,6 +18,17 @@ export interface AppConfig {
   readonly maxHistorySize: number;
   readonly sessionTimeout: number;
   readonly preferences: ReadonlyMap<string, unknown>;
+  readonly configPath?: string; // Path to LLM configuration directory
+}
+
+/**
+ * LLM configuration for specific roles
+ */
+export interface LLMRoleConfig {
+  readonly provider: string;
+  readonly model: string;
+  readonly temperature?: number;
+  readonly maxTokens?: number;
 }
 
 /**
@@ -94,6 +107,14 @@ export interface IStateManager {
   getConfig(): AppConfig;
   updateConfig(updates: Partial<AppConfig>): void;
   resetConfig(): void;
+  
+  // LLM configuration management  
+  loadLLMConfig(configPath: string): Promise<void>;
+  getClassifierConfig(): LLMRoleConfig | null;
+  getPromptConfig(): LLMRoleConfig | null;
+  updatePromptModel(model: string): void;
+  getAvailablePromptModels(): readonly string[];
+  getLLMConfigForPromptModule(): any | null; // Returns LLMConfig structure that prompt module expects
   
   // Model management
   getCurrentModel(): string;

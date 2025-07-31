@@ -44,6 +44,17 @@ export interface ClassificationResult {
 }
 
 /**
+ * LLM configuration for classification
+ */
+export interface LLMConfig {
+  readonly provider: string;
+  readonly model: string;
+  readonly temperature?: number;
+  readonly maxTokens?: number;
+  readonly baseURL?: string;
+}
+
+/**
  * Classification configuration
  */
 export interface ClassificationConfig {
@@ -55,6 +66,7 @@ export interface ClassificationConfig {
   readonly promptIndicators: readonly string[];
   readonly workflowIndicators: readonly string[];
   readonly complexityThresholds: ReadonlyMap<string, number>;
+  readonly llmConfig?: LLMConfig;
 }
 
 /**

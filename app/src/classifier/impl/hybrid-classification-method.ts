@@ -26,10 +26,13 @@ export class HybridClassificationMethod implements IClassificationMethod {
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
     const startTime = Date.now();
+    console.log('🔍 Hybrid: Starting classification for:', input.substring(0, 50));
 
     try {
       // Stage 1: Fast rule-based classification
+      console.log('🔍 Hybrid: Stage 1 - Rule-based classification');
       const ruleResult = await this.ruleBasedMethod.classify(input, context);
+      console.log('🔍 Hybrid: Rule result:', ruleResult.type, 'confidence:', ruleResult.confidence);
       
       // If rule-based has high confidence, use it directly
       if (ruleResult.confidence >= this.confidenceThreshold) {
@@ -46,8 +49,33 @@ export class HybridClassificationMethod implements IClassificationMethod {
         };
       }
 
-      // Stage 2: Low confidence - use LLM for accuracy
-      const llmResult = await this.llmMethod.classify(input, context);
+      // Stage 2: Low confidence - use LLM for accuracy (with timeout fallback)
+      console.log('🔍 Hybrid: Stage 2 - Starting LLM classification with timeout...');
+      let llmResult;
+      try {
+        llmResult = await Promise.race([
+          this.llmMethod.classify(input, context),
+          new Promise((_, reject) => 
+            setTimeout(() => {
+              console.log('🔍 Hybrid: LLM timeout reached (3s), rejecting...');
+              reject(new Error('LLM classification timeout'));
+            }, 3000)
+          )
+        ]);
+        console.log('🔍 Hybrid: LLM classification completed:', llmResult?.type);
+      } catch (error) {
+        console.warn('LLM classification failed, using rule-based result:', error);
+        return {
+          ...ruleResult,
+          method: 'hybrid',
+          metadata: new Map([
+            ...ruleResult.metadata,
+            ['hybrid_stage', 'rule-based-fallback'],
+            ['llm_error', error instanceof Error ? error.message : String(error)],
+            ['total_latency', Date.now() - startTime]
+          ])
+        };
+      }
       
       // Combine insights from both methods
       const combinedExtractedData = new Map([

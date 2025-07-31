@@ -29,6 +29,11 @@ export interface ProviderInfo {
  */
 export interface IPromptHandler {
   /**
+   * Initialize the handler with configuration
+   */
+  initialize(configPath: string, schemaPath: string): Promise<PromptResponse>
+  
+  /**
    * Execute a prompt with the specified provider
    */
   complete(prompt: string, options?: PromptOptions): Promise<PromptResponse>

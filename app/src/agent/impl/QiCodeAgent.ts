@@ -21,6 +21,7 @@ import type { IPromptHandler, PromptOptions } from '../../prompt/index.js';
 import type { IWorkflowEngine, IWorkflowExtractor } from '../../workflow/index.js';
 import type { IStateManager } from '../../state/index.js';
 import type { IContextManager } from '../../context/index.js';
+import { createContextAwarePromptHandler } from '../../context/utils/ContextAwarePrompting.js';
 
 /**
  * QiCode Agent - Main orchestrator with StateManager integration
@@ -31,8 +32,12 @@ export class QiCodeAgent implements IAgent {
   private classifier?: IClassifier;
   private commandHandler?: ICommandHandler;
   private promptHandler?: IPromptHandler;
+  private contextAwarePromptHandler?: any; // Will be initialized in initialize()
   private workflowEngine?: IWorkflowEngine;
   private workflowExtractor?: IWorkflowExtractor;
+  
+  // Session to context mapping for context continuation
+  private sessionContextMap = new Map<string, string>();
   
   private config: AgentConfig;
   private isInitialized = false;
@@ -72,6 +77,14 @@ export class QiCodeAgent implements IAgent {
     
     // Initialize context manager
     await this.contextManager.initialize();
+    
+    // Initialize context-aware prompt handler if prompt handler is available
+    if (this.promptHandler) {
+      this.contextAwarePromptHandler = createContextAwarePromptHandler(
+        this.promptHandler,
+        this.contextManager
+      );
+    }
     
     // Initialize other components that need initialization
     // Each component handles its own initialization
@@ -228,6 +241,9 @@ export class QiCodeAgent implements IAgent {
     // Shutdown context manager
     await this.contextManager.shutdown();
     
+    // Clear session context mapping
+    this.sessionContextMap.clear();
+    
     // Cleanup resources if needed
     this.isInitialized = false;
   }
@@ -280,23 +296,60 @@ export class QiCodeAgent implements IAgent {
       // Extract prompt options from context if available
       const promptOptions = this.extractPromptOptions(request.context);
       
-      // Execute the prompt through the handler
-      const result = await this.promptHandler.complete(request.input, promptOptions);
+      let result: any;
       
-      if (result.success) {
-        // Update conversation history through state manager
+      // Use context-aware prompting if available
+      if (this.contextAwarePromptHandler) {
+        // Get or create conversation context for this session
+        const sessionId = request.context.sessionId;
+        let contextId = this.sessionContextMap.get(sessionId);
+        
+        if (!contextId) {
+          // Create new conversation context for this session
+          const newContext = this.contextManager.createConversationContext('main');
+          contextId = newContext.id;
+          
+          // Map session to context for future requests
+          this.sessionContextMap.set(sessionId, contextId);
+        }
+        
+        // Verify context still exists (cleanup may have removed it)
+        const existingContext = this.contextManager.getConversationContext(contextId);
+        if (!existingContext) {
+          // Context was cleaned up, create a new one
+          const newContext = this.contextManager.createConversationContext('main');
+          contextId = newContext.id;
+          this.sessionContextMap.set(sessionId, contextId);
+        }
+        
+        // Execute with context continuation
+        result = await this.contextAwarePromptHandler.completeWithContext(
+          request.input,
+          promptOptions,
+          contextId,
+          true // Include conversation history
+        );
+      } else {
+        // Fallback to basic prompt processing
+        result = await this.promptHandler.complete(request.input, promptOptions);
+        
+        // Manually update state manager for fallback
         this.stateManager.addConversationEntry({
           type: 'user_input',
           content: request.input,
           metadata: new Map([['inputType', 'prompt']])
         });
         
-        this.stateManager.addConversationEntry({
-          type: 'agent_response',
-          content: result.data,
-          metadata: new Map([['responseType', 'prompt']])
-        });
-        
+        if (result.success) {
+          this.stateManager.addConversationEntry({
+            type: 'agent_response',
+            content: result.data,
+            metadata: new Map([['responseType', 'prompt']])
+          });
+        }
+      }
+      
+      if (result.success) {
         return {
           content: result.data,
           type: 'prompt',
@@ -304,7 +357,8 @@ export class QiCodeAgent implements IAgent {
           executionTime: 0, // Will be set by main process method
           metadata: new Map([
             ['promptOptions', JSON.stringify(promptOptions)],
-            ['provider', promptOptions.provider || 'default']
+            ['provider', promptOptions.provider || 'default'],
+            ['contextAware', this.contextAwarePromptHandler ? 'true' : 'false']
           ]),
           success: true
         };

@@ -21,7 +21,7 @@
     "config:show": "bun --cwd app src/main.ts config --show ../config/qi-config.yaml",
     "config:validate": "bun --cwd app src/main.ts config --validate ../config/qi-config.yaml",
     "check": "bun run typecheck && bun run lint && bun run test",
-    "check:lib": "bun run --cwd lib type-check && bun run --cwd lib lint"
+    "check:lib": "bun run --cwd lib type-check && bun run --cwd lib lint && bun run --cwd lib test"
   },
   "devDependencies": {
     "bun-types": "^1.1.38",
@@ -29,6 +29,10 @@
     "chalk": "^5.4.1"
   },
   "dependencies": {
-    "react-devtools-core": "^6.1.5"
+    "@types/js-yaml": "^4.0.9",
+    "js-yaml": "^4.1.0",
+    "multi-llm-ts": "^4.2.2",
+    "react-devtools-core": "^6.1.5",
+    "yaml": "^2.8.0"
   }
 }

@@ -8,6 +8,9 @@ export type * from './abstractions/index.js';
 // Implementations
 export * from './impl/index.js';
 
+// Utilities
+export * from './utils/index.js';
+
 // Factory functions
 import { ContextManager } from './impl/ContextManager.js';
 import type { AppContext } from './abstractions/index.js';

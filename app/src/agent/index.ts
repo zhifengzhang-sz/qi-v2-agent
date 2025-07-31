@@ -24,6 +24,7 @@ import type { ICommandHandler } from '../command/index.js';
 import type { IPromptHandler } from '../prompt/index.js';
 import type { IWorkflowEngine, IWorkflowExtractor } from '../workflow/index.js';
 import type { IStateManager } from '../state/index.js';
+import type { IContextManager } from '../context/index.js';
 
 /**
  * Agent factory configuration following prompt module pattern
@@ -39,7 +40,11 @@ export interface AgentFactoryConfig extends AgentConfig {
 /**
  * Create a QiCode agent with dependencies
  */
-export function createAgent(stateManager: IStateManager, config: AgentFactoryConfig): QiCodeAgent {
+export function createAgent(
+  stateManager: IStateManager, 
+  contextManager: IContextManager,
+  config: AgentFactoryConfig
+): QiCodeAgent {
   const agentConfig: AgentConfig = {
     domain: config.domain,
     enableCommands: config.enableCommands ?? true,
@@ -56,5 +61,5 @@ export function createAgent(stateManager: IStateManager, config: AgentFactoryCon
     workflowExtractor: config.workflowExtractor
   };
 
-  return new QiCodeAgent(stateManager, agentConfig, dependencies);
+  return new QiCodeAgent(stateManager, contextManager, agentConfig, dependencies);
 }

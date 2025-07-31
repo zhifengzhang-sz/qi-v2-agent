@@ -200,12 +200,39 @@ export class InputClassifier implements IClassifier {
     // Very short inputs with no technical content
     if (input.length < 10 && indicators.technicalTerms.length === 0 && indicators.actionVerbs.length === 0) return true;
     
+    // Simple coding requests - single action verb with no file references or complex tasks
+    if (this.isSimpleCodingRequest(input, indicators)) return true;
+    
     // Check if it's clearly more prompt-like than workflow-like
     const promptScore = indicators.greetingWords.length + indicators.questionWords.length + indicators.conversationalMarkers.length;
     const workflowScore = indicators.actionVerbs.length + indicators.fileReferences.length + indicators.technicalTerms.length + indicators.taskComplexity.length;
     
     // Only classify as simple prompt if prompt signals clearly dominate AND there are weak workflow signals
     if (promptScore > 0 && workflowScore <= 1 && input.length < 30) return true;
+    
+    return false;
+  }
+
+  private isSimpleCodingRequest(input: string, indicators: ComplexityIndicators): boolean {
+    // Check for simple coding request patterns regardless of action verbs
+    // because "write" is not in the workflow indicators but is a common coding request
+    if (indicators.fileReferences.length === 0 && 
+        indicators.stepIndicators.length === 0 &&
+        indicators.taskComplexity.length === 0) {
+      
+      // Common simple coding request patterns
+      const simpleCodingPatterns = [
+        /^write\s+(a|an)?\s*.*?\s*(function|algorithm|class|method)/i,
+        /^create\s+(a|an)?\s*.*?\s*(function|algorithm|class|method)/i,
+        /^implement\s+(a|an)?\s*.*?\s*(function|algorithm|class|method)/i,
+        /^show\s+me\s+(how\s+to|a)/i,
+        /^generate\s+(a|an)?\s*.*?\s*(function|algorithm|class|method)/i,
+        /^write\s+(some|a|an)\s+.*?\s+(code|script)/i,
+        /^(help\s+me\s+)?(write|create|make)\s+.*?\s+in\s+\w+$/i // "write X in language"
+      ];
+      
+      return simpleCodingPatterns.some(pattern => pattern.test(input));
+    }
     
     return false;
   }

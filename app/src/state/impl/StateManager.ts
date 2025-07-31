@@ -6,6 +6,15 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
+import { 
+  match, 
+  fromAsyncTryCatch, 
+  validationError,
+  type Result,
+  type QiError 
+} from '@qi/base';
+import { ConfigBuilder } from '@qi/core';
 import type {
   IStateManager,
   AppConfig,
@@ -15,7 +24,8 @@ import type {
   SessionData,
   ConversationEntry,
   StateChange,
-  StateChangeListener
+  StateChangeListener,
+  LLMRoleConfig
 } from '../abstractions/index.js';
 
 /**
@@ -69,6 +79,11 @@ export class StateManager implements IStateManager {
   private session: SessionData;
   private models: Map<string, ModelInfo>;
   private listeners: Set<StateChangeListener> = new Set();
+  
+  // LLM configuration
+  private llmConfig: any = null;
+  private classifierConfig: LLMRoleConfig | null = null;
+  private promptConfig: LLMRoleConfig | null = null;
 
   constructor() {
     this.config = { ...DEFAULT_CONFIG };
@@ -122,6 +137,139 @@ export class StateManager implements IStateManager {
       newValue: this.config,
       timestamp: new Date()
     });
+  }
+
+  // LLM configuration management (qicore internal, simple interface for agent)
+  async loadLLMConfig(configPath: string): Promise<void> {
+    const result = await fromAsyncTryCatch(
+      async () => {
+        const configFilePath = join(configPath, 'llm-providers.yaml');
+        const schemaFilePath = join(configPath, 'llm-providers.schema.json');
+        
+        const builderResult = await ConfigBuilder.fromYamlFile(configFilePath);
+        const config = match(
+          (builder: unknown) => match(
+            (validatedConfig: unknown) => validatedConfig,
+            (error: QiError) => { throw new Error(`Config validation failed: ${error.message}`) },
+            (builder as { validateWithSchemaFile: (path: string) => { build: () => Result<unknown, QiError> } }).validateWithSchemaFile(schemaFilePath).build()
+          ),
+          (error: QiError) => { throw new Error(`Config loading failed: ${error.message}`) },
+          builderResult
+        );
+
+        // Extract LLM config using proper pattern
+        const llmSection = match(
+          (section: any) => section,
+          (error: QiError) => { throw new Error(`LLM config not found: ${error.message}`) },
+          (config as { get: (key: string) => Result<any, QiError> }).get('llm')
+        );
+
+        this.llmConfig = { llm: llmSection };
+        
+        // Extract classifier configuration from validated config
+        if (this.llmConfig.llm?.classifier) {
+          this.classifierConfig = {
+            provider: this.llmConfig.llm.classifier.provider,
+            model: this.llmConfig.llm.classifier.model,
+            temperature: this.llmConfig.llm.classifier.temperature,
+            maxTokens: this.llmConfig.llm.classifier.maxTokens
+          };
+        }
+        
+        // Extract prompt configuration from validated config
+        if (this.llmConfig.llm?.prompt) {
+          this.promptConfig = {
+            provider: this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider,
+            model: this.llmConfig.llm.prompt.currentModel,
+            temperature: this.llmConfig.llm.providers?.[this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider]?.models?.[0]?.defaultParameters?.temperature,
+            maxTokens: this.llmConfig.llm.providers?.[this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider]?.models?.[0]?.defaultParameters?.max_tokens
+          };
+        }
+        
+        // Update app config with the config path
+        this.updateConfig({ configPath });
+        
+        this.notifyChange({
+          type: 'config',
+          field: 'llmConfig',
+          oldValue: null,
+          newValue: this.llmConfig,
+          timestamp: new Date()
+        });
+        
+        return void 0;
+      },
+      (error: unknown) => validationError(
+        `LLM config loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    );
+
+    // Convert Result<T> to simple Promise<void> for agent layer
+    return match(
+      () => Promise.resolve(),
+      (error: QiError) => Promise.reject(new Error(error.message)),
+      result
+    );
+  }
+
+  getClassifierConfig(): LLMRoleConfig | null {
+    return this.classifierConfig ? { ...this.classifierConfig } : null;
+  }
+
+  getPromptConfig(): LLMRoleConfig | null {
+    return this.promptConfig ? { ...this.promptConfig } : null;
+  }
+
+  updatePromptModel(model: string): void {
+    if (!this.promptConfig) {
+      throw new Error('Prompt configuration not loaded');
+    }
+    
+    const availableModels = this.getAvailablePromptModels();
+    if (!availableModels.includes(model)) {
+      throw new Error(`Model '${model}' not available for prompts`);
+    }
+    
+    const oldConfig = { ...this.promptConfig };
+    this.promptConfig = { ...this.promptConfig, model };
+    
+    // Update the underlying config
+    if (this.llmConfig?.llm?.prompt) {
+      this.llmConfig.llm.prompt.currentModel = model;
+    }
+    
+    this.notifyChange({
+      type: 'config',
+      field: 'promptModel',
+      oldValue: oldConfig,
+      newValue: this.promptConfig,
+      timestamp: new Date()
+    });
+  }
+
+  getAvailablePromptModels(): readonly string[] {
+    if (!this.llmConfig?.llm?.prompt?.availableModels) {
+      return [];
+    }
+    return [...this.llmConfig.llm.prompt.availableModels];
+  }
+
+  /**
+   * Extract LLMConfig structure that the prompt module expects
+   * This removes our classifier/prompt sections and returns the traditional structure
+   */
+  getLLMConfigForPromptModule(): any | null {
+    if (!this.llmConfig?.llm) {
+      return null;
+    }
+
+    // Return the LLMConfig structure the prompt module expects
+    // Remove our custom classifier/prompt sections
+    const { classifier, prompt, ...llmCore } = this.llmConfig.llm;
+    
+    return {
+      llm: llmCore
+    };
   }
 
   // Model management

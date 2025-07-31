@@ -209,10 +209,14 @@ export class MultiMethodInputClassifier implements IClassifier {
       // Note: complexityThresholds not part of RuleBasedConfig interface
     }));
 
-    // LLM-based method (accurate, slower)
+    // LLM-based method - use config from StateManager if available
+    const llmConfig = this.config.llmConfig;
+    const baseUrl = llmConfig?.baseURL || process.env.OLLAMA_BASE_URL || 'http://172.18.144.1:11434';
+    const modelId = llmConfig?.model || process.env.CLASSIFICATION_MODEL || 'qwen2.5-coder:7b';
+
     this.methods.set('llm-based', new LLMClassificationMethod({
-      baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-      modelId: process.env.CLASSIFICATION_MODEL || 'qwen2.5:7b'
+      baseUrl,
+      modelId
     }));
 
     // Hybrid method (best balance)
@@ -225,8 +229,8 @@ export class MultiMethodInputClassifier implements IClassifier {
         // Note: complexityThresholds not part of RuleBasedConfig interface
       },
       llmConfig: {
-        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-        modelId: process.env.CLASSIFICATION_MODEL || 'qwen2.5:7b'
+        baseUrl,
+        modelId
       }
     }));
 
@@ -234,8 +238,8 @@ export class MultiMethodInputClassifier implements IClassifier {
     this.methods.set('ensemble', new EnsembleClassificationMethod({
       minimumAgreement: 0.6,
       llmConfig: {
-        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-        modelId: process.env.CLASSIFICATION_MODEL || 'qwen2.5:7b'
+        baseUrl: process.env.OLLAMA_BASE_URL || 'http://172.18.144.1:11434',
+        modelId: process.env.CLASSIFICATION_MODEL || 'qwen2.5-coder:7b'
       }
     }));
   }

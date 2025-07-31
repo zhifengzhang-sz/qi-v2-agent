@@ -1,5 +1,8 @@
 # Phase 1 study repositories (temporary)
 study/phase1/
+app/study/
+app/docs/cc-agent
+app/docs/tools
 
 # IDE and editor files
 .vscode/

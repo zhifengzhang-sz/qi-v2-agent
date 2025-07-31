@@ -4,8 +4,7 @@
  * LangChain structured output workflow extractor adapted for app layer
  */
 
-import { ChatOllama } from '@langchain/ollama';
-import { z } from 'zod';
+import { createOllamaStructuredWrapper, type OllamaStructuredWrapper } from '../../llm/index.js';
 import type {
   IWorkflowExtractor,
   IWorkflowExtractorConfig,
@@ -15,46 +14,50 @@ import type {
   ProcessingContext
 } from '../interfaces/index.js';
 
-// Zod schema for workflow condition
-const WorkflowConditionSchema = z.object({
-  type: z.enum(['always', 'success', 'error', 'custom']),
-  expression: z.string().optional(),
-  parameters: z.record(z.string(), z.unknown()).optional()
-});
-
-// Zod schema for workflow node
-const WorkflowNodeSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.enum(['input', 'processing', 'tool', 'reasoning', 'output', 'decision', 'validation']),
-  parameters: z.record(z.string(), z.unknown()),
-  requiredTools: z.array(z.string()).optional(),
-  conditions: z.array(WorkflowConditionSchema).optional(),
-  dependencies: z.array(z.string()).optional()
-});
-
-// Zod schema for workflow edge
-const WorkflowEdgeSchema = z.object({
-  from: z.string(),
-  to: z.string(),
-  condition: WorkflowConditionSchema.optional(),
-  priority: z.number().optional()
-});
-
-// Zod schema for complete workflow specification
-const WorkflowSpecSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  nodes: z.array(WorkflowNodeSchema),
-  edges: z.array(WorkflowEdgeSchema),
-  parameters: z.record(z.string(), z.unknown()),
-  steps: z.array(WorkflowNodeSchema)
-});
+// JSON Schema for workflow specification (replacing broken Zod schemas)
+const WorkflowSpecSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    description: { type: "string" },
+    nodes: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          type: { type: "string", enum: ["input", "processing", "tool", "reasoning", "output", "decision", "validation"] },
+          parameters: { type: "object" },
+          requiredTools: { type: "array", items: { type: "string" } },
+          conditions: { type: "array" },
+          dependencies: { type: "array", items: { type: "string" } }
+        },
+        required: ["id", "name", "type", "parameters"]
+      }
+    },
+    edges: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          from: { type: "string" },
+          to: { type: "string" },
+          condition: { type: "object" },
+          priority: { type: "number" }
+        },
+        required: ["from", "to"]
+      }
+    },
+    parameters: { type: "object" },
+    steps: { type: "array" }
+  },
+  required: ["id", "name", "description", "nodes", "edges", "parameters", "steps"]
+};
 
 export class QiWorkflowExtractor implements IWorkflowExtractor {
-  private model: ChatOllama;
-  private structuredModel: any;
+  private wrapper: OllamaStructuredWrapper;
   private supportedModes: readonly WorkflowMode[];
   private patternMapping: Map<string, string>;
 
@@ -62,16 +65,11 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
     this.supportedModes = config.supportedModes;
     this.patternMapping = new Map(config.patternMapping);
 
-    this.model = new ChatOllama({
-      baseUrl: config.baseUrl || 'http://localhost:11434',
-      model: config.modelId || 'qwen2.5:7b',
-      temperature: config.temperature || 0.2,
-      numCtx: 4096
-    });
-
-    // Bind structured output schema
-    this.structuredModel = this.model.withStructuredOutput(WorkflowSpecSchema, {
-      name: 'workflow_extraction'
+    // Use working OllamaStructuredWrapper instead of broken ChatOllama
+    this.wrapper = createOllamaStructuredWrapper({
+      model: config.modelId || 'qwen2.5-coder:7b',
+      baseURL: config.baseUrl || 'http://172.18.144.1:11434',
+      temperature: config.temperature || 0.2
     });
   }
 
@@ -87,15 +85,22 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
       const mode = analysis.detectedMode;
       const pattern = this.getPatternForMode(mode);
 
-      // 2. Generate workflow using LangChain structured output
+      // 2. Generate workflow using OllamaStructuredWrapper
       const prompt = this.buildExtractionPrompt(input, mode, context);
-      const workflowSpec = await this.structuredModel.invoke(prompt);
+      const workflowSpec = await this.wrapper.generateStructured(prompt, WorkflowSpecSchema);
 
       // 3. Post-process and validate
       const processedSpec = this.postProcessWorkflowSpec(workflowSpec);
       const isValid = await this.validateWorkflowSpec(processedSpec);
 
       if (!isValid) {
+        console.log('DEBUG: Validation failed for spec:', JSON.stringify(workflowSpec, null, 2));
+        console.log('DEBUG: Processed spec:', JSON.stringify({
+          id: processedSpec.id,
+          name: processedSpec.name,
+          nodeCount: processedSpec.nodes.length,
+          edgeCount: processedSpec.edges.length
+        }, null, 2));
         return {
           success: false,
           mode,
@@ -123,7 +128,7 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
           ['nodeCount', processedSpec.nodes.length.toString()],
           ['edgeCount', processedSpec.edges.length.toString()],
           ['complexity', analysis.level],
-          ['model', this.model.model],
+          ['model', 'ollama-structured-wrapper'],
           ['schemaValidated', 'true']
         ])
       };
@@ -267,7 +272,30 @@ ${contextInfo}
 - **decision**: Conditional branching based on criteria
 - **validation**: Verify results and ensure quality
 
-Generate a complete workflow specification that will effectively accomplish: "${input}"`;
+Generate a complete workflow specification that will effectively accomplish: "${input}"
+
+IMPORTANT: Return ONLY valid JSON data (NOT a schema). Example format:
+{
+  "id": "workflow_123",
+  "name": "Workflow Name", 
+  "description": "What this workflow does",
+  "nodes": [
+    {
+      "id": "node1",
+      "name": "Node Name",
+      "type": "input",
+      "parameters": {}
+    }
+  ],
+  "edges": [
+    {
+      "from": "node1", 
+      "to": "node2"
+    }
+  ],
+  "parameters": {},
+  "steps": []
+}`;
   }
 
   private formatContext(context: ProcessingContext): string {
@@ -285,7 +313,22 @@ Generate a complete workflow specification that will effectively accomplish: "${
 
   private postProcessWorkflowSpec(rawSpec: any): WorkflowSpec {
     // Convert raw LLM output to proper WorkflowSpec with Maps
-    const processedNodes = rawSpec.nodes.map((node: any) => ({
+    // Handle cases where LLM returns schema format instead of data
+    const extractValue = (field: any) => {
+      if (typeof field === 'object' && field.value !== undefined) {
+        return field.value; // Schema format: {"type": "string", "value": "actual_value"}
+      }
+      return field; // Direct format: "actual_value"
+    };
+
+    // Extract actual values from potentially schema-formatted response
+    const id = extractValue(rawSpec.id) || 'workflow_' + Date.now();
+    const name = extractValue(rawSpec.name) || 'Generated Workflow';
+    const description = extractValue(rawSpec.description) || 'Auto-generated workflow';
+    const nodes = rawSpec.nodes || [];
+    const edges = rawSpec.edges || [];
+    
+    const processedNodes = nodes.map((node: any) => ({
       id: node.id,
       name: node.name,
       type: node.type,
@@ -299,7 +342,7 @@ Generate a complete workflow specification that will effectively accomplish: "${
       dependencies: node.dependencies || []
     }));
 
-    const processedEdges = rawSpec.edges.map((edge: any) => ({
+    const processedEdges = edges.map((edge: any) => ({
       from: edge.from,
       to: edge.to,
       condition: edge.condition ? {
@@ -311,9 +354,9 @@ Generate a complete workflow specification that will effectively accomplish: "${
     }));
 
     return {
-      id: rawSpec.id,
-      name: rawSpec.name,
-      description: rawSpec.description,
+      id,
+      name, 
+      description,
       nodes: processedNodes,
       edges: processedEdges,
       parameters: new Map(Object.entries(rawSpec.parameters || {})),

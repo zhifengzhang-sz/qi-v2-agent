@@ -11,5 +11,6 @@ export type {
   ConversationEntry,
   StateChange,
   StateChangeListener,
-  IStateManager
+  IStateManager,
+  LLMRoleConfig
 } from './IStateManager.js';
