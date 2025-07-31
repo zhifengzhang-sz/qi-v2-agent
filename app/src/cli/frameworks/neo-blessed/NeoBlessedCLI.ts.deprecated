@@ -1,0 +1,347 @@
+/**
+ * Neo-blessed CLI Application
+ * 
+ * Terminal UI application using Neo-blessed widgets and XState 5 for state management
+ */
+
+import blessed from 'neo-blessed'
+import { StateWidget } from './widgets/StateWidget.js'
+import { InputWidget } from './widgets/InputWidget.js'
+import { OutputWidget } from './widgets/OutputWidget.js'
+import { 
+  CLIParser, 
+  CLIStateManager, 
+  CLICommandHandler,
+  createParser,
+  createStateManager,
+  createCommandHandler
+} from '../../impl/index.js'
+import { createPromptHandler } from '../../../prompt/index.js'
+import type { 
+  ICLIApplication,
+  CLIConfig,
+  CLIStatus,
+  KeyboardShortcut,
+  AppState,
+  AppSubState,
+  AppStateContext
+} from '../../abstractions/index.js'
+
+// ============================================================================
+// Neo-blessed CLI Application
+// ============================================================================
+
+export class NeoBlessedCLIApplication implements ICLIApplication {
+  private screen?: blessed.Widgets.Screen
+  private stateWidget?: StateWidget
+  private inputWidget?: InputWidget
+  private outputWidget?: OutputWidget
+  private headerWidget?: blessed.Widgets.BoxElement
+  private footerWidget?: blessed.Widgets.BoxElement
+  
+  private parser: CLIParser
+  private stateManager: CLIStateManager
+  private commandHandler: CLICommandHandler
+  private promptHandler: any // Will be from @qi/prompt
+  
+  private isRunning = false
+  private commandsExecuted = 0
+  private errors = 0
+  private startTime = new Date()
+  
+  constructor() {
+    this.parser = createParser()
+    this.stateManager = createStateManager()
+    this.commandHandler = createCommandHandler()
+    this.promptHandler = createPromptHandler()
+  }
+  
+  async initialize(config: CLIConfig): Promise<void> {
+    // Configure parser
+    this.parser.configure({
+      enableLangChain: config.enableLangChainParsing || false
+    })
+    
+    // Configure command handler
+    this.commandHandler.setShellCommandsEnabled(config.enableShellCommands || false)
+    
+    // Register custom commands
+    if (config.customCommands) {
+      for (const cmdDef of config.customCommands) {
+        // Custom command registration would go here
+      }
+    }
+    
+    // Initialize prompt handler
+    try {
+      const { join } = await import('node:path')
+      const configPath = join(process.cwd(), '..', 'config', 'llm-providers.yaml')
+      const schemaPath = join(process.cwd(), '..', 'config', 'llm-providers.schema.json')
+      
+      const initResult = await this.promptHandler.initialize(configPath, schemaPath)
+      if (!initResult.success) {
+        console.warn('Prompt handler initialization failed:', initResult.error)
+      }
+    } catch (error) {
+      console.warn('Prompt handler initialization error:', error)
+    }
+  }
+  
+  async start(): Promise<void> {
+    this.isRunning = true
+    this.startTime = new Date()
+    
+    this.createScreen()
+    this.createWidgets()
+    this.setupEventHandlers()
+    this.setupStateSubscription()
+    
+    // Focus input widget
+    this.inputWidget?.focus()
+    
+    // Initial render
+    this.screen?.render()
+  }
+  
+  async stop(): Promise<void> {
+    this.isRunning = false
+    
+    // Cleanup widgets
+    this.stateWidget?.destroy()
+    this.inputWidget?.destroy()
+    this.outputWidget?.destroy()
+    this.headerWidget?.destroy()
+    this.footerWidget?.destroy()
+    
+    // Stop state manager
+    this.stateManager.stop()
+    
+    // Destroy screen
+    this.screen?.destroy()
+    
+    process.exit(0)
+  }
+  
+  async processInput(input: string): Promise<void> {
+    await this.handleInput(input)
+  }
+  
+  getStatus(): CLIStatus {
+    const context = this.stateManager.getStateContext()
+    
+    return {
+      isRunning: this.isRunning,
+      currentState: context.currentState,
+      currentSubState: context.currentSubState,
+      uptime: Date.now() - this.startTime.getTime(),
+      commandsExecuted: this.commandsExecuted,
+      errors: this.errors
+    }
+  }
+  
+  handleKeyboardShortcut(key: KeyboardShortcut): void {
+    // Keyboard shortcuts are handled by widgets
+  }
+  
+  // ==========================================================================
+  // Private Methods
+  // ==========================================================================
+  
+  private createScreen(): void {
+    this.screen = blessed.screen({
+      smartCSR: true,
+      title: 'Qi CLI v2',
+      cursor: {
+        artificial: true,
+        shape: 'line',
+        blink: true,
+        color: 'white'
+      }
+    })
+    
+    // Handle Ctrl+C globally
+    this.screen.key(['C-c'], () => {
+      this.stop()
+    })
+    
+    // Handle window resize
+    this.screen.on('resize', () => {
+      this.screen?.render()
+    })
+  }
+  
+  private createWidgets(): void {
+    if (!this.screen) return
+    
+    // Create header
+    this.headerWidget = blessed.box({
+      parent: this.screen,
+      top: 0,
+      left: 0,
+      right: 30,
+      height: 3,
+      border: {
+        type: 'line'
+      },
+      style: {
+        fg: 'cyan',
+        bold: true
+      },
+      content: ' 🤖 Qi CLI v2',
+      padding: {
+        left: 1,
+        right: 1
+      }
+    })
+    
+    // Create state widget
+    const context = this.stateManager.getStateContext()
+    this.stateWidget = new StateWidget({
+      parent: this.screen,
+      state: context.currentState,
+      subState: context.currentSubState,
+      taskName: context.taskName
+    })
+    
+    // Create output widget
+    this.outputWidget = new OutputWidget({
+      parent: this.screen,
+      maxMessages: 100
+    })
+    
+    // Create input widget
+    this.inputWidget = new InputWidget({
+      parent: this.screen,
+      state: context.currentState,
+      subState: context.currentSubState,
+      onSubmit: (input) => this.handleInput(input),
+      onStateChange: () => this.handleStateChange()
+    })
+    
+    // Create footer
+    this.footerWidget = blessed.box({
+      parent: this.screen,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 1,
+      style: {
+        fg: 'dim'
+      },
+      content: 'Use /help for commands • Ctrl+C to exit • Shift+Tab to cycle modes',
+      padding: {
+        left: 1,
+        right: 1
+      }
+    })
+  }
+  
+  private setupEventHandlers(): void {
+    if (!this.screen) return
+    
+    // Global key handlers
+    this.screen.key(['q', 'C-c'], () => {
+      this.stop()
+    })
+    
+    // Focus management
+    this.screen.key(['tab'], () => {
+      this.inputWidget?.focus()
+    })
+    
+    this.screen.key(['escape'], () => {
+      this.inputWidget?.focus()
+    })
+  }
+  
+  private setupStateSubscription(): void {
+    this.stateManager.subscribe((context: AppStateContext) => {
+      // Update state widget
+      this.stateWidget?.updateState(
+        context.currentState,
+        context.currentSubState,
+        context.taskName
+      )
+      
+      // Update input widget
+      this.inputWidget?.updateState(
+        context.currentState,
+        context.currentSubState
+      )
+    })
+  }
+  
+  private async handleInput(input: string): Promise<void> {
+    // Add user input to output
+    this.outputWidget?.addMessage(input, 'command')
+    
+    try {
+      // Parse input
+      const parseResult = await this.parser.parse(input)
+      
+      if (parseResult.type === 'command') {
+        // Handle command
+        this.stateManager.setBusy('Executing command')
+        
+        const commandInfo = this.parser.extractCommandInfo(input)
+        const result = await this.commandHandler.execute(commandInfo.name, [...commandInfo.args])
+        
+        this.commandsExecuted++
+        
+        if (result.success) {
+          if (result.output) {
+            this.outputWidget?.addMessage(result.output, 'success')
+          }
+        } else {
+          this.outputWidget?.addMessage(result.content || 'Command failed', 'error')
+          this.errors++
+        }
+        
+        this.stateManager.setReady()
+        
+      } else {
+        // Handle prompt
+        this.stateManager.setBusy('Processing prompt')
+        
+        try {
+          // Integrate with actual prompt handler
+          const response = await this.promptHandler.complete(input, {
+            provider: 'ollama' // Default provider
+          })
+          
+          if (response.success) {
+            this.outputWidget?.addMessage(response.data || 'Response received', 'response')
+          } else {
+            this.outputWidget?.addMessage(response.error || 'Prompt processing failed', 'error')
+            this.errors++
+          }
+          
+        } catch (error) {
+          this.outputWidget?.addMessage(`Prompt processing failed: ${error}`, 'error')
+          this.errors++
+        }
+        
+        this.stateManager.setReady()
+      }
+      
+    } catch (error) {
+      this.outputWidget?.addMessage(`Input processing failed: ${error}`, 'error')
+      this.errors++
+      this.stateManager.setReady()
+    }
+  }
+  
+  private handleStateChange(): void {
+    if (this.stateManager.canCycleStates()) {
+      this.stateManager.cycleReadyStates()
+    }
+  }
+}
+
+// ============================================================================
+// Factory Function
+// ============================================================================
+
+export function createNeoBlessedCLI(): NeoBlessedCLIApplication {
+  return new NeoBlessedCLIApplication()
+}

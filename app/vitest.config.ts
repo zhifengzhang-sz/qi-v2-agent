@@ -6,11 +6,26 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.{test,spec}.{js,ts}'],
-    exclude: ['node_modules', 'dist', '.git', '**/*.d.ts'],
+    exclude: ['node_modules', 'dist', '.git', '**/*.d.ts', 'src/demos/**', 'src/fine-tuning/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
+      include: ['src/**/*'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/demos/**',
+        'src/fine-tuning/**',
+        'src/test-*.ts'
+      ],
+      thresholds: {
+        global: {
+          branches: 80,
+          functions: 85,
+          lines: 85,
+          statements: 85
+        }
+      }
     },
     testTimeout: 10000,
     hookTimeout: 10000,

@@ -1,0 +1,11 @@
+[install]
+# Configure module resolution
+
+[module]
+# Enable proper ES module resolution
+resolution = "bundler"
+
+# Path mapping for TypeScript
+[install.scopes]
+"@qi/base" = "file:../../qi-v2-qicore/typescript/dist/base.js"
+"@qi/core" = "file:../../qi-v2-qicore/typescript/dist/core.js"

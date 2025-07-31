@@ -1,14 +1,22 @@
 # qi-v2 agent
 
-Local AI agent with conversational interface and extensible tool integration.
+Practical local AI coding assistant with CLI interface, three-type input classification, and LangChain template-based context continuation.
 
 ## Architecture
 
-- **Frontend**: Ink + TypeScript CLI
-- **Workflow**: LangGraph.js v0.3.11+ (unified orchestration)
-- **LLM**: LangChain + Ollama (local)
-- **Knowledge**: ChromaDB vector database
-- **Tools**: MCP servers (official SDK integration)
+### Core System (v0.3.0)
+- **Three-Type Classification**: Command, Prompt, Workflow input routing
+- **Context Continuation**: LangChain ChatPromptTemplate with conversation history
+- **Agent Coordination**: Session-based context management with security isolation
+- **Local LLM**: Ollama integration with multi-llm-ts for provider abstraction
+- **CLI Interface**: Command-line interface with built-in command system
+
+### Technology Stack
+- **TypeScript**: Type-safe implementation with abstract interfaces
+- **LangChain**: Structured prompt templates and message handling
+- **Ollama**: Local LLM execution and model management
+- **MCP Protocol**: Tool integration (planned)
+- **LangGraph**: Workflow orchestration (planned)
 
 ## Documentation
 
@@ -46,7 +54,28 @@ git clone https://github.com/langchain-ai/langchain-mcp-adapters.git
 
 ## Current Status
 
-**v-0.2.6**: Complete C4 framework architecture documentation with interface-driven design. Two-container architecture (CLI + Smart Router) with 16 component interface contracts. Ready for interface-based refactoring and enhanced testing strategies.
+**v0.3.0**: CLI + Agent with Command, Prompt & Context Continuation capabilities:
+
+### ✅ Implemented Features
+- **Three-Type Input Classification**: Commands (`/help`), Prompts (`hello`), Workflows (multi-step tasks)
+- **Context Continuation**: LangChain ChatPromptTemplate with conversation history across sessions
+- **Agent Coordination**: Session-to-context mapping with proper conversation state management
+- **Command System**: Built-in commands for model, status, configuration management
+- **Prompt Templates**: 5 specialized templates (coding, educational, debugging, problem-solving, default)
+- **Local LLM Integration**: Ollama provider with multi-llm-ts abstraction
+- **Security Isolation**: Context boundaries and security restrictions for sub-agents
+
+### 🧪 Testing
+```bash
+# Test context continuation
+bun --cwd app run test:context
+
+# Test LangChain integration  
+bun --cwd app run test:langchain
+
+# Run all demos
+bun --cwd app run demo:three-type
+```
 
 ## Quick Start
 
@@ -54,11 +83,16 @@ git clone https://github.com/langchain-ai/langchain-mcp-adapters.git
 # Install dependencies
 bun install
 
-# Run verification checks
-bun run check
+# Build components
+bun --cwd lib build && bun --cwd app build
 
-# Start development
-bun run dev
+# Test the system
+bun --cwd app run test:context    # Context continuation
+bun --cwd app run test:langchain  # LangChain templates
+
+# Run demos
+bun --cwd app run demo:three-type        # Input classification
+bun --cwd app run demo:context-manager   # Context management
 ```
 
 📖 **For complete setup with Ollama, configuration, and usage instructions, see [Ollama Setup Guide](docs/usage/ollama-setup.md)**

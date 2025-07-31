@@ -14,8 +14,16 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@qi/lib": ["../lib/src/index.ts"],
+      "@qi/lib/*": ["../lib/src/*"],
       "@qi/agent": ["../lib/src/index.ts"],
       "@qi/agent/*": ["../lib/src/*"],
+      "@qi/base": ["../../qi-v2-qicore/typescript/lib/src/base/index.ts"],
+      "@qi/core": ["../../qi-v2-qicore/typescript/lib/src/core/index.ts"],
+      "@qi/prompt": ["./src/prompt/index.ts"],
+      "@qi/prompt/*": ["./src/prompt/*"],
+      "@qi/workflow": ["./src/workflow/index.ts"],
+      "@qi/workflow/*": ["./src/workflow/*"],
       "@/cli/*": ["./src/cli/*"],
       "@/ui/*": ["./src/ui/*"],
       "@/workflows/*": ["./src/workflows/*"]
@@ -24,5 +32,6 @@
     "types": ["bun-types"]
   },
   "include": ["src/**/*", "../lib/src/**/*"],
+  "typeRoots": ["./src/types", "./node_modules/@types"],
   "exclude": ["node_modules", "dist"]
 }

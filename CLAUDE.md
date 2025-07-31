@@ -4,49 +4,54 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-qi-v2 agent is a practical local AI coding assistant providing Claude Code-like functionality with local LLM support. The project implements an **abstract pattern-based cognitive system** with domain specialization, multi-signal pattern detection, and operational reliability using a simplified, production-ready architecture.
+qi-v2 agent is a practical local AI coding assistant providing Claude Code-like functionality with local LLM support. The project implements a **three-type input classification system** with abstract cognitive patterns, domain specialization, and production-ready architecture.
 
 ## Quick Start
 
 - **Runtime**: Node.js 18+ with Bun for package management
-- **Main Interface**: `bun --cwd app src/main.ts unified` for practical agent chat interface
+- **Main Interface**: `bun --cwd app src/main.ts unified` for three-type agent chat interface
 - **Configuration**: Unified YAML configuration system with environment variable support
 - **Build**: Run `bun --cwd lib build && bun --cwd app build` after changes
 
 ## Architecture Overview
 
-### Practical Agent Architecture
+### Three-Type Classification System
 
-The project implements a straightforward, production-ready architecture based on **opus4 review corrections**:
+The project implements a modern three-type input classification architecture:
 
 ```
-User Input → Pattern Detection → Mode Validation → Workflow Execution → Response
-             (Multi-Signal)     (Tool Safety)    (Direct Orchestration)
+User Input → Input Classifier → (Command|Prompt|Workflow) → Handler → Response
+             (Complexity Analysis)  (Three Types)         (Specialized)
 ```
 
 ### Core Components
 
-**Detection Layer**:
-- **Multi-Signal Pattern Matcher**: Weighted analysis replacing keyword-based detection
-- **Mode Validator**: Tool availability and safety validation
-- **Context Tracker**: Conversation continuity and session management
+**Input Classification Layer**:
+- **Input Classifier**: Three-type classification (command/prompt/workflow)
+- **Command Handler**: Direct system command execution  
+- **Workflow Extractor**: Complex task workflow extraction
 
 **Execution Layer**:
-- **Tool Executor**: Production-ready MCP tool execution with retry/timeout
-- **Workflow Orchestrator**: Simple orchestration absorbing Smart Router functionality
-- **Operational Handler**: Rate limiting, circuit breakers, cost tracking
+- **Model Provider**: Direct LLM interaction for prompts (Ollama support)
+- **Tool Provider**: Production-ready MCP tool execution with retry/timeout
+- **Workflow Engine**: LangGraph-based workflow orchestration
 
 **Agent Layer**:
-- **Practical Agent**: Main coordinator with streaming and error handling
+- **Three-Type Agent**: Main coordinator with streaming and error handling
 - **Agent Factory**: Simplified creation with development/production modes
-- **Unified Configuration**: Single YAML config with environment variable support
+- **Memory Provider**: Optional conversation state management
 
-### Domain-Specific Modes (from Abstract Patterns)
-- **Planning**: Strategic analysis with sequential-thinking tools (from analytical pattern)
-- **Coding**: Implementation with filesystem and git tools (from creative pattern)
-- **Information**: Knowledge sharing with web-search tools (from informational pattern)
-- **Debugging**: Problem resolution with comprehensive tool access (from problem-solving pattern)
-- **Generic**: Safe default mode for conversational interactions (from conversational pattern)
+### Three Input Types
+1. **Command**: System functions with `/` prefix (e.g., `/help`, `/config`)
+2. **Prompt**: Simple conversational inputs (e.g., "hi", "write a quicksort in haskell")
+3. **Workflow**: Complex multi-step tasks requiring tool orchestration
+
+### Abstract Cognitive Patterns
+- **Analytical**: Deep analysis and structured reasoning
+- **Creative**: Generation and synthesis of new content  
+- **Informational**: Knowledge sharing and explanation
+- **Problem-solving**: Issue identification and resolution
+- **Conversational**: General dialog and interaction
 
 ### Core Principles
 - **Practical Over Abstract**: Direct implementation without over-engineering
@@ -55,92 +60,137 @@ User Input → Pattern Detection → Mode Validation → Workflow Execution → 
 - **Production Ready**: Comprehensive error handling and operational features
 
 ### Technology Stack
-- **TypeScript** with direct interfaces and Zod validation
-- **Multi-Signal Detection** replacing abstract cognitive patterns
+- **TypeScript** with abstract interfaces following docs/agents/v1/
+- **Three-Type Classification** with complexity analysis
+- **LangGraph** for workflow orchestration  
+- **LangChain** for model provider abstractions
 - **MCP Protocol** for standardized tool integration
 - **Ollama** for local LLM execution
-- **Operational Services** for production reliability
 
 ## Documentation References
 
 ### For Architecture Understanding (PRIORITY)
-- **[CURRENT] Corrected Agent Documentation**: `docs/agents/` - Practical agent framework
-  - **Agent Overview**: `docs/agents/agent.md` - Abstract patterns with domain specialization and tool requirements
-  - **Operational Features**: `docs/agents/operational-concerns.md` - Production reliability features
-  - **Unified Configuration**: `docs/agents/unified-configuration.md` - Single YAML config system
-  - **Architecture Reviews**: `docs/agents/reviews/opus4.md` - Critical corrections removing over-engineering
+- **[CURRENT] Agent Framework**: `docs/agents/v1/` - Complete agent framework
+  - **Abstract Interfaces**: `docs/agents/v1/agent.abstractions.md` - Pure technology-agnostic interfaces
+  - **Implementation Guide**: `docs/agents/v1/agent.impl.md` - Concrete LangGraph/LangChain/MCP implementations
+  - **Three-Type Classification**: Input classification with command/prompt/workflow types
 
-### For Implementation Work
-- **Core Interfaces**: `lib/src/core/` - Direct, practical interfaces
-- **Detection Layer**: `lib/src/detection/` - Multi-signal pattern detection and validation
-- **Execution Layer**: `lib/src/execution/` - Production tools and workflow orchestration
-- **Agent Layer**: `lib/src/agent/` - Main agent implementation and factory
-
-### For Legacy Context (Historical)
-- **Previous Design**: `docs/design/` - Over-engineered C4 framework (replaced)
-- **Phase Studies**: `docs/study/` - Historical documentation (reference only)
+### For Implementation Work (Component-Based Structure)
+- **Core Interfaces**: `lib/src/core/interfaces.ts` - All abstract interfaces from docs/agents/v1/
+- **Input Classification**: `lib/src/impl/classifiers/input-classifier.ts` - Three-type input classification
+- **Command Handling**: `lib/src/impl/commands/command-handler.ts` - Built-in command system
+- **Prompt Processing**:
+  - `lib/src/impl/prompts/prompt-handler.ts` - Prompt orchestration and template rendering
+  - `lib/src/impl/prompts/prompt-manager.ts` - Template and model configuration management
+- **Model Integration**:
+  - `lib/src/impl/models/ollama-model-provider.ts` - Local Ollama LLM support
+  - `lib/src/impl/models/model-routing-engine.ts` - Provider selection logic
+- **Workflow Processing**:
+  - `lib/src/impl/workflows/workflow-extractor.ts` - Natural language to workflow conversion
+  - `lib/src/impl/workflows/langgraph-workflow-engine.ts` - LangGraph orchestration
+- **Tool Integration**: `lib/src/impl/tools/mcp-tool-provider.ts` - MCP tool integration
+- **Memory Management**: `lib/src/impl/memory/memory-provider.ts` - Conversation state persistence
+- **Agent Coordination**: `lib/src/impl/agents/three-type-agent.ts` - Main agent coordinator
 
 ## Current Status
 
 ### Architecture Maturity
-- **Design Completeness**: ✅ Complete practical agent framework based on opus4 corrections
-- **Implementation Status**: ✅ All core components implemented with operational reliability
-- **Migration Strategy**: ✅ Ready to replace legacy monolithic implementation
+- **Design Completeness**: ✅ Complete three-type classification agent framework
+- **Implementation Status**: ✅ All core components implemented following docs/agents/v1/
+- **Migration Strategy**: ✅ Ready for application layer integration
 
-### Working Components (Practical Agent Framework)
-- ✅ **Core Interfaces**: Abstract patterns with domain specialization and clear tool requirements (`lib/src/core/`)
-- ✅ **Multi-Signal Pattern Detection**: Weighted analysis replacing keyword matching (`lib/src/detection/`)
-- ✅ **Production Tool Execution**: MCP integration with retry/timeout/monitoring (`lib/src/execution/`)
-- ✅ **Workflow Orchestration**: Simple orchestration absorbing Smart Router functionality
-- ✅ **Operational Services**: Rate limiting, circuit breakers, cost tracking
-- ✅ **Practical Agent**: Main coordinator with streaming and comprehensive error handling
-- ✅ **Unified Configuration**: Single YAML config with environment variable support
-- ✅ **Agent Factory**: Development/production modes with mock providers for testing
+### Working Components (Three-Type Agent Framework)
+- ✅ **Core Interfaces**: Complete abstract interfaces from docs/agents/v1/ (`lib/src/core/interfaces.ts`)
+- ✅ **Input Classification**: Three-type classification with complexity analysis (`lib/src/impl/classifiers/input-classifier.ts`)
+- ✅ **Command System**: Built-in commands with extensible registration (`lib/src/impl/commands/command-handler.ts`)
+- ✅ **Prompt Processing**: Template rendering and model integration (`lib/src/impl/prompts/`)
+- ✅ **Model Providers**: Ollama local LLM support with routing (`lib/src/impl/models/`)
+- ✅ **Workflow Engine**: LangGraph StateGraph orchestration (`lib/src/impl/workflows/`)
+- ✅ **Tool Integration**: MCP protocol with retry/timeout/monitoring (`lib/src/impl/tools/mcp-tool-provider.ts`)
+- ✅ **Memory Management**: Conversation state and session handling (`lib/src/impl/memory/memory-provider.ts`)
+- ✅ **Agent Coordination**: Three-type agent coordinator (`lib/src/impl/agents/three-type-agent.ts`)
 
 ### Next Implementation Phases  
-- 🔄 **Phase 5**: Application layer integration (update CLI/UI to use practical agent)
-- 🔄 **Phase 6**: Legacy replacement and comprehensive testing
+- 🔄 **Phase 5**: Application layer demos and integration
+- 🔄 **Phase 6**: Memory provider implementation
 - 🔄 **Phase 7**: Production deployment and monitoring
 
 ### Key Commands
 ```bash
-# Test current system
-bun --cwd app src/main.ts unified   # Unified chat interface
-bun --cwd app src/main.ts chat      # Basic chat
-bun --cwd app src/main.ts edit file.js "fix bug"    # Workflow commands
-bun --cwd app src/main.ts analyze src/             # Code analysis
-bun --cwd app src/main.ts config --show            # Show configuration
-bun --cwd app src/main.ts servers --list           # List MCP servers
+# Build and test current system
+bun --cwd lib build && bun --cwd app build
+
+# Test components (upcoming demos)
+bun --cwd app src/demo-input-classification.ts    # Input classification demo
+bun --cwd app src/demo-pattern-recognition.ts     # Pattern recognition demo  
+bun --cwd app src/demo-workflow-extraction.ts     # Workflow extraction demo
+bun --cwd app src/demo-workflow-engine.ts         # Workflow engine demo
+
+# Main agent interface (to be implemented)
+bun --cwd app src/main.ts unified   # Three-type agent interface
 ```
 
 ## Development Guidelines
 
 ### Before Making Changes
-1. **Read agent docs** from `docs/agents/` to understand practical architecture
-2. **Check opus4 reviews** in `docs/agents/reviews/` for architectural corrections
-3. **Review implementation** in `lib/src/` to understand current system
-4. **Use unified configuration** for consistent configuration management
+1. **Read architecture docs** from `docs/agents/v1/` to understand the three-type classification system
+2. **Review abstract interfaces** in `docs/agents/v1/agent.abstractions.md` 
+3. **Check implementation guide** in `docs/agents/v1/agent.impl.md` for technology mapping
+4. **Review current implementation** in `lib/src/` to understand system components
 
 ### Architecture Principles
-1. **Direct Implementation**: Use concrete cognitive modes, avoid abstract patterns
-2. **Operational Reliability**: Include rate limiting, retries, circuit breakers
-3. **Multi-Signal Detection**: Replace keyword matching with weighted analysis
-4. **Unified Configuration**: Single YAML file with environment variable support
+1. **Three-Type Classification**: All inputs classified as command/prompt/workflow
+2. **Abstract Interfaces**: Technology-agnostic interfaces from docs/agents/v1/
+3. **Complexity Analysis**: Sophisticated input analysis replacing simple keyword matching
+4. **Local Privacy**: All processing local-only with no external data transmission
+
+### Input Classification Rules
+- **"hi"** → **prompt** (greeting detected in promptIndicators)
+- **"write a quicksort in haskell"** → **prompt** (simple conversational coding request)
+- **"/help"** → **command** (starts with command prefix)
+- **"fix bug in src/file.ts and run tests"** → **workflow** (multi-step task with file references)
 
 ### Testing Strategy
-1. **Mode Detection**: Verify multi-signal pattern matcher accuracy
-2. **Tool Validation**: Ensure tool-mode restrictions work correctly
-3. **Operational Features**: Test rate limiting, retries, circuit breakers
-4. **Workflow Orchestration**: Verify direct mode-to-workflow execution
+1. **Input Classification**: Test three-type classification accuracy
+2. **Pattern Recognition**: Verify cognitive pattern detection
+3. **Workflow Extraction**: Test complex task extraction
+4. **Tool Integration**: Ensure MCP tool execution works correctly
 
-### File Structure (Current)
-- `lib/src/core/` - Direct interfaces and cognitive modes
-- `lib/src/detection/` - Multi-signal pattern detection and validation
-- `lib/src/execution/` - Production tool execution and workflow orchestration
-- `lib/src/agent/` - Main agent implementation and factory
-- `app/src/` - CLI application layer (to be updated)
-- `docs/agents/` - **CURRENT**: Practical agent architecture documentation
-- `docs/design/` - **LEGACY**: Over-engineered architecture (replaced)
+### File Structure (Component-Based Architecture)
+
+```
+lib/src/impl/
+├── agents/                    # 🤖 Main agent implementations
+│   ├── three-type-agent.ts    # Primary agent coordinator
+│   └── agent.ts               # Base agent implementation
+├── classifiers/               # 🔍 Input classification components
+│   ├── input-classifier.ts    # Three-type classification
+│   └── pattern-matcher.ts     # Pattern recognition utilities
+├── commands/                  # ⚡ Command processing
+│   └── command-handler.ts     # Built-in command system
+├── config/                    # ⚙️ Configuration management (ready for implementation)
+├── models/                    # 🧠 Model providers and routing
+│   ├── ollama-model-provider.ts
+│   └── model-routing-engine.ts
+├── prompts/                   # 💬 Prompt processing pipeline  
+│   ├── prompt-handler.ts      # Template rendering and orchestration
+│   └── prompt-manager.ts      # Configuration management
+├── workflows/                 # 🔄 Workflow processing engine
+│   ├── workflow-extractor.ts  # Natural language → WorkflowSpec
+│   └── langgraph-workflow-engine.ts  # LangGraph execution
+├── tools/                     # 🛠️ Tool integration
+│   └── mcp-tool-provider.ts   # MCP protocol implementation
+├── memory/                    # 💾 Memory and state management
+│   └── memory-provider.ts     # Conversation persistence
+└── utils/                     # 🔧 Cross-cutting utilities
+    └── operational-reliability.ts  # Production reliability features
+```
+
+**Key Directories**:
+- `lib/src/core/interfaces.ts` - All abstract interfaces from docs/agents/v1/
+- `lib/src/impl/` - Component-based concrete implementations
+- `app/src/` - Application layer and demos  
+- `docs/agents/v1/` - **CURRENT**: Complete agent framework documentation
 
 ## Security Notes
 
@@ -151,16 +201,16 @@ bun --cwd app src/main.ts servers --list           # List MCP servers
 
 ---
 
-## Migration Guidance
+## Implementation Guidance
 
-**For New Development**: Follow the practical agent architecture in `docs/agents/` with abstract patterns, domain specialization, and operational reliability.
+**For New Development**: Follow the three-type classification architecture in `docs/agents/v1/` with abstract interfaces and concrete technology implementations.
 
-**For Integration**: Use the agent factory to create development or production agent instances with unified configuration.
+**For Integration**: Use the agent factory with input classifier, model provider, tool provider, and workflow engine components.
 
-**Implementation Priority**: The practical agent framework is complete and ready to replace the legacy monolithic implementation.
+**Implementation Priority**: The three-type agent framework is complete and ready for application layer integration.
 
-**Architecture Status**: Implementation is complete and consistent with opus4 corrected design principles.
+**Architecture Status**: Implementation is complete and consistent with docs/agents/v1/ abstract interface design.
 
 ---
 
-**Important**: This project implements a practical, production-ready agent framework. Always consult `docs/agents/` for current architecture and `docs/agents/reviews/opus4.md` for design corrections.
+**Important**: This project implements a three-type input classification agent framework. Always consult `docs/agents/v1/` for current architecture, with `agent.abstractions.md` for interfaces and `agent.impl.md` for implementation guidance.

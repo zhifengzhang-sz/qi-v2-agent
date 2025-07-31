@@ -1,0 +1,256 @@
+/**
+ * Ink CLI Application Component
+ * 
+ * Main React component that orchestrates the CLI using Ink framework
+ */
+
+import React, { useState, useEffect, useCallback } from 'react'
+import { render } from 'ink'
+import { MainLayout } from './components/MainLayout.js'
+import { createOutputMessage, type OutputMessage } from './components/OutputDisplay.js'
+import { 
+  CLIParser, 
+  CLIStateManager, 
+  CLICommandHandler,
+  createParser,
+  createStateManager,
+  createCommandHandler
+} from '../../impl/index.js'
+import { createPromptHandler } from '../../../prompt/index.js'
+import type { 
+  ICLIApplication,
+  CLIConfig,
+  CLIStatus,
+  KeyboardShortcut,
+  AppState,
+  AppSubState,
+  AppStateContext
+} from '../../abstractions/index.js'
+
+// ============================================================================
+// Ink CLI Application
+// ============================================================================
+
+export class InkCLIApplication implements ICLIApplication {
+  private parser: CLIParser
+  private stateManager: CLIStateManager
+  private commandHandler: CLICommandHandler
+  private promptHandler: any // Will be from @qi/prompt
+  private isRunning = false
+  private commandsExecuted = 0
+  private errors = 0
+  private startTime = new Date()
+  
+  constructor() {
+    this.parser = createParser()
+    this.stateManager = createStateManager()
+    this.commandHandler = createCommandHandler()
+    this.promptHandler = createPromptHandler()
+  }
+  
+  async initialize(config: CLIConfig): Promise<void> {
+    // Configure parser
+    this.parser.configure({
+      enableLangChain: config.enableLangChainParsing || false
+    })
+    
+    // Configure command handler
+    this.commandHandler.setShellCommandsEnabled(config.enableShellCommands || false)
+    
+    // Register custom commands
+    if (config.customCommands) {
+      for (const cmdDef of config.customCommands) {
+        // Custom command registration would go here
+      }
+    }
+    
+    // Initialize prompt handler
+    try {
+      const { join } = await import('node:path')
+      const configPath = join(process.cwd(), '..', 'config', 'llm-providers.yaml')
+      const schemaPath = join(process.cwd(), '..', 'config', 'llm-providers.schema.json')
+      
+      const initResult = await this.promptHandler.initialize(configPath, schemaPath)
+      if (!initResult.success) {
+        console.warn('Prompt handler initialization failed:', initResult.error)
+      }
+    } catch (error) {
+      console.warn('Prompt handler initialization error:', error)
+    }
+  }
+  
+  async start(): Promise<void> {
+    this.isRunning = true
+    this.startTime = new Date()
+    
+    // Render the Ink application
+    render(<InkCLIApp 
+      parser={this.parser}
+      stateManager={this.stateManager}
+      commandHandler={this.commandHandler}
+      promptHandler={this.promptHandler}
+      onCommandExecuted={() => this.commandsExecuted++}
+      onError={() => this.errors++}
+    />)
+  }
+  
+  async stop(): Promise<void> {
+    this.isRunning = false
+    this.stateManager.stop()
+    process.exit(0)
+  }
+  
+  async processInput(input: string): Promise<void> {
+    // This is handled by the React component
+  }
+  
+  getStatus(): CLIStatus {
+    const context = this.stateManager.getStateContext()
+    
+    return {
+      isRunning: this.isRunning,
+      currentState: context.currentState,
+      currentSubState: context.currentSubState,
+      uptime: Date.now() - this.startTime.getTime(),
+      commandsExecuted: this.commandsExecuted,
+      errors: this.errors
+    }
+  }
+  
+  handleKeyboardShortcut(key: KeyboardShortcut): void {
+    // Handled by React component
+  }
+}
+
+// ============================================================================
+// React Component
+// ============================================================================
+
+interface InkCLIAppProps {
+  parser: CLIParser
+  stateManager: CLIStateManager
+  commandHandler: CLICommandHandler
+  promptHandler: any
+  onCommandExecuted: () => void
+  onError: () => void
+}
+
+function InkCLIApp({
+  parser,
+  stateManager,
+  commandHandler,
+  promptHandler,
+  onCommandExecuted,
+  onError
+}: InkCLIAppProps) {
+  const [messages, setMessages] = useState<OutputMessage[]>([])
+  const [state, setState] = useState<AppState>('ready')
+  const [subState, setSubState] = useState<AppSubState>('generic')
+  const [taskName, setTaskName] = useState<string>()
+  
+  // Subscribe to state changes
+  useEffect(() => {
+    const unsubscribe = stateManager.subscribe((context: AppStateContext) => {
+      setState(context.currentState)
+      setSubState(context.currentSubState)
+      setTaskName(context.taskName)
+    })
+    
+    return unsubscribe
+  }, [stateManager])
+  
+  // Add welcome message
+  useEffect(() => {
+    addMessage('Welcome to Qi CLI! Type /help for available commands.', 'info')
+  }, [])
+  
+  const addMessage = useCallback((content: string, type: OutputMessage['type'] = 'info') => {
+    const message = createOutputMessage(content, type)
+    setMessages(prev => [...prev, message])
+  }, [])
+  
+  const handleInput = useCallback(async (input: string) => {
+    // Add user input to messages
+    addMessage(input, 'command')
+    
+    try {
+      // Parse input
+      const parseResult = await parser.parse(input)
+      
+      if (parseResult.type === 'command') {
+        // Handle command
+        stateManager.setBusy('Executing command')
+        
+        const commandInfo = parser.extractCommandInfo(input)
+        const result = await commandHandler.execute(commandInfo.name, [...commandInfo.args])
+        
+        onCommandExecuted()
+        
+        if (result.success) {
+          if (result.output) {
+            addMessage(result.output, 'success')
+          }
+        } else {
+          addMessage(result.content || 'Command failed', 'error')
+          onError()
+        }
+        
+        stateManager.setReady()
+        
+      } else {
+        // Handle prompt
+        stateManager.setBusy('Processing prompt')
+        
+        try {
+          // Integrate with actual prompt handler
+          const response = await promptHandler.complete(input, {
+            provider: 'ollama' // Default provider
+          })
+          
+          if (response.success) {
+            addMessage(response.data || 'Response received', 'response')
+          } else {
+            addMessage(response.error || 'Prompt processing failed', 'error')
+            onError()
+          }
+          
+        } catch (error) {
+          addMessage(`Prompt processing failed: ${error}`, 'error')
+          onError()
+        }
+        
+        stateManager.setReady()
+      }
+      
+    } catch (error) {
+      addMessage(`Input processing failed: ${error}`, 'error')
+      onError()
+      stateManager.setReady()
+    }
+  }, [parser, stateManager, commandHandler, promptHandler, addMessage, onCommandExecuted, onError])
+  
+  const handleStateChange = useCallback(() => {
+    if (stateManager.canCycleStates()) {
+      stateManager.cycleReadyStates()
+    }
+  }, [stateManager])
+  
+  return (
+    <MainLayout
+      state={state}
+      subState={subState}
+      taskName={taskName}
+      messages={messages}
+      onInput={handleInput}
+      onStateChange={handleStateChange}
+    />
+  )
+}
+
+// ============================================================================
+// Factory Function
+// ============================================================================
+
+export function createInkCLI(): InkCLIApplication {
+  return new InkCLIApplication()
+}

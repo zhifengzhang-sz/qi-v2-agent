@@ -20,12 +20,14 @@ import type { ICommandHandler, CommandRequest } from '../../command/index.js';
 import type { IPromptHandler, PromptOptions } from '../../prompt/index.js';
 import type { IWorkflowEngine, IWorkflowExtractor } from '../../workflow/index.js';
 import type { IStateManager } from '../../state/index.js';
+import type { IContextManager } from '../../context/index.js';
 
 /**
  * QiCode Agent - Main orchestrator with StateManager integration
  */
 export class QiCodeAgent implements IAgent {
   private stateManager: IStateManager;
+  private contextManager: IContextManager;
   private classifier?: IClassifier;
   private commandHandler?: ICommandHandler;
   private promptHandler?: IPromptHandler;
@@ -41,6 +43,7 @@ export class QiCodeAgent implements IAgent {
 
   constructor(
     stateManager: IStateManager,
+    contextManager: IContextManager,
     config: AgentConfig,
     dependencies: {
       classifier?: IClassifier;
@@ -51,6 +54,7 @@ export class QiCodeAgent implements IAgent {
     } = {}
   ) {
     this.stateManager = stateManager;
+    this.contextManager = contextManager;
     this.config = config;
     this.classifier = dependencies.classifier;
     this.commandHandler = dependencies.commandHandler;
@@ -66,7 +70,10 @@ export class QiCodeAgent implements IAgent {
 
     this.startTime = new Date();
     
-    // Initialize components that need initialization
+    // Initialize context manager
+    await this.contextManager.initialize();
+    
+    // Initialize other components that need initialization
     // Each component handles its own initialization
     
     this.isInitialized = true;
@@ -218,6 +225,9 @@ export class QiCodeAgent implements IAgent {
   }
 
   async shutdown(): Promise<void> {
+    // Shutdown context manager
+    await this.contextManager.shutdown();
+    
     // Cleanup resources if needed
     this.isInitialized = false;
   }
