@@ -2,25 +2,44 @@
 
 /**
  * Agent State Commands Demo
- * 
+ *
  * Tests the Agent handling state commands (/model, /status, /config, /mode, /session)
  * through its StateManager integration.
  */
 
-import { createAgent, type AgentRequest, type AgentContext } from '../../agent/index.js';
-import { createStateManager } from '../../state/index.js';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { type AgentRequest, createAgent } from '@qi/agent';
+import { createContextManager, createDefaultAppContext } from '@qi/agent/context';
+import { createStateManager } from '@qi/agent/state';
 
 async function demonstrateAgentStateCommands(): Promise<void> {
   console.log('🤖 Agent State Commands Demo');
   console.log('============================\n');
 
-  // Create state manager and agent
+  // Create state manager, context manager and agent
   const stateManager = createStateManager();
-  const agent = createAgent(stateManager, {
+  
+  // Load LLM configuration through StateManager (proper way)
+  console.log('📝 Loading LLM configuration...');
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const configPath = join(__dirname, '..', '..', '..', '..', 'config');
+    await stateManager.loadLLMConfig(configPath);
+    console.log('✅ Configuration loaded successfully');
+  } catch (error) {
+    console.error('❌ Failed to load configuration:', error);
+    process.exit(1);
+  }
+  
+  const appContext = createDefaultAppContext();
+  const contextManager = createContextManager(appContext);
+  const agent = createAgent(stateManager, contextManager, {
     domain: 'demo',
     enableCommands: true,
     enablePrompts: true,
-    enableWorkflows: true
+    enableWorkflows: true,
   });
 
   await agent.initialize();
@@ -28,14 +47,14 @@ async function demonstrateAgentStateCommands(): Promise<void> {
   // Test helper function
   async function testCommand(input: string): Promise<void> {
     console.log(`📤 Input: "${input}"`);
-    
+
     const request: AgentRequest = {
       input,
       context: {
         sessionId: 'demo-session',
         timestamp: new Date(),
-        source: 'demo'
-      }
+        source: 'demo',
+      },
     };
 
     try {
@@ -87,13 +106,13 @@ async function demonstrateAgentStateCommands(): Promise<void> {
   stateManager.addConversationEntry({
     type: 'user_input',
     content: 'Hello, this is a test message',
-    metadata: new Map([['demo', true]])
+    metadata: new Map([['demo', true]]),
   });
-  
+
   stateManager.addConversationEntry({
     type: 'agent_response',
     content: 'This is a response from the agent',
-    metadata: new Map([['model', 'groq']])
+    metadata: new Map([['model', 'groq']]),
   });
 
   console.log('📝 After adding conversation history:');
@@ -118,7 +137,7 @@ async function demonstrateAgentStateCommands(): Promise<void> {
   console.log('');
 
   console.log('✅ Agent state commands demo completed successfully!');
-  
+
   await agent.shutdown();
 }
 

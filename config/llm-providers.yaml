@@ -22,7 +22,7 @@ llm:
   # LLM configuration for input classification
   classifier:
     provider: "ollama"
-    model: "qwen2.5-coder:7b"  # Fast, consistent model for classification
+    model: "qwen3:8b"  # Available model for classification
     temperature: 0.1  # Low temperature for consistent classification
     maxTokens: 200    # Short responses for classification
 
@@ -39,7 +39,7 @@ llm:
       name: "Ollama"
       type: "local"
       enabled: true
-      baseURL: "http://localhost:11434"
+      baseURL: "http://172.18.144.1:11434"
       # No API key required for local Ollama
       models:
         - name: "llama3.2:3b"
@@ -263,7 +263,7 @@ environment:
       description: "API key for Together AI service"
     - name: "OLLAMA_BASE_URL"
       required: false
-      default: "http://localhost:11434"
+      default: "http://172.18.144.1:11434"
       description: "Base URL for local Ollama instance"
 
 # Security settings

@@ -2,13 +2,12 @@
 
 /**
  * Working Classifier Demo
- * 
+ *
  * Demonstrates the actual implemented three-type classification system
  * using the rule-based method that exists in the codebase.
  */
 
-import { RuleBasedClassificationMethod } from '../../classifier/impl/rule-based-classification-method.js';
-import type { ProcessingContext } from '../../classifier/abstractions/IClassifier.js';
+import { RuleBasedClassificationMethod } from '@qi/agent/classifier/impl/rule-based-classification-method';
 
 async function main() {
   console.log('🔍 Working Classifier Demo');
@@ -21,9 +20,9 @@ async function main() {
     workflowIndicators: ['fix', 'create', 'implement', 'debug', 'build', 'test'],
     confidenceThresholds: new Map([
       ['command', 1.0],
-      ['prompt', 0.8], 
-      ['workflow', 0.7]
-    ])
+      ['prompt', 0.8],
+      ['workflow', 0.7],
+    ]),
   });
 
   // Test cases
@@ -31,11 +30,11 @@ async function main() {
     '/help',
     '/status',
     'hi there',
-    'what is recursion?', 
+    'what is recursion?',
     'how do I write a function?',
     'fix the bug in auth.js and run tests',
     'create a new API endpoint with proper validation',
-    'debug the performance issue in the database query'
+    'debug the performance issue in the database query',
   ];
 
   console.log('Testing classification accuracy:\n');
@@ -43,7 +42,7 @@ async function main() {
   for (const input of testInputs) {
     try {
       const result = await classifier.classify(input);
-      
+
       console.log(`Input: "${input}"`);
       console.log(`  Type: ${result.type}`);
       console.log(`  Confidence: ${(result.confidence * 100).toFixed(1)}%`);

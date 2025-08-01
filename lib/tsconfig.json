@@ -3,7 +3,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -12,19 +13,23 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@qi/agent": ["./src/index.ts"],
+      "@qi/base": ["../../qi-v2-qicore/typescript/lib/src/base"],
+      "@qi/core": ["../../qi-v2-qicore/typescript/lib/src/core"],
+      "@qi/lib": ["./src"],
+      "@qi/lib/*": ["./src/*"],
+      "@qi/agent": ["./src/agent"],
       "@qi/agent/*": ["./src/*"],
-      "@/*": ["./src/*"],
-      "@/agent/*": ["./src/agent/*"],
-      "@/mcp/*": ["./src/mcp/*"],
-      "@/llm/*": ["./src/llm/*"],
-      "@/config/*": ["./src/config/*"],
-      "@/utils/*": ["./src/utils/*"]
+      "@qi/prompt": ["./src/prompt"],
+      "@qi/prompt/*": ["./src/prompt/*"],
+      "@qi/cli": ["./src/cli"],
+      "@qi/cli/*": ["./src/cli/*"],
+      "@/*": ["./src/*"]
     },
-    "types": ["bun-types"]
+    "types": ["bun-types", "react"]
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

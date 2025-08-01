@@ -2,17 +2,17 @@
 
 /**
  * Simple CLI Demo
- * 
+ *
  * Demonstrates proper CLI functionality focused on interface concerns:
  * - Command parsing and execution
  * - Input/output handling
  * - Basic CLI commands (help, exit, clear, version)
- * 
+ *
  * Does NOT do agent work - that should be handled by the agent layer.
  */
 
 import * as readline from 'node:readline';
-import { SimpleCLICommandHandler, type CLICommand } from '../../cli/impl/simple-command-handler.js';
+import { type CLICommand, SimpleCLICommandHandler } from '@qi/cli/impl/simple-command-handler';
 
 class SimpleCLIDemo {
   private commandHandler: SimpleCLICommandHandler;
@@ -24,7 +24,7 @@ class SimpleCLIDemo {
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
-      prompt: '> '
+      prompt: '> ',
     });
   }
 
@@ -66,7 +66,7 @@ class SimpleCLIDemo {
       const commandRequest = this.commandHandler.parseCommand(input);
       if (commandRequest) {
         const result = this.commandHandler.executeCommand(commandRequest);
-        
+
         if (result.shouldClear) {
           console.clear();
         } else if (result.output) {
@@ -100,9 +100,9 @@ class SimpleCLIDemo {
 // Demo scenarios
 async function runDemo(): Promise<void> {
   console.log('Starting CLI demo...\n');
-  
+
   const demo = new SimpleCLIDemo();
-  
+
   // Show command capabilities first
   console.log('Available CLI commands:');
   const commands = demo.getCommands();

@@ -1,29 +1,90 @@
-// Main Entry Point - qi-v2-agent Library
-//
-// Exports both the new agent framework and existing implementations
-// for backward compatibility
+/**
+ * qi-v2-agent Library - Main Entry Point
+ *
+ * This is the main entry point for the qi-v2-agent library.
+ * It exports all public APIs and abstractions with explicit re-exports to avoid conflicts.
+ */
 
-// Core interfaces (technology-agnostic)
-export * from './core/interfaces/index.js';
+// Core Agent Framework
+export * from './agent/index.js';
 
-// Abstract base classes
-export * from './core/abstracts/index.js';
+// Input Classification System
+export {
+  ClassificationConfig,
+  ClassificationMethod,
+  ClassificationOptions,
+  ClassificationResult,
+  ClassificationStats,
+  ClassificationType,
+  createBasicClassifier,
+  createClassifier,
+  createCompleteClassifier,
+  createEnsembleClassifier,
+  createHybridClassifier,
+  createLLMClassifier,
+  createMultiMethodClassifier,
+  createRuleBasedClassifier,
+  IClassificationMethod,
+  IClassifier,
+  ProcessingContext as ClassificationProcessingContext,
+} from './classifier/index.js';
 
-// New agent framework (recommended)
-export * from './agents/index.js';
+// Command Processing
+export * from './command/index.js';
 
-// Component-based implementations
-export { Agent } from './impl/agents/agent.js';
-export { ThreeTypeAgent } from './impl/agents/three-type-agent.js';
-export { InputClassifier } from './impl/classifiers/input-classifier.js';
-export { MultiSignalPatternMatcher } from './impl/classifiers/pattern-matcher.js';
-export { BasicCommandHandler } from './impl/commands/command-handler.js';
-export { OllamaModelProvider } from './impl/models/ollama-model-provider.js';
-export { ModelRoutingEngine } from './impl/models/model-routing-engine.js';
-export { BasicPromptHandler } from './impl/prompts/prompt-handler.js';
-export { BasicPromptManager } from './impl/prompts/prompt-manager.js';
-export { HybridWorkflowExtractor } from './impl/workflows/workflow-extractor.js';
-export { LangGraphWorkflowEngine } from './impl/workflows/langgraph-workflow-engine.js';
-export { MCPToolProvider } from './impl/tools/mcp-tool-provider.js';
-export { MultiModalMemoryProvider } from './impl/memory/memory-provider.js';
-export * from './impl/utils/operational-reliability.js';
+// Context Management
+export {
+  AgentSpecialization,
+  AppContext,
+  ContextAccessAudit,
+  ContextManager,
+  ContextMessage,
+  ConversationContext,
+  createContextManager,
+  createDefaultAppContext,
+  IContextManager,
+  IsolatedContext,
+  IsolatedContextConfig,
+  SecurityBoundaryManager,
+  SecurityRestrictions,
+} from './context/index.js';
+
+// LLM Integration
+export * from './llm/index.js';
+
+// Prompt Processing
+export * from './prompt/index.js';
+
+// State Management
+export {
+  createStateManager as createStateManagerFactory,
+  IStateManager as StateManagerInterface,
+} from './state/index.js';
+
+// Workflow Processing
+export {
+  ExecutableWorkflow,
+  IWorkflowEngine,
+  IWorkflowEngineConfig,
+  IWorkflowExtractor,
+  IWorkflowExtractorConfig,
+  ProcessingContext as WorkflowProcessingContext,
+  ToolResult,
+  WorkflowCondition,
+  WorkflowConditionSpec,
+  WorkflowCustomization,
+  WorkflowEdge,
+  WorkflowEdgeSpec,
+  WorkflowError,
+  WorkflowExtractionResult,
+  WorkflowMetadata,
+  WorkflowMode,
+  WorkflowNode,
+  WorkflowNodeHandler,
+  WorkflowNodeSpec,
+  WorkflowPerformance,
+  WorkflowResult,
+  WorkflowSpec,
+  WorkflowState,
+  WorkflowStreamChunk,
+} from './workflow/index.js';

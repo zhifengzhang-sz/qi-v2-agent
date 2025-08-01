@@ -1,0 +1,2120 @@
+{
+  "metadata": {
+    "created": "2025-08-01T10:10:22.980Z",
+    "totalSamples": 300,
+    "samplesPerCategory": 100,
+    "distribution": {
+      "command": 100,
+      "prompt": 100,
+      "workflow": 100
+    },
+    "sources": {
+      "Generated": 100,
+      "PersonaChat": 100,
+      "SGD": 100,
+      "SGD_Generated": 0
+    }
+  },
+  "samples": [
+    {
+      "id": 1,
+      "input": "/help",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 101,
+      "input": "hi , how are you doing ? i'm getting ready to do some cheetah chasing to stay in shape .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 201,
+      "input": "I want to make a restaurant reservation for 2 people at half past 11 in the morning.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 2,
+      "input": "/config",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 102,
+      "input": "that's neat . when i was in high school i placed 6th in 100m dash !",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 202,
+      "input": "Please find restaurants in San Jose. Can you try Sino?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 3,
+      "input": "/settings",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 103,
+      "input": "i would have to say its prime rib . do you have any favorite foods ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 203,
+      "input": "Yes, thanks. What's their phone number?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 4,
+      "input": "/status",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 104,
+      "input": "i think i will can some jam . do you also play footfall for fun ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 204,
+      "input": "What's their address? Do they have vegetarian options on their menu?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 5,
+      "input": "/info",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 105,
+      "input": "hi , how are you doing today ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 205,
+      "input": "Thanks very much.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 6,
+      "input": "/version",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 106,
+      "input": "i agree . what do you do for a living ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 206,
+      "input": "No, that's all. Thanks.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 7,
+      "input": "/about",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 107,
+      "input": "that's awesome . i have always had a love for technology .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 207,
+      "input": "I am not in the mood to cook today. I want to eat out at a restaurant instead.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 8,
+      "input": "/quit",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 108,
+      "input": "that's nice . moms are pretty cool too .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 208,
+      "input": "Look for a restaurant in Saratoga. Check to see if I can have a table for 1 at Sipan for 11:30.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 9,
+      "input": "/exit",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 109,
+      "input": "we all live in a yellow submarine , a yellow submarine . morning !",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 209,
+      "input": "I would like to book at table at Rosie Mccann's for March 2nd.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 10,
+      "input": "/list",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 110,
+      "input": "really ? what shows ? i like tv , it makes me forget i do not like my family",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 210,
+      "input": "I want the eat there on the 4th of this month.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 11,
+      "input": "/show",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 111,
+      "input": "put the lime in the coconut as well . . .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 211,
+      "input": "That would be fine. Is the restaurant costly?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 12,
+      "input": "/display",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 112,
+      "input": "hi ! i work as a gourmet cook .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 212,
+      "input": "No thanks. You have been very helpful.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 13,
+      "input": "/view",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 113,
+      "input": "great ! i had won an award for spelling bee .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 213,
+      "input": "I want to reserve a table at a restaurant, specifically Bourbon Steak.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 14,
+      "input": "/clear",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 114,
+      "input": "i have not . i can cook any word you want me to",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 214,
+      "input": "Find Bourbon Steaks in San Francisco please.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 15,
+      "input": "/reset",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 115,
+      "input": "i love carrots . i eat carrots like a horse .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 215,
+      "input": "Please do it for one in the afternoon.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 16,
+      "input": "/restart",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 116,
+      "input": "how are you doing today",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 216,
+      "input": "Yes, that is correct.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 17,
+      "input": "/reload",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 117,
+      "input": "what do you weld ? houses ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 217,
+      "input": "Thanks for your help. That will be it.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 18,
+      "input": "/refresh",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 118,
+      "input": "how does that feel for you",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 218,
+      "input": "I would like to make a restaurant reservation at morning 11:15.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 19,
+      "input": "/save",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 119,
+      "input": "i watch kids for a living",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 219,
+      "input": "Can I get a reservation at Andes Cafe?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 20,
+      "input": "/load",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 120,
+      "input": "hello friend , how is it going",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 220,
+      "input": "Find a restaurant in San Mateo.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 21,
+      "input": "/open",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 121,
+      "input": "you work for a funeral home ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 221,
+      "input": "The reservation is just for 1 person.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 22,
+      "input": "/close",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 122,
+      "input": "ok i see , that's your halloween costume",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 222,
+      "input": "That is correct.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 23,
+      "input": "/start",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 123,
+      "input": "lol , oh i see , taught you own it",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 223,
+      "input": "Not at this time.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 24,
+      "input": "/stop",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 124,
+      "input": "rock on , i'm listening to my favorite band guns and roses .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 224,
+      "input": "I want to make a dinner reservation on March 5th.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 25,
+      "input": "/pause",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 125,
+      "input": "well i'm into black everything . so at least it wouldn't show on my black carpet .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 225,
+      "input": "I want a restaurant in San Jose, for 18:30, please.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 26,
+      "input": "/resume",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 126,
+      "input": "wow , does he live there or work ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 226,
+      "input": "Can you get me a table at Ludwig's German Table?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 27,
+      "input": "/search",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 127,
+      "input": "sounds a bit scary . i ve never been .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 227,
+      "input": "Yes, that's right.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 28,
+      "input": "/find",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 128,
+      "input": "hi . how are you doing today ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 228,
+      "input": "What type of food do they serve, and what's the address?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 29,
+      "input": "/connect",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 129,
+      "input": "it is my living . i like culture .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 229,
+      "input": "Thanks. That's all.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 30,
+      "input": "/disconnect",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 130,
+      "input": "do you own your own company",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 230,
+      "input": "I want to make a reservation at a restaurant.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 31,
+      "input": "/login",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 131,
+      "input": "that is a good start",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 231,
+      "input": "Can you look at Villa Romano in Napa?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 32,
+      "input": "/logout",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 132,
+      "input": "hi how are you today",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 232,
+      "input": "Try for afternoon 12:45.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 33,
+      "input": "/install",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 133,
+      "input": "what do you do ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 233,
+      "input": "Make it for 4 people.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 34,
+      "input": "/uninstall",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 134,
+      "input": "yes it does pay the bills",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 234,
+      "input": "Actually, can we change it to Big 4.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 35,
+      "input": "/update",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 135,
+      "input": "i love nature and it keeps my mind off things . do you travel",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 235,
+      "input": "Yes, that's right.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 36,
+      "input": "/upgrade",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 136,
+      "input": "hello , how are you today ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 236,
+      "input": "I need to taste good food , i am very much eager to taste different food varieties from my normal routine food. Will you book a table at a restaurant?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 37,
+      "input": "/sync",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 137,
+      "input": "what do you do for a living ? i proofread for hallmark .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 237,
+      "input": "Find restaurants in SFO and at time 13:00 ? Can you try booking a table at Tuba?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 38,
+      "input": "/backup",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 138,
+      "input": "i agree . have you seen goodfellas ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 238,
+      "input": "No Find restaurants in Livermore and Book a table at simply fondue?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 39,
+      "input": "/restore",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 139,
+      "input": "i do . i travel extensively to europe and south america .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 239,
+      "input": "Ok That's correct.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 40,
+      "input": "/delete",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 140,
+      "input": "hi i am sally , i live with my sweet dogs in taos , new mexico .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 240,
+      "input": "Thanks a lot for your help. thats all i need",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 41,
+      "input": "/remove",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 141,
+      "input": "maybe you will have to record your playing and dance to it .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 241,
+      "input": "I want to go out to eat somewhere.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 42,
+      "input": "/add",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 142,
+      "input": "interesting , i'm a struggling artist and part time tutor",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 242,
+      "input": "I want a restaurant in SF. I heard that a place called Zaoh is really good. I wonder if it has any free seats?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 43,
+      "input": "/create",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 143,
+      "input": "do you have any pets ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 243,
+      "input": "I'd love to go there for lunch, so 12 o\"clock in the afternoon.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 44,
+      "input": "/edit",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 144,
+      "input": "hello . how are you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 244,
+      "input": "No. The reservation should be for 4 people, and it should be for the 8th of this month.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 45,
+      "input": "/modify",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 145,
+      "input": "i enjoy reading but also garden in my spare time .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 245,
+      "input": "Yeah. I wonder what I should wear? Is Zaoh an ultra high-end restaurant?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 46,
+      "input": "/copy",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 146,
+      "input": "yes . lots of rabbits .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 246,
+      "input": "That's all, thanks.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 47,
+      "input": "/move",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 147,
+      "input": "very cool . thanks for the chat . have a great day .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 247,
+      "input": "I'd like to make a restaurant reservation.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 48,
+      "input": "/rename",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 148,
+      "input": "hey how are you today ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 248,
+      "input": "It's called House Of Genji and you can look for it in San Jose. I want the reservation for evening 6:15.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 49,
+      "input": "/chmod",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 149,
+      "input": "yes , i am going to university of michigan . what year are you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 249,
+      "input": "Yeah, that's right. Do they do outdoor seating?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 50,
+      "input": "/run",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 150,
+      "input": "fun . have you decided on your major for school ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 250,
+      "input": "That won't work for me.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 51,
+      "input": "/execute",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 151,
+      "input": "hey , what are you up to ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 251,
+      "input": "No, thanks a lot.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 52,
+      "input": "/build",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 152,
+      "input": "i would if i could , but i have a farm to maintain .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 252,
+      "input": "I wanna book a restaurant reservation on the 14th of March",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 53,
+      "input": "/compile",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 153,
+      "input": "work is tiring . i would love to travel the world instead .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 253,
+      "input": "Can you find me a table at Mcdonald's",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 54,
+      "input": "/test",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 154,
+      "input": "they're both greyhounds . their names are tom and jerry .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 254,
+      "input": "Find me one in Livermore",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 55,
+      "input": "/debug",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 155,
+      "input": "hello , how are you doing ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 255,
+      "input": "Yes that works, but do they have vegetarian options?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 56,
+      "input": "/profile",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 156,
+      "input": "that's awesome . the ocean is incredible ! i totally believe that mermaids are out in the sea",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 256,
+      "input": "What is their phone number and address?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 57,
+      "input": "/monitor",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 157,
+      "input": "oh nice ! my mom went to beauty school too",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 257,
+      "input": "Thank you so much, that's it for now.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 58,
+      "input": "/log",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 158,
+      "input": "that is such a great thing ! ! not married , single and trying to mingle haha . you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 258,
+      "input": "I want to book a table at a restaurant. Is there anything available at Uncle Yu's. I don't care what date.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 59,
+      "input": "/trace",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 159,
+      "input": "i am frank . nice to meet you . what is your name ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 259,
+      "input": "Please look in Livermore for a reservation at 7 in the evening. I'd prefer Wednesday next week.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 60,
+      "input": "/dump",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 160,
+      "input": "do you have any hobbies ? i like to ready and go cycling",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 260,
+      "input": "Sorry, please make it 3 people. Can you look at Mai instead?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 61,
+      "input": "/export",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 161,
+      "input": "that's so cool . how do you like to spend your free time ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 261,
+      "input": "Yes, that's correct.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 62,
+      "input": "/import",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 162,
+      "input": "have you even been to canada for snowboarding ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 262,
+      "input": "Can you try again? This time look for 5:15 pm.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 63,
+      "input": "/convert",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 163,
+      "input": "hey how are you ? i wanted to go to florida to surf but no way !",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 263,
+      "input": "Yes, please. What type of food is on their menu? Do they have vegetarian options?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 64,
+      "input": "/help1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 164,
+      "input": "wouldn't mind ! i'm so busy at the hospital all the time .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 264,
+      "input": "No, that's all. Thanks.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 65,
+      "input": "/config1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 165,
+      "input": "oh boy do i lol i bake alot when i have spare time , would love to share",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 265,
+      "input": "Can you book a table at a restaurant?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 66,
+      "input": "/settings1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 166,
+      "input": "hi . how are you doing today ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 266,
+      "input": "I would like a table at the Tacolicious in San Jose for 7:30 in the evening.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 67,
+      "input": "/status1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 167,
+      "input": "that sounds like a lot of work",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 267,
+      "input": "Can you find a table at Isushi in Castro Valley instead please?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 68,
+      "input": "/info1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 168,
+      "input": "what do you like to cook",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 268,
+      "input": "Can you make it for the 14th of this month please?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 69,
+      "input": "/version1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 169,
+      "input": "i understand that . my church has a pantry .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 269,
+      "input": "Yes, that is perfect.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 70,
+      "input": "/about1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 170,
+      "input": "hello , tell me about you .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 270,
+      "input": "Thank you for your assistance.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 71,
+      "input": "/quit1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 171,
+      "input": "you should go some time .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 271,
+      "input": "No, that is all thank you.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 72,
+      "input": "/exit1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 172,
+      "input": "maybe i could introduce you to my sister in law . she's all wrong for my brother .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 272,
+      "input": "I need help with a reservation in a restaurant.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 73,
+      "input": "/list1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 173,
+      "input": "i've not ventured into employment yet in fashion . too much to do .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 273,
+      "input": "It's for 6:45 in the evening.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 74,
+      "input": "/show1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 174,
+      "input": "hey whats going on ? how are you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 274,
+      "input": "Look around San Jose.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 75,
+      "input": "/display1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 175,
+      "input": "so you have two cats ? what are their names ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 275,
+      "input": "Yes, go for Lalla.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 76,
+      "input": "/view1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 176,
+      "input": "i live with my mom and watch a lot star trek . ever seen it ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 276,
+      "input": "Yes, you can proceed.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 77,
+      "input": "/clear1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 177,
+      "input": "yeah i bet we would . i like hunting but i do not kill animals . i'm weird like that",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 277,
+      "input": "That's wonderful.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 78,
+      "input": "/reset1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 178,
+      "input": "hello there how are you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 278,
+      "input": "No I don't, thank you.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 79,
+      "input": "/restart1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 179,
+      "input": "its my favorite activity outside of being a doctor . do you like beaches ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 279,
+      "input": "Can You help me in booking a table for four people at a restaurant?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 80,
+      "input": "/reload1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 180,
+      "input": "i too am a vegan , how long for you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 280,
+      "input": "Can you look for Taverna restaurant in Sunnyvale?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 81,
+      "input": "/refresh1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 181,
+      "input": "i work at an urban farm , i love them . do you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 281,
+      "input": "Book the table for evening 5:45.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 82,
+      "input": "/save1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 182,
+      "input": "hello how is life treating you today ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 282,
+      "input": "Yes, That sounds good to me.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 83,
+      "input": "/load1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 183,
+      "input": "do you usually make bank waiting tables ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 283,
+      "input": "No. Don't do thst.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 84,
+      "input": "/open1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 184,
+      "input": "i find people to help now they come to me like stray cats .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 284,
+      "input": "No. That will be all. Thank you.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 85,
+      "input": "/close1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 185,
+      "input": "when i was growing up my family moved 40 times .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 285,
+      "input": "Please make a dinner reservation in Livermore.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 86,
+      "input": "/start1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 186,
+      "input": "hi , how are you doing today ? do you have any hobbies ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 286,
+      "input": "I like Sai's T.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 87,
+      "input": "/stop1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 187,
+      "input": "i'm a personal chef for a family of 4 . what about you ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 287,
+      "input": "I changed my mind. How about Kiku restaurant.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 88,
+      "input": "/pause1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 188,
+      "input": "it was in the 2nd grade . i missed the cut in the 3rd grade . haha .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 288,
+      "input": "Exactly. What food type is on the menu?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 89,
+      "input": "/resume1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 189,
+      "input": "hi ! how was your weekend ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 289,
+      "input": "No, that's all.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 90,
+      "input": "/search1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 190,
+      "input": "great ! went for pizza , my fav , on friday . whats your favorite food ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 290,
+      "input": "Can you help me reserve a table at a restaurant? I'd like to book at Royal Rangoon.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 91,
+      "input": "/find1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 191,
+      "input": "yes ! i love sushi ! i always eat it while studying .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 291,
+      "input": "I'd like the reservation at quarter to 12 in the morning. The restaurant is in Berkeley.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 92,
+      "input": "/connect1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 192,
+      "input": "hello , how are you doing tonight ? its midnight here",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 292,
+      "input": "No, I'd like to reserve it on the 3rd of this month.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 93,
+      "input": "/disconnect1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 193,
+      "input": "my father . i work for the navy , 17 years at sea . its still terrifying",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 293,
+      "input": "Yes, that sounds correct. What's the restaurant's rating, and what kind of food do they serve?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 94,
+      "input": "/login1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 194,
+      "input": "september of 1972 . in 1960 was hurricane donna . fortunately , i love to swim",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 294,
+      "input": "Yes, sounds good.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 95,
+      "input": "/logout1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 195,
+      "input": "ah , not many jobs left after the hurricane ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 295,
+      "input": "I am making dinner plans with a friend and would like to book a table at a restaurant.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 96,
+      "input": "/install1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 196,
+      "input": "hello ! how are you ? i'm about to have pizza , i'm excited ! !",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "complex"
+    },
+    {
+      "id": 296,
+      "input": "The reservation will be for 7 in the evening for a restaurant in SFO.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "medium"
+    },
+    {
+      "id": 97,
+      "input": "/uninstall1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 197,
+      "input": "i bet that is fun ! i sell cars . it is new to me",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 297,
+      "input": "Can you try to book it for Kittea Cat?",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    },
+    {
+      "id": 98,
+      "input": "/update1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 198,
+      "input": "yes , pizza is my vice ! sour candy is good , also .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "medium"
+    },
+    {
+      "id": 298,
+      "input": "Yes, that is correct.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 99,
+      "input": "/upgrade1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 199,
+      "input": "i like that , also . all pizza .",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 299,
+      "input": "Thank you. That is all I need for now.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "simple"
+    },
+    {
+      "id": 100,
+      "input": "/sync1",
+      "expected": "command",
+      "source": "Generated",
+      "complexity": "simple"
+    },
+    {
+      "id": 200,
+      "input": "how is you night going so far ?",
+      "expected": "prompt",
+      "source": "PersonaChat",
+      "complexity": "simple"
+    },
+    {
+      "id": 300,
+      "input": "I'd like to book a restaurant table.",
+      "expected": "workflow",
+      "source": "SGD",
+      "complexity": "complex"
+    }
+  ]
+}

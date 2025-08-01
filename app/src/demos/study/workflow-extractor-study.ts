@@ -7,9 +7,9 @@
  * to understand workflow generation quality, validation success rates, and complexity handling.
  */
 
-import { QiWorkflowExtractor } from '../../workflow/impl/QiWorkflowExtractor.js';
-import type { IWorkflowExtractorConfig } from '../../workflow/interfaces/IWorkflowExtractor.js';
-import type { WorkflowExtractionResult, WorkflowSpec } from '../../workflow/interfaces/IWorkflow.js';
+import { QiWorkflowExtractor } from '@qi/agent/workflow/impl/QiWorkflowExtractor';
+import type { IWorkflowExtractorConfig } from '@qi/agent/workflow/interfaces/IWorkflowExtractor';
+import type { WorkflowExtractionResult, WorkflowSpec } from '@qi/agent/workflow/interfaces/IWorkflow';
 
 interface WorkflowTestCase {
   input: string;
@@ -174,26 +174,77 @@ export class WorkflowExtractorStudy {
     this.models = models || ['qwen2.5-coder:7b']; // Default benchmark model
   }
 
-  private config: IWorkflowExtractorConfig = {
-    supportedModes: [
-      { name: 'creative', description: 'Creative and generative tasks' },
-      { name: 'analytical', description: 'Analysis and reasoning tasks' },
-      { name: 'problem-solving', description: 'Problem solving and debugging' },
-      { name: 'general', description: 'General purpose tasks' }
-    ],
-    patternMapping: [
-      ['creative', 'generate-implement-validate'],
-      ['analytical', 'analyze-reason-conclude'],
-      ['problem-solving', 'identify-debug-fix'],
-      ['general', 'input-process-output']
-    ],
-    baseUrl: 'http://172.18.144.1:11434',
-    temperature: 0.2,
-    maxTokens: 3000
-  };
+  private config: IWorkflowExtractorConfig | null = null;
 
   async runStudy(): Promise<Map<string, WorkflowStudyResult>> {
     console.log(`🔍 Workflow Extractor Study: ${this.testCases.length} test cases, ${this.models.length} model(s)\n`);
+
+    // Load configuration from the actual config system
+    try {
+      const { createStateManager } = await import('@qi/agent/state');
+      const stateManager = createStateManager();
+      
+      // Load LLM configuration from config file
+      await stateManager.loadLLMConfig(process.cwd() + '/config');
+      const llmConfig = stateManager.getLLMConfigForPromptModule();
+      
+      if (!llmConfig?.llm?.providers?.ollama) {
+        throw new Error('Ollama configuration not found in config/llm-providers.yaml');
+      }
+      
+      const baseUrl = llmConfig.llm.providers.ollama.baseURL || 'http://localhost:11434';
+      console.log(`📋 Using configured base URL: ${baseUrl}`);
+      
+      this.config = {
+        supportedModes: [
+          { 
+            name: 'creative', 
+            description: 'Creative and generative tasks',
+            category: 'creation',
+            keywords: ['create', 'generate', 'build', 'write'],
+            commonNodes: ['create', 'generate', 'validate'],
+            requiredTools: ['file-system', 'text-editor']
+          },
+          { 
+            name: 'analytical', 
+            description: 'Analysis and reasoning tasks',
+            category: 'analysis',
+            keywords: ['analyze', 'examine', 'study', 'investigate'],
+            commonNodes: ['analyze', 'process', 'report'],
+            requiredTools: ['data-analysis', 'reporting']
+          },
+          { 
+            name: 'problem-solving', 
+            description: 'Problem solving and debugging',
+            category: 'debugging',
+            keywords: ['debug', 'fix', 'solve', 'troubleshoot'],
+            commonNodes: ['identify', 'diagnose', 'fix', 'test'],
+            requiredTools: ['debugger', 'testing', 'file-system']
+          },
+          { 
+            name: 'general', 
+            description: 'General purpose tasks',
+            category: 'general',
+            keywords: ['task', 'work', 'do', 'help'],
+            commonNodes: ['start', 'process', 'complete'],
+            requiredTools: ['basic-tools']
+          }
+        ],
+        patternMapping: [
+          ['creative', 'generate-implement-validate'],
+          ['analytical', 'analyze-reason-conclude'],
+          ['problem-solving', 'identify-debug-fix'],
+          ['general', 'input-process-output']
+        ],
+        baseUrl: baseUrl,
+        temperature: 0.2,
+        maxTokens: 3000
+      };
+      
+    } catch (error) {
+      console.error('❌ Failed to load configuration:', error);
+      throw error;
+    }
 
     const results = new Map<string, WorkflowStudyResult>();
 
@@ -227,11 +278,15 @@ export class WorkflowExtractorStudy {
   }
 
   private async testModel(model: string): Promise<WorkflowStudyResult> {
-    // Create extractor with user config but override the model
+    if (!this.config) {
+      throw new Error('Configuration not loaded');
+    }
+    
+    // Create extractor with loaded config but override the model
     const extractor = new QiWorkflowExtractor({
       supportedModes: this.config.supportedModes,
       patternMapping: this.config.patternMapping,
-      baseUrl: this.config.baseUrl || 'http://172.18.144.1:11434', // Use user's URL from config
+      baseUrl: this.config.baseUrl,
       modelId: model, // Override with command line model parameter
       temperature: this.config.temperature || 0.2,
       maxTokens: this.config.maxTokens || 3000
@@ -251,8 +306,7 @@ export class WorkflowExtractorStudy {
         const startTime = Date.now();
         const result = await extractor.extractWorkflow(testCase.input, {
           sessionId: 'study-session',
-          timestamp: new Date(),
-          source: 'study',
+          currentInputType: 'workflow',
           environmentContext: new Map([
             ['workingDirectory', process.cwd()],
             ['userId', 'study-user']
@@ -362,6 +416,16 @@ export class WorkflowExtractorStudy {
     if (best && best[1].successRate > 0) {
       console.log(`🏆 Best: ${best[0]} (${best[1].successRate.toFixed(1)}% success, ${best[1].avgLatency.toFixed(0)}ms latency, ${best[1].avgNodeCount.toFixed(1)} avg nodes)`);
     }
+    
+    // Add markdown table output
+    console.log('\n## Workflow Extractor Results (Markdown)');
+    console.log('```markdown');
+    console.log('| Model | Success% | Valid% | Latency | Confidence | Nodes | Errors |');
+    console.log('|-------|----------|--------|---------|------------|-------|--------|');
+    for (const [model, result] of sortedResults) {
+      console.log(`| ${model} | ${result.successRate.toFixed(1)}% | ${result.validationSuccessRate.toFixed(1)}% | ${result.avgLatency.toFixed(0)}ms | ${result.avgConfidence.toFixed(2)} | ${result.avgNodeCount.toFixed(1)} | ${result.errors.length} |`);
+    }
+    console.log('```');
   }
 
 }

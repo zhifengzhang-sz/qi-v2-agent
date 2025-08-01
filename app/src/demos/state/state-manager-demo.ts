@@ -2,7 +2,7 @@
 
 /**
  * State Manager Demo
- * 
+ *
  * Demonstrates the state manager functionality:
  * - Configuration management
  * - Model management
@@ -11,7 +11,7 @@
  * - Session management
  */
 
-import { createStateManager, type IStateManager } from '../../state/index.js';
+import { createStateManager, type IStateManager } from '@qi/agent/state';
 
 async function demonstrateStateManager(): Promise<void> {
   console.log('🔧 State Manager Demo');
@@ -22,10 +22,10 @@ async function demonstrateStateManager(): Promise<void> {
   // Test configuration
   console.log('📋 Configuration Management:');
   console.log('Initial config:', stateManager.getConfig());
-  
-  stateManager.updateConfig({ 
+
+  stateManager.updateConfig({
     enableDebugMode: true,
-    maxHistorySize: 50 
+    maxHistorySize: 50,
   });
   console.log('Updated config:', stateManager.getConfig());
   console.log('');
@@ -33,8 +33,11 @@ async function demonstrateStateManager(): Promise<void> {
   // Test model management
   console.log('🧠 Model Management:');
   console.log('Current model:', stateManager.getCurrentModel());
-  console.log('Available models:', stateManager.getAvailableModels().map(m => `${m.id} (${m.name})`));
-  
+  console.log(
+    'Available models:',
+    stateManager.getAvailableModels().map((m) => `${m.id} (${m.name})`)
+  );
+
   stateManager.setCurrentModel('groq');
   console.log('Changed to model:', stateManager.getCurrentModel());
   console.log('');
@@ -42,10 +45,10 @@ async function demonstrateStateManager(): Promise<void> {
   // Test mode management
   console.log('⚡ Mode Management:');
   console.log('Current mode:', stateManager.getCurrentMode());
-  
+
   stateManager.setCurrentMode('planning');
   console.log('Changed to mode:', stateManager.getCurrentMode());
-  
+
   stateManager.setCurrentMode('executing');
   console.log('Changed to mode:', stateManager.getCurrentMode());
   console.log('');
@@ -55,10 +58,10 @@ async function demonstrateStateManager(): Promise<void> {
   const context = stateManager.getContext();
   console.log('Session ID:', context.sessionId);
   console.log('Current directory:', context.currentDirectory);
-  
+
   stateManager.updateContext({
     workspaceId: 'demo-workspace',
-    metadata: new Map([['demo', true]])
+    metadata: new Map([['demo', true]]),
   });
   console.log('Updated context workspace:', stateManager.getContext().workspaceId);
   console.log('');
@@ -69,23 +72,26 @@ async function demonstrateStateManager(): Promise<void> {
   console.log('Session ID:', session.id);
   console.log('Created at:', session.createdAt.toISOString());
   console.log('History length:', session.conversationHistory.length);
-  
+
   // Add conversation entries
   stateManager.addConversationEntry({
     type: 'user_input',
     content: 'Hello, how are you?',
-    metadata: new Map([['demo', true]])
+    metadata: new Map([['demo', true]]),
   });
-  
+
   stateManager.addConversationEntry({
     type: 'agent_response',
     content: 'I am doing well, thank you!',
-    metadata: new Map([['model', 'groq']])
+    metadata: new Map([['model', 'groq']]),
   });
-  
+
   const updatedSession = stateManager.getCurrentSession();
   console.log('Updated history length:', updatedSession.conversationHistory.length);
-  console.log('Last entry:', updatedSession.conversationHistory[updatedSession.conversationHistory.length - 1]);
+  console.log(
+    'Last entry:',
+    updatedSession.conversationHistory[updatedSession.conversationHistory.length - 1]
+  );
   console.log('');
 
   // Test state change notifications
@@ -93,10 +99,10 @@ async function demonstrateStateManager(): Promise<void> {
   const unsubscribe = stateManager.subscribe((change) => {
     console.log(`  Change: ${change.type}.${change.field} = ${change.newValue}`);
   });
-  
+
   stateManager.setCurrentModel('ollama');
   stateManager.setCurrentMode('ready');
-  
+
   unsubscribe();
   console.log('');
 
