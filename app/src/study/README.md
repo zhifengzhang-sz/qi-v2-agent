@@ -1,245 +1,179 @@
-# Classification Performance Study
+# Classification Study Framework
 
-This directory contains comprehensive tools for testing and evaluating different classification approaches for the three-type input classification system (command/prompt/workflow).
+Research-based testing and analysis for three-type input classification: **command/prompt/workflow**.
 
-## 🧪 Test Files
+## 🏗️ Structure
 
-### `classifier-performance-test.ts`
-Comprehensive performance test comparing different classification methods:
-- **Rule-based classification**: Pattern matching and indicator words
-- **LLM-based classification**: Mock sophisticated LLM reasoning
-- **Structured output classification**: Zod schema validation approach
+```
+study/
+├── data-ops/              # Dataset operations and preparation
+├── research/              # Classifier research by type
+│   ├── classification-benchmarks/  # Comparative analysis
+│   ├── ollama-structured-wrapper/  # OllamaWrapper method
+│   └── langchain-evaluation/       # LangChain method analysis
+├── datasets/              # Test datasets
+├── comprehensive-test-runner.ts    # Main orchestrator
+└── results.md            # Research findings
+```
 
-**Features:**
-- 45 carefully curated test cases covering edge cases
-- Comprehensive metrics: accuracy, latency, confidence, type-specific performance
-- Error analysis and detailed reporting
-- Export capability for further analysis
+## 🚀 Quick Start
 
-### `langchain-structured-output-test.ts`
-Demonstrates LangChain's `withStructuredOutput` method with Zod schema validation:
-- **Real LangChain integration**: Uses actual LangChain providers (Ollama, OpenAI, Groq)
-- **Comprehensive Zod schema**: Detailed classification with reasoning and metadata
-- **Provider comparison**: Test multiple LLM providers
-- **Schema compliance validation**: Ensures structured output format
+### **Test Specific Classifiers**
 
-**Features:**
-- Complex Zod schema with reasoning, indicators, and metadata
-- Multi-provider support (Ollama, OpenAI, Groq)
-- Schema compliance tracking
-- Ambiguity level analysis
-
-### `run-classification-tests.ts`
-Test runner and CLI interface for all classification tests:
-- **Unified test execution**: Run all tests with a single command
-- **Quick testing**: Fast validation with representative cases
-- **Latency benchmarking**: Performance-focused testing
-- **Comparative analysis**: Side-by-side method comparison
-
-## 🚀 Usage
-
-> **Note**: The LangChain structured output tests require a running Ollama instance with the `qwen3:0.6b` model. If you don't have Ollama set up, the rule-based and mock LLM tests will still work perfectly.
-
-### Run All Tests
 ```bash
-bun run study:all
+# Rule-based classifier (fast, no LLM needed)
+DATASET=balanced-10x3.json bun run study:rule-based-classifier
+
+# LangChain classifier (requires function calling models)
+DATASET=balanced-10x3.json MODEL_ID=qwen3:8b bun run study:langchain-classifier
+
+# OllamaWrapper classifier (works with any model)  
+DATASET=balanced-10x3.json MODEL_ID=qwen2.5-coder:7b bun run study:ollama-wrapper-classifier
+
+# Quiet mode (suppresses Ollama logs)
+DATASET=balanced-10x3.json MODEL_ID=qwen3:8b bun run study:langchain-classifier-quiet
 ```
 
-### Individual Tests
+### **Research Analysis**
+
 ```bash
-# Comprehensive performance test
-bun run study:classifier
+# Schema compliance testing
+bun run study:ollama-wrapper-schema
 
-# LangChain structured output test
-bun run study:structured
+# LangChain debugging
+bun run study:langchain-debugging
 
-# Quick validation test
-bun run study:quick
-
-# Latency benchmark
-bun run study:benchmark
+# Comprehensive comparison
+DATASET=balanced-100x3.json bun run study:test
 ```
 
-### Quick Tests by Method
+## 🧪 **Classifier Types**
+
+### **1. Rule-Based Classifier**
+- **File**: `research/classification-benchmarks/rule-based-classifier.ts`
+- **Method**: Pattern matching with keyword detection
+- **Speed**: ~1ms per classification
+- **Accuracy**: ~68% overall, 100% for commands
+- **Dependencies**: None (no LLM required)
+
+### **2. LangChain Classifier** 
+- **File**: `research/classification-benchmarks/langchain-classifier.ts`
+- **Method**: LangChain `withStructuredOutput` + function calling
+- **Speed**: ~400ms per classification
+- **Accuracy**: ~94% with function calling models
+- **Dependencies**: Models with function calling support
+- **⚠️ Requirement**: Only works with `qwen3`, `llama3.2+`, newer models
+
+### **3. OllamaWrapper Classifier**
+- **File**: `research/ollama-structured-wrapper/ollama-wrapper-classifier.ts`
+- **Method**: Custom JSON prompting with OllamaStructuredWrapper
+- **Speed**: ~350ms per classification  
+- **Accuracy**: ~83% with any model
+- **Dependencies**: Any Ollama model
+- **✅ Universal**: Works with ALL models
+
+## 📊 **Available Datasets**
+
+Located in `datasets/`:
+
 ```bash
-# Test only rule-based classifier
-bun run study:quick rule
+# Quick testing (30 samples)
+DATASET=balanced-10x3.json
 
-# Test only LLM-based classifier  
-bun run study:quick llm
+# Standard evaluation (300 samples) 
+DATASET=balanced-100x3.json
 
-# Test only structured output classifier
-bun run study:quick structured
+# Comprehensive analysis (2100 samples)
+DATASET=balanced-700x3.json
+
+# External benchmarks
+DATASET=clinc150_full.json      # Intent classification benchmark
+DATASET=banking_intent.csv      # Banking domain classification
 ```
 
-## 📊 Test Results
+## 🎯 **Model Compatibility**
 
-### Current Performance (Latest Run)
-Based on the most recent comprehensive test:
+### **Function Calling Models** (LangChain works):
+- ✅ `qwen3:8b`, `qwen3:14b`, `qwen3:30b-a3b`
+- ✅ `llama3.2:3b`, `llama3.3:70b`
+- ✅ `kirito1/qwen3-coder:4b`
 
-| Method | Accuracy | Latency | Confidence | Tests |
-|--------|----------|---------|------------|-------|
-| **Rule-Based** | **93.3%** | **0ms** | 0.801 | 42/45 |
-| LLM-Based | 86.7% | 210ms | 0.844 | 39/45 |
-| Structured | 84.4% | 333ms | 0.851 | 38/45 |
+### **Non-Function Calling Models** (LangChain fails):
+- ❌ `qwen2.5-coder:7b`, `qwen2.5-coder:14b`, `qwen2.5-coder:32b`
+- ❌ `SmolLM2:1.7B`, `deepseek-r1:7b`
 
-### Type-Specific Performance
+### **Universal Models** (OllamaWrapper works):
+- ✅ **ALL models** - no function calling requirement
 
-| Method | Command | Prompt | Workflow |
-|--------|---------|--------|----------|
-| **Rule-Based** | **100.0%** | **95.0%** | **86.7%** |
-| LLM-Based | 100.0% | 95.0% | 66.7% |
-| Structured | 100.0% | 100.0% | 53.3% |
+## 🔬 **Research Findings**
 
-### Key Findings
+### **Root Cause Discovery**
+**LangChain's `withStructuredOutput` requires function calling support**:
+- Models WITH function calling: Returns real structured JSON
+- Models WITHOUT function calling: Returns `undefined` → fallback to fake results
 
-1. **Rule-Based Classifier** shows excellent overall performance:
-   - Highest accuracy (93.3%)
-   - Fastest execution (0.1ms average latency, 0.0-0.3ms range)
-   - Reliable command detection (100%)
-   - Good workflow detection (86.7%)
-   - **Recommended for production use**
+### **Performance Comparison**
+| Classifier | Speed | Accuracy | Model Support | Use Case |
+|------------|-------|----------|---------------|----------|
+| Rule-Based | ~1ms | 68% | All | Development/Commands |
+| LangChain | ~400ms | 94% | Function calling only | Production (new models) |
+| OllamaWrapper | ~350ms | 83% | All | Production (any model) |
 
-2. **LLM-Based Approach** provides sophisticated reasoning:
-   - Good accuracy (86.7%) with detailed explanations
-   - Moderate latency (210ms average)
-   - Struggles with complex workflow detection
+### **Recommendations**
+- **Development**: Use Rule-Based (instant feedback)
+- **Production (new models)**: Use LangChain (highest accuracy)
+- **Production (any model)**: Use OllamaWrapper (universal compatibility)
 
-3. **Structured Output** offers comprehensive metadata:
-   - Rich structured output with reasoning and indicators
-   - Highest latency (333ms average)
-   - Schema compliance tracking
-   - Best for analysis and debugging
+## 📋 **Commands Reference**
 
-## 📈 Test Dataset
+```bash
+# Data Operations
+bun run study:download              # Download external datasets
+bun run study:adapt                 # Convert to three-type format
+bun run study:generate-balanced     # Create balanced test sets
 
-The test dataset includes 45 carefully curated inputs:
+# Classifier Testing
+bun run study:rule-based-classifier           # Rule-based method
+bun run study:langchain-classifier            # LangChain method  
+bun run study:langchain-classifier-quiet      # LangChain (quiet)
+bun run study:ollama-wrapper-classifier       # OllamaWrapper method
 
-### Command Cases (10)
-- Clear system functions with `/` prefix
-- Examples: `/help`, `/config`, `/status`, `/model`
-
-### Prompt Cases (20)
-- Simple conversational requests
-- Educational questions and creation tasks  
-- Examples: "what is TypeScript?", "write a function", "explain closures"
-
-### Workflow Cases (15)
-- Multi-step tasks requiring coordination
-- Complex development workflows
-- Examples: "fix bug and run tests", "implement feature with docs"
-
-### Edge Cases
-- Ambiguous inputs that could be multiple types
-- Challenging classification scenarios
-- Examples: "test", "help me debug", "create /config file"
-
-## 🔧 LangChain Integration
-
-The structured output test demonstrates modern LangChain patterns:
-
-### Zod Schema Definition
-```typescript
-const ClassificationSchema = z.object({
-  type: z.enum(['command', 'prompt', 'workflow']),
-  confidence: z.number().min(0).max(1),
-  reasoning: z.string().min(10),
-  primary_indicators: z.array(z.string()),
-  complexity_score: z.number().min(0).max(1),
-  ambiguity_level: z.enum(['low', 'medium', 'high']),
-  // ... additional metadata
-});
+# Research Analysis
+bun run study:ollama-wrapper-schema           # Schema compliance test
+bun run study:langchain-debugging             # LangChain debugging
+bun run study:test                            # Comprehensive comparison
 ```
 
-### Structured Output Usage
-```typescript
-const structuredModel = model.withStructuredOutput(ClassificationSchema, {
-  name: 'classify_input',
-  description: 'Classify user input into command, prompt, or workflow categories'
-});
+## ⚙️ **Configuration**
 
-const result = await structuredModel.invoke(prompt);
+### **Environment Variables**
+```bash
+DATASET=balanced-10x3.json         # Dataset selection
+MODEL_ID=qwen3:8b                  # Model selection
+SAMPLE_LIMIT=100                   # Limit samples for testing
 ```
 
-## 🎯 Recommendations
+### **Model Selection Guidelines**
+- **For LangChain**: Use `qwen3:8b`, `llama3.2:3b`, or newer models
+- **For OllamaWrapper**: Any model works (`qwen2.5-coder:7b`, etc.)
+- **For Rule-Based**: No model needed
 
-Based on current test results:
+## 🧠 **Technical Insights**
 
-### For Production Use
-1. **Rule-Based Classifier** for primary classification:
-   - Excellent accuracy (93.3%)
-   - Zero latency overhead
-   - Reliable and predictable
+### **LangChain Connection Method**
+- Uses `ChatOpenAI` class (NOT `ChatOllama`)
+- Connects via Ollama's OpenAI-compatible endpoint: `/v1`
+- Requires Zod schema for structured output validation
+- Function calling translated to OpenAI function calling protocol
 
-### For Analysis and Debugging
-2. **Structured Output** for detailed analysis:
-   - Rich metadata and reasoning
-   - Schema validation
-   - Comprehensive error analysis
-
-### For Hybrid Approach
-3. **Combine methods** for best results:
-   - Use rule-based for fast classification
-   - Fall back to LLM for ambiguous cases
-   - Use structured output for detailed analysis
-
-## 🔍 Error Analysis
-
-Common misclassification patterns:
-
-### Rule-Based Errors
-- **Workflow → Prompt**: Complex creation tasks misclassified as simple prompts
-- **Prompt → Workflow**: Simple tasks with workflow keywords over-classified
-
-### LLM-Based Errors  
-- **Workflow → Prompt**: Complex multi-step tasks seen as conversational
-- **Prompt → Workflow**: Simple creation tasks over-classified as complex
-
-### Improvement Strategies
-1. **Enhance keyword patterns** for better workflow detection
-2. **Add context awareness** for ambiguous cases
-3. **Implement confidence thresholds** for hybrid decision-making
-4. **Fine-tune prompts** for better LLM classification
-
-## 📝 Future Enhancements
-
-1. **Real LLM Integration**: Connect to actual LLM providers for realistic testing
-2. **Confidence Calibration**: Improve confidence score accuracy across methods
-3. **Incremental Learning**: Add capability to learn from misclassifications
-4. **Performance Monitoring**: Track accuracy drift over time
-5. **A/B Testing**: Framework for comparing classification approaches in production
-
-## 🛠️ Development
-
-### Adding New Test Cases
-Add test cases to the `testCases` array in `classifier-performance-test.ts`:
-
-```typescript
-const testCases = [
-  ['new input', 'expected_type', 'description'],
-  // ...
-];
-```
-
-### Adding New Classification Methods
-Implement the classification interface:
-
-```typescript
-const newClassifier = async (input: string): Promise<ClassificationResult> => {
-  // Your classification logic
-  return {
-    type: 'prompt',
-    confidence: 0.8,
-    reasoning: 'Classification reasoning',
-    // ...
-  };
-};
-```
-
-### Extending Metrics
-Add new metrics to the `TestStats` interface and update calculation functions.
+### **OllamaWrapper Advantages**
+- Direct Ollama API calls (no OpenAI compatibility layer)
+- JSON schema prompting (no function calling needed)
+- Works with ANY model (even old/small ones)
+- Robust error handling and fallback mechanisms
 
 ---
 
-**Last Updated**: 2025-08-01  
-**Status**: Fully functional test suite with comprehensive coverage
+**Research Status**: ✅ **Complete** - Root cause identified, all methods working, comprehensive comparison available.
+
+**Key Discovery**: LangChain's function calling requirement explains compatibility issues. OllamaWrapper provides universal solution.

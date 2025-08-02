@@ -16,18 +16,43 @@ export {
   ClassificationResult,
   ClassificationStats,
   ClassificationType,
+  createAccurateClassifier,
+  createBalancedClassifier,
   createBasicClassifier,
   createClassifier,
   createCompleteClassifier,
   createEnsembleClassifier,
+  createFastClassifier,
   createHybridClassifier,
+  createInputClassifier,
+  createLangChainClassifier,
   createLLMClassifier,
-  createMultiMethodClassifier,
   createRuleBasedClassifier,
   IClassificationMethod,
   IClassifier,
   ProcessingContext as ClassificationProcessingContext,
+  // New LangChain classifiers
+  GenericLangChainClassifier,
+  FewShotLangChainClassifier,
+  OutputParserLangChainClassifier,
+  ChatPromptTemplateLangChainClassifier,
+  OutputFixingParserLangChainClassifier,
 } from './classifier/index.js';
+
+// Classification Schemas
+export {
+  ClassificationSchemas,
+  ThreeTypeSchema,
+  SentimentSchema,
+  IntentSchema,
+  TopicSchema,
+  type ThreeTypeResult,
+  type SentimentResult,
+  type IntentResult,
+  type TopicResult,
+  type SchemaKey,
+  type SchemaResult,
+} from './schemas/ClassificationSchemas.js';
 
 // Command Processing
 export * from './command/index.js';

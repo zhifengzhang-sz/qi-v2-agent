@@ -1,96 +1,73 @@
-// Input Classifier Implementation
+// Input Classifier Implementation - Clean Interface Layer
 //
-// Implements three-type input classification: command, prompt, workflow
-// Follows the architecture defined in docs/agents/agent.impl.three-type-classification.md
+// Provides simple user-friendly API while hiding qicore complexity
+// Follows same pattern as prompt module's DefaultPromptHandler
+// NO QiCore imports - interface layer hides all Result<T> complexity
 
 import type {
   ClassificationConfig,
   ClassificationMethod,
+  ClassificationOptions,
   ClassificationResult,
+  ClassificationStats,
   ClassificationType,
-  IClassifier,
   IClassificationMethod,
-  ProcessingContext,
+  IClassifier,
 } from '../abstractions/index.js';
-import { RuleBasedClassificationMethod } from './rule-based-classification-method.js';
-import { LLMClassificationMethod } from './llm-classification-method.js';
 
+/**
+ * Input Classifier Interface Layer
+ *
+ * Clean delegation to classification method with proper Result<T> handling.
+ * Never throws exceptions - always returns Result<T> or unwrapped values.
+ */
 export class InputClassifier implements IClassifier {
-  private config: ClassificationConfig;
-  private methods: Map<ClassificationMethod, IClassificationMethod> = new Map();
+  private method: IClassificationMethod;
+  private _totalClassifications: number = 0;
+  private _averageConfidence: number = 0;
+  private _averageProcessingTime: number = 0;
+  private _typeDistribution: Map<ClassificationType, number> = new Map();
+  private _methodUsage: Map<ClassificationMethod, number> = new Map();
 
-  constructor(config: Partial<ClassificationConfig> = {}) {
-    this.config = {
-      defaultMethod: config.defaultMethod || 'rule-based',
-      fallbackMethod: config.fallbackMethod || 'rule-based',
-      confidenceThreshold: config.confidenceThreshold || 0.8,
-      commandPrefix: config.commandPrefix || '/',
-      promptIndicators: config.promptIndicators || [
-        'hi',
-        'hello',
-        'thanks',
-        'what',
-        'how',
-        'why',
-        'when',
-        'can you',
-        'could you',
-        'please',
-        'explain',
-      ],
-      workflowIndicators: config.workflowIndicators || [
-        'fix',
-        'create',
-        'refactor',
-        'implement',
-        'debug',
-        'analyze',
-        'build',
-        'design',
-        'test',
-        'deploy',
-      ],
-      complexityThresholds:
-        config.complexityThresholds ||
-        new Map([
-          ['command', 1.0],
-          ['prompt', 0.8],
-          ['workflow', 0.7],
-        ]),
-    };
-    
-    // Initialize available classification methods
-    this.initializeMethods();
-  }
-  
-  private initializeMethods(): void {
-    // Always initialize rule-based method
-    this.methods.set('rule-based', new RuleBasedClassificationMethod({
-      commandPrefix: this.config.commandPrefix,
-      promptIndicators: this.config.promptIndicators,
-      workflowIndicators: this.config.workflowIndicators,
-      confidenceThresholds: this.config.complexityThresholds,
-    }));
-    
-    // LLM method can be added when needed
-    // this.methods.set('llm-based', new LLMClassificationMethod(...));
+  constructor(method: IClassificationMethod) {
+    this.method = method;
   }
 
-  async classify(
-    input: string,
-    options?: { method?: ClassificationMethod; context?: ProcessingContext }
-  ): Promise<ClassificationResult> {
-    // Determine which method to use
-    const methodName = options?.method || this.config.defaultMethod;
-    const method = this.methods.get(methodName);
+  async classify(input: string, options?: ClassificationOptions): Promise<ClassificationResult> {
+    const startTime = Date.now();
     
-    if (!method) {
-      throw new Error(`Classification method '${methodName}' not available. Available methods: ${Array.from(this.methods.keys()).join(', ')}`);
+    try {
+      const result = await this.method.classify(input, options?.context);
+      
+      // Interface layer expects ClassificationResult directly
+      // Internal layer should handle all QiCore complexity
+      const classification = result as ClassificationResult;
+      
+      // Update stats
+      this.updateStats(classification, Date.now() - startTime);
+      
+      return classification;
+    } catch (error) {
+      // Fallback classification on any error
+      const fallback: ClassificationResult = {
+        type: 'prompt',
+        confidence: 0.0,
+        method: this.method.getMethodName?.() || 'unknown',
+        metadata: new Map([['error', error instanceof Error ? error.message : String(error)]]),
+        extractedData: new Map(),
+      };
+      
+      this.updateStats(fallback, Date.now() - startTime);
+      return fallback;
     }
-    
-    // Delegate to the appropriate classification method
-    // The method will handle command detection using the shared utility function
-    return await method.classify(input, options?.context);
+  }
+
+  // Interface layer provides simple API only - no QiCore exposure
+
+  // Interface implementation methods
+  configure(config: Partial<ClassificationConfig>): void {
+    // Simple implementation - in a full implementation this would configure the underlying method
+    console.warn('configure() not implemented in InputClassifier');
   }
 
   getSupportedTypes(): readonly ClassificationType[] {
@@ -98,57 +75,49 @@ export class InputClassifier implements IClassifier {
   }
 
   getSupportedMethods(): readonly ClassificationMethod[] {
-    return Array.from(this.methods.keys()) as readonly ClassificationMethod[];
+    return [this.method.getMethodName()];
   }
 
-  updateClassificationRules(config: ClassificationConfig): void {
-    this.config = config;
-    // Re-initialize methods with new config
-    this.initializeMethods();
-  }
-  
-  /**
-   * Add LLM classification method if needed
-   */
-  addLLMMethod(config: { baseUrl?: string; modelId?: string; temperature?: number; maxTokens?: number }): void {
-    this.methods.set('llm-based', new LLMClassificationMethod(config));
-  }
-
-  configure(config: Partial<ClassificationConfig>): void {
-    this.config = { ...this.config, ...config };
-    // Re-initialize methods with new config
-    this.initializeMethods();
-  }
-
-  getStats(): any {
-    // Placeholder - would aggregate stats from all methods
+  getStats(): ClassificationStats {
     return {
-      totalClassifications: 0,
-      averageConfidence: 0,
-      averageProcessingTime: 0,
-      typeDistribution: new Map(),
-      methodUsage: new Map(),
+      totalClassifications: this._totalClassifications,
+      averageConfidence: this._averageConfidence,
+      averageProcessingTime: this._averageProcessingTime,
+      typeDistribution: new Map(this._typeDistribution),
+      methodUsage: new Map(this._methodUsage),
     };
   }
 
   resetStats(): void {
-    // Placeholder for stats reset
+    this._totalClassifications = 0;
+    this._averageConfidence = 0;
+    this._averageProcessingTime = 0;
+    this._typeDistribution.clear();
+    this._methodUsage.clear();
   }
 
   validateConfig(config: ClassificationConfig): boolean {
-    return (
-      config.confidenceThreshold >= 0 &&
-      config.confidenceThreshold <= 1 &&
-      config.commandPrefix.length > 0 &&
-      config.promptIndicators.length > 0 &&
-      config.workflowIndicators.length > 0
-    );
+    // Simple validation
+    return !!(config.defaultMethod && config.confidenceThreshold >= 0 && config.confidenceThreshold <= 1);
   }
-}
 
-export interface InputClassifierConfig {
-  commandPrefix?: string;
-  promptIndicators?: string[];
-  workflowIndicators?: string[];
-  confidenceThresholds?: Map<string, number>;
+  private updateStats(result: ClassificationResult, processingTime: number): void {
+    this._totalClassifications++;
+    
+    // Update average confidence
+    const totalConfidence = this._averageConfidence * (this._totalClassifications - 1) + result.confidence;
+    this._averageConfidence = totalConfidence / this._totalClassifications;
+    
+    // Update average processing time
+    const totalTime = this._averageProcessingTime * (this._totalClassifications - 1) + processingTime;
+    this._averageProcessingTime = totalTime / this._totalClassifications;
+    
+    // Update type distribution
+    const currentCount = this._typeDistribution.get(result.type) || 0;
+    this._typeDistribution.set(result.type, currentCount + 1);
+    
+    // Update method usage
+    const currentMethodCount = this._methodUsage.get(result.method) || 0;
+    this._methodUsage.set(result.method, currentMethodCount + 1);
+  }
 }

@@ -11,5 +11,6 @@ export type {
   ClassificationType,
   IClassificationMethod,
   IClassifier,
+  InputClassifierConfig,
   ProcessingContext,
 } from './IClassifier.js';

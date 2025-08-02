@@ -8,7 +8,7 @@
 /**
  * Classification method types
  */
-export type ClassificationMethod = 'rule-based' | 'llm-based' | 'hybrid' | 'ensemble';
+export type ClassificationMethod = 'rule-based' | 'llm-based' | 'langchain-structured' | 'hybrid' | 'ensemble';
 
 /**
  * Three input types for classification
@@ -90,6 +90,43 @@ export interface ClassificationOptions {
   readonly includeMetadata?: boolean;
   readonly includeReasoning?: boolean;
   readonly includeAlternatives?: boolean;
+}
+
+/**
+ * Flexible configuration for InputClassifier
+ * Supports both standalone (file-based) and integrated (state manager) usage
+ */
+export interface InputClassifierConfig {
+  // Approach 1: Config file path (standalone)
+  configPath?: string;
+  schemaPath?: string;
+
+  // Approach 2: Direct LLM config (integrated with state manager)
+  llmConfig?: {
+    modelId?: string;
+    baseUrl?: string;
+    temperature?: number;
+    maxTokens?: number;
+    provider?: string;
+  };
+
+  // Approach 3: Runtime override (hybrid)
+  llmConfigOverride?: {
+    modelId?: string;
+    baseUrl?: string;
+    temperature?: number;
+    maxTokens?: number;
+    provider?: string;
+  };
+
+  // Direct configuration (backward compatibility)
+  defaultMethod?: ClassificationMethod;
+  fallbackMethod?: ClassificationMethod;
+  confidenceThreshold?: number;
+  commandPrefix?: string;
+  promptIndicators?: readonly string[];
+  workflowIndicators?: readonly string[];
+  complexityThresholds?: ReadonlyMap<string, number>;
 }
 
 /**

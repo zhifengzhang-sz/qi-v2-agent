@@ -23,7 +23,7 @@ export const DEFAULT_COMMAND_CONFIG: CommandDetectionConfig = {
  * Detects if input is a command and returns immediately if so.
  * This should be called first by all classification methods to avoid
  * expensive LLM processing for obvious commands.
- * 
+ *
  * @param input - The user input to analyze
  * @param config - Command detection configuration
  * @returns Classification result if input is a command, null otherwise
@@ -33,16 +33,16 @@ export function detectCommand(
   config: CommandDetectionConfig = DEFAULT_COMMAND_CONFIG
 ): ClassificationResult | null {
   const trimmedInput = input.trim();
-  
+
   // Check if input starts with command prefix
   if (!trimmedInput.startsWith(config.commandPrefix)) {
     return null;
   }
-  
+
   // Extract command details
   const commandName = extractCommandName(trimmedInput, config);
   const commandArgs = extractCommandArgs(trimmedInput, config);
-  
+
   // Return command classification result immediately
   return {
     type: 'command',
@@ -63,13 +63,13 @@ export function detectCommand(
 
 /**
  * Checks if input is a command (without returning classification result)
- * 
+ *
  * @param input - The user input to check
  * @param config - Command detection configuration
  * @returns true if input is a command, false otherwise
  */
 export function isCommand(
-  input: string, 
+  input: string,
   config: CommandDetectionConfig = DEFAULT_COMMAND_CONFIG
 ): boolean {
   return input.trim().startsWith(config.commandPrefix);
@@ -77,7 +77,7 @@ export function isCommand(
 
 /**
  * Extracts command name from command input
- * 
+ *
  * @param input - Command input (e.g., "/help arg1 arg2")
  * @param config - Command detection configuration
  * @returns The command name (e.g., "help")
@@ -94,7 +94,7 @@ export function extractCommandName(
 
 /**
  * Extracts command arguments from command input
- * 
+ *
  * @param input - Command input (e.g., "/help arg1 arg2")
  * @param config - Command detection configuration
  * @returns Array of command arguments (e.g., ["arg1", "arg2"])

@@ -1,51 +1,94 @@
-# Workflow Module Documentation
+# Workflow Orchestration Module
 
-This directory contains documentation for the workflow module (`app/src/workflow/`).
+## Architectural Framework
 
-## Contents
+### Workflow Extraction Problem
+**Input**: Natural language description $L$  
+**Output**: Executable workflow specification $W = (N, E, P)$ where:
+- $N$: Set of workflow nodes (tasks)
+- $E$: Set of directed edges (dependencies) 
+- $P$: Cognitive pattern classification
 
-- **workflow-architecture.md** - Workflow system architecture and design
-- **integration-guide.md** - CLI integration and usage patterns  
-- **api-reference.md** - Interface and implementation documentation
-- **examples.md** - Usage examples and patterns
+### Graph-Based Execution Model
 
-## Related Code
+Workflows represented as directed acyclic graphs (DAGs) with topological ordering for execution:
 
-The corresponding implementation is in `app/src/workflow/`:
-- `interfaces/` - TypeScript interfaces (IWorkflow, IWorkflowExtractor, IWorkflowEngine)
-- `impl/` - Concrete implementations (QiWorkflowExtractor, QiWorkflowEngine)
-- `index.ts` - Module exports and factory functions
+**Execution Algorithm**: Modified Kahn's algorithm with streaming support
+1. Initialize in-degree count for all nodes
+2. Enqueue nodes with in-degree = 0  
+3. For each dequeued node: execute, update dependents, stream results
+4. Continue until all nodes processed or cycle detected
 
-## Key Concepts
+**Time Complexity**: $O(|N| + |E|)$  
+**Space Complexity**: $O(|N|)$
 
-- **Workflow Extraction**: Convert natural language to executable workflow specifications
-- **Workflow Execution**: Execute multi-step workflows with state management
-- **CLI Integration**: Seamless integration with command-line interface
-- **Pattern Recognition**: Cognitive pattern detection for workflow optimization
-- **Streaming Support**: Real-time workflow execution updates
-
-## Quick Start
+### Interface Specifications
 
 ```typescript
-import { createWorkflowExtractor, createWorkflowEngine } from '@qi/workflow';
+interface IWorkflowExtractor {
+  extractWorkflow(input: string, context?: ProcessingContext): Promise<WorkflowExtractionResult>
+  getSupportedModes(): WorkflowMode[]
+  validateWorkflowSpec(spec: WorkflowSpec): boolean
+  getWorkflowTemplates(mode: WorkflowMode): WorkflowSpec[]
+}
 
-// Create components
-const extractor = createWorkflowExtractor();
-const engine = createWorkflowEngine();
-
-// Extract workflow from natural language
-const result = await extractor.extractWorkflow(
-  'create a React component and write tests for it'
-);
-
-// Execute workflow
-if (result.success && result.workflowSpec) {
-  const workflow = engine.createWorkflow(result.pattern);
-  const execution = await engine.execute(workflow, initialState);
+interface IWorkflowEngine {
+  createWorkflow(pattern: string, customizations?: WorkflowCustomization[]): ExecutableWorkflow
+  execute(workflow: ExecutableWorkflow, initialState: WorkflowState): Promise<WorkflowResult>
+  stream(workflow: ExecutableWorkflow, initialState: WorkflowState): AsyncIterable<WorkflowStreamChunk>
+  precompileWorkflows(patterns: string[]): Promise<void>
 }
 ```
 
-## Demo Scripts
+### Cognitive Pattern Recognition
 
-- `bun run demo:workflow-extractor` - Test workflow extraction
-- `bun run demo:workflow-integration` - Test CLI integration
+Workflows classified by cognitive patterns affecting execution strategy:
+
+- **Analytical**: Systematic analysis with detailed logging
+- **Creative**: Exploratory execution with multiple solution paths  
+- **Problem-solving**: Error recovery and alternative approaches
+- **Informational**: Documentation and explanation focus
+
+### Node Type Taxonomy
+
+```typescript
+type WorkflowNodeType = 
+  | 'input'      // Data ingestion and validation
+  | 'processing' // Computational operations  
+  | 'tool'       // External tool invocation
+  | 'reasoning'  // LLM-based analysis
+  | 'output'     // Result formatting and delivery
+  | 'control'    // Conditional logic and branching
+```
+
+### State Management
+
+**State Vector**: $S_t = (input, context, results, metadata)$  
+**State Transition**: $S_{t+1} = f(S_t, N_i, output_i)$
+
+```typescript
+interface WorkflowState {
+  readonly input: string
+  readonly pattern: string  
+  readonly context: ProcessingContext
+  readonly results: Map<string, unknown>
+  readonly metadata: WorkflowMetadata
+  readonly performance: WorkflowPerformance
+}
+```
+
+### Performance Characteristics
+
+- **Extraction Latency**: 100-500ms (LLM dependent)
+- **Execution Overhead**: ~5ms per node + tool execution time
+- **Memory Usage**: Linear with workflow complexity
+- **Throughput**: Concurrent workflow support with resource limits
+
+### Error Handling Strategy
+
+- **Node Failure**: Attempt retry with exponential backoff
+- **Dependency Failure**: Skip dependent nodes, continue with available paths
+- **Resource Exhaustion**: Graceful degradation with partial results
+- **Timeout Management**: Per-node and total workflow timeouts
+
+## Implementation: `lib/src/workflow/`

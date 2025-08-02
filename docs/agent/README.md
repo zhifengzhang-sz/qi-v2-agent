@@ -1,195 +1,118 @@
-# qi-v2 Agent Implementation
+# Agent Module
 
-## What is an Agent?
-
-**Agent = Toolbox + Workflow Executor + NLP Capability**
-
-An agent is a system that combines:
-- **Toolbox**: A collection of specialized tools for different tasks (file operations, search, execution, etc.)
-- **Workflow Executor (WE)**: The capability to orchestrate multi-step workflows and coordinate tool usage
-- **NLP Capability**: The ability to map natural language instructions into executable workflow steps
-
-This definition captures the essence of what makes an AI agent intelligent: it's not just about having tools, but having the intelligence to understand natural language requests and translate them into coordinated tool executions that accomplish complex tasks.
-
-## Overview
-
-The qi-v2 Agent is our main AI coding assistant implementation that embodies this agent definition. It follows an **agent-centric architecture** where the agent owns and coordinates StateManager, ContextManager, and other components through well-defined contracts.
-
-## Architecture
-
-```
-QiCodeAgent (Central Orchestrator)
-├── StateManager (owned)      - Configuration, sessions, conversation history
-├── ContextManager (owned)    - Context isolation and security boundaries  
-├── Classifier (owned)        - Three-type input classification
-├── CommandHandler (optional) - Built-in system commands
-├── PromptHandler (optional)  - LLM integration for simple requests
-├── WorkflowEngine (optional) - Complex multi-step task orchestration
-└── WorkflowExtractor (optional) - Natural language to workflow spec
-```
-
-## Core Components
-
-### 1. Agent Interface (`IAgent`)
-### 2. Agent Implementation (`QiCodeAgent`)
-### 3. Agent Factory (`createAgent`)
-### 4. Request Processing Pipeline
-### 5. State Integration Patterns
-
-## Documentation Structure
-
-- **[Agent Design](agent.design.md)** - Core design principles and interfaces
-- **[Agent Implementation](agent.impl.md)** - QiCodeAgent implementation details
-- **[Integration Patterns](integration.patterns.md)** - How components work together
-- **[Request Processing](request.processing.md)** - Complete request lifecycle
-- **[Factory Patterns](factory.patterns.md)** - Agent creation and configuration
-
-## Quick Start
+## Interface Specification
 
 ```typescript
-import { createStateManager } from '../state/index.js';
-import { createAgent } from './index.js';
-import { InputClassifier } from '../classifier/impl/input-classifier.js';
+interface IAgent {
+  initialize(): Promise<void>
+  process(request: AgentRequest): Promise<AgentResponse>
+  stream(request: AgentRequest): AsyncIterable<AgentStreamChunk>  
+  getStatus(): AgentStatus
+  shutdown(): Promise<void>
+}
+```
 
-// Create dependencies
-const stateManager = createStateManager();
-const classifier = new InputClassifier();
+## Architectural Role
 
-// Create agent
+The agent serves as the main orchestrator in a component-based architecture:
+
+- **Input Processing**: Receives structured requests with context metadata
+- **Classification Coordination**: Delegates input analysis to classification subsystem
+- **Handler Routing**: Routes classified inputs to appropriate execution handlers
+- **State Management**: Maintains conversation state and system configuration
+- **Response Coordination**: Aggregates and formats responses from multiple components
+
+## Behavioral Contracts
+
+### Processing Pipeline
+1. **Request Validation**: Verify input structure and context completeness
+2. **Classification**: Determine input type (command/prompt/workflow) via classifier
+3. **Handler Dispatch**: Route to CommandHandler, PromptHandler, or WorkflowEngine
+4. **State Integration**: Update conversation history and metrics
+5. **Response Formatting**: Structure output with metadata and performance data
+
+### Streaming Protocol
+- **Classification Phase**: Initial input type determination
+- **Processing Phase**: Progressive output from execution handlers  
+- **Completion Phase**: Final metadata and performance metrics
+
+## Configuration Parameters
+
+```typescript
+interface AgentConfig {
+  domain: string                    // Specialization domain (e.g., 'coding-assistant')
+  enableCommands?: boolean          // Enable built-in system commands  
+  enablePrompts?: boolean           // Enable LLM-based prompt processing
+  enableWorkflows?: boolean         // Enable multi-step workflow execution
+  sessionPersistence?: boolean      // Maintain conversation history
+  providers?: {
+    modelProvider?: string          // Primary model provider selection
+    toolProvider?: string           // Tool execution provider
+  }
+  timeouts?: {
+    classification?: number         // Classification timeout (ms)
+    commandExecution?: number       // Command timeout (ms) 
+    promptProcessing?: number       // Prompt timeout (ms)
+    workflowExecution?: number      // Workflow timeout (ms)
+  }
+}
+```
+
+## Performance Characteristics
+
+- **Classification Latency**: 0-1ms (rule-based) to 200-400ms (LLM-based)
+- **Command Execution**: Sub-millisecond for built-in commands
+- **Prompt Processing**: Variable based on model provider and complexity
+- **Memory Usage**: Linear with conversation history size
+- **Throughput**: Concurrent request processing with configurable limits
+
+## Error Handling
+
+- **Classification Failures**: Fallback to default handler with confidence scoring
+- **Handler Unavailability**: Graceful degradation with error response structure
+- **Timeout Management**: Configurable timeouts per operation type
+- **State Recovery**: Automatic session state restoration after failures
+
+## Usage Patterns
+
+### Basic Agent Instantiation
+```typescript
 const agent = createAgent(stateManager, {
   domain: 'coding-assistant',
-  classifier,
   enableCommands: true,
   enablePrompts: true,
   enableWorkflows: true
 });
-
-// Initialize and use
 await agent.initialize();
+```
 
+### Request Processing
+```typescript
 const response = await agent.process({
-  input: "write a quicksort function in TypeScript",
+  input: "write a quicksort function",
   context: {
-    sessionId: stateManager.getCurrentSession().id,
+    sessionId: session.id,
     timestamp: new Date(),
     source: 'cli'
   }
 });
 ```
 
-## Key Features
-
-### 1. **Agent-Centric Design**
-- Agent owns and coordinates all components
-- Contract-based interactions prevent tight coupling
-- Clear separation of concerns
-
-### 2. **Three-Type Classification with NLP Capability**
-- **Commands**: Built-in system operations (`/help`, `/config`)
-- **Prompts**: Simple conversational requests (`"hi"`, `"write quicksort"`)
-- **Workflows**: Complex multi-step tasks (`"fix bug and run tests"`) - demonstrates NLP→workflow mapping
-
-### 3. **State Integration**
-- Direct StateManager ownership and access
-- Automatic conversation history tracking
-- Configuration and model management
-
-### 4. **Toolbox Integration**
-- Comprehensive tool collection (file ops, search, execution, memory, web)
-- Optional handler injection for different tool capabilities
-- Graceful degradation when tools unavailable
-- Easy extensibility for new tools and request types
-
-### 5. **Workflow Execution Capability**
-- Natural language to workflow specification mapping
-- Multi-step task orchestration with tool coordination
-- Sub-agent delegation with context isolation
-- Progress tracking and error recovery
-
-### 6. **Built-in State Commands**
-- `/model` - Model selection and information
-- `/status` - Complete agent and system status
-- `/config` - Configuration display and management
-- `/session` - Session information and history
-
-## Integration with Other Components
-
-### StateManager Integration
+### Streaming Interface
 ```typescript
-// Agent owns StateManager and uses it directly
-constructor(stateManager: IStateManager, config: AgentConfig) {
-  this.stateManager = stateManager; // Direct ownership
-}
-
-// Direct access to state via contracts
-const currentModel = this.stateManager.getCurrentModel();
-const session = this.stateManager.getCurrentSession();
-```
-
-### Classifier Integration
-```typescript
-// Agent uses classifier to determine request type
-const classification = await this.classifier.classify(request.input);
-
-// Route based on classification
-switch (classification.type) {
-  case 'command': return await this.handleCommand(request, classification);
-  case 'prompt': return await this.handlePrompt(request, classification);  
-  case 'workflow': return await this.handleWorkflow(request, classification);
+for await (const chunk of agent.stream(request)) {
+  switch (chunk.type) {
+    case 'classification':
+      console.log(`Type: ${chunk.data.type}`);
+      break;
+    case 'processing':
+      process.stdout.write(chunk.data.content);
+      break;
+    case 'completion':
+      console.log(`Done in ${chunk.data.executionTime}ms`);
+      break;
+  }
 }
 ```
 
-### Handler Integration
-```typescript
-// Optional handler injection with graceful fallback
-if (!this.promptHandler) {
-  return this.createErrorResponse('prompt', 'Prompt handler not available');
-}
-
-const result = await this.promptHandler.process(promptRequest);
-```
-
-## Current Implementation Status
-
-### ✅ Completed
-- Core agent architecture and interfaces
-- StateManager integration and ownership
-- Three-type input classification and routing
-- Built-in state management commands (`/model`, `/status`, `/config`, `/session`)
-- Agent factory with dependency injection
-- Request lifecycle management
-- Error handling and response formatting
-- Status tracking and metrics
-
-### 🔄 In Progress
-- PromptHandler integration for LLM requests
-- WorkflowEngine integration for complex tasks
-- ContextManager integration for sub-agent isolation
-
-### 📋 Planned
-- Advanced streaming support
-- Performance metrics and monitoring
-- Advanced error recovery
-- Plugin system for custom handlers
-
-## Testing
-
-Our agent implementation includes comprehensive testing:
-
-```bash
-# Test the complete agent architecture
-bun run qi-code:test
-
-# Test specific components
-bun test src/agent/
-```
-
-See the test results in our current implementation - the agent successfully:
-- Creates and initializes with StateManager integration
-- Processes state commands and returns detailed information
-- Tracks metrics (requests processed, response times)
-- Manages conversation history through StateManager
-
----
-
-**Next**: See the detailed documentation files for complete implementation details and usage patterns.
+## Implementation: `lib/src/agent/`

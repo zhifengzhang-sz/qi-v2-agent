@@ -50,7 +50,7 @@ export class OllamaStructuredWrapper extends LLM {
       // Use the same working pattern as prompt system
       const messages = [new Message('user', prompt)];
       const response = await this.engine.complete(this.model, messages);
-      
+
       return this.processResponse(response);
     } catch (error) {
       throw new Error(
@@ -60,16 +60,16 @@ export class OllamaStructuredWrapper extends LLM {
   }
 
   private processResponse(response: any): string {
-      // Handle different response formats (same as prompt system)
-      if (typeof response === 'string') {
-        return response;
-      }
+    // Handle different response formats (same as prompt system)
+    if (typeof response === 'string') {
+      return response;
+    }
 
-      if (response && typeof response === 'object' && 'content' in response) {
-        return response.content as string;
-      }
+    if (response && typeof response === 'object' && 'content' in response) {
+      return response.content as string;
+    }
 
-      return JSON.stringify(response);
+    return JSON.stringify(response);
   }
 
   _llmType(): string {
@@ -109,22 +109,22 @@ JSON response:`;
 
       // Clean and extract JSON more robustly
       let jsonString = response.trim();
-      
+
       // Remove markdown code blocks if present
       if (jsonString.startsWith('```json')) {
         jsonString = jsonString.replace(/^```json\s*/, '').replace(/\s*```$/, '');
       } else if (jsonString.startsWith('```')) {
         jsonString = jsonString.replace(/^```\s*/, '').replace(/\s*```$/, '');
       }
-      
+
       // Try to find JSON object bounds more carefully
       const firstBrace = jsonString.indexOf('{');
       const lastBrace = jsonString.lastIndexOf('}');
-      
+
       if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
         jsonString = jsonString.substring(firstBrace, lastBrace + 1);
       }
-      
+
       // Parse with better error handling
       try {
         const parsed = JSON.parse(jsonString);
@@ -134,10 +134,10 @@ JSON response:`;
         console.warn(`Raw model response (first 500 chars): ${response.substring(0, 500)}`);
         console.warn(`Extracted JSON string: ${jsonString}`);
         console.warn(`Parse error: ${parseError}`);
-        
+
         // Try to fix common JSON issues
         let fixedJson = jsonString;
-        
+
         // Fix truncated strings (common issue)
         if (fixedJson.includes('"reasoning": "') && !fixedJson.includes('",\n  "indicators"')) {
           // Find and fix incomplete reasoning field
@@ -146,7 +146,7 @@ JSON response:`;
             fixedJson = fixedJson.replace(reasoningMatch[0], '"reasoning": "Incomplete response"');
           }
         }
-        
+
         // Try parsing the fixed version
         try {
           const parsed = JSON.parse(fixedJson);
@@ -158,19 +158,18 @@ JSON response:`;
           return fallback as T;
         }
       }
-      
     } catch (error) {
       throw new Error(
         `Structured output generation failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
-  
+
   private createFallbackResult(schema: any): any {
     // Create a basic fallback that matches the expected schema
     if (schema.properties) {
       const fallback: any = {};
-      
+
       if (schema.properties.type) {
         fallback.type = 'prompt'; // Default classification
       }
@@ -186,10 +185,10 @@ JSON response:`;
       if (schema.properties.extracted_data) {
         fallback.extracted_data = {};
       }
-      
+
       return fallback;
     }
-    
+
     return { error: 'fallback_result' };
   }
 

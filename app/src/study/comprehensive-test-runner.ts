@@ -14,12 +14,38 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
-import { InputClassifier } from '@qi/classifier/impl/input-classifier';
-import { LLMClassificationMethod } from '@qi/classifier/impl/llm-classification-method';
-import type { ClassificationResult } from '@qi/classifier/abstractions';
+import { 
+  createInputClassifier, 
+  type ClassificationResult, 
+  type IClassifier
+} from '@qi/agent/classifier';
 import { createStateManager } from '@qi/agent/state';
-import type { TestCase, AdaptedDataset } from './adapt-datasets.js';
-import { dataDir } from './download-datasets.js';
+// Local interfaces for balanced datasets
+interface TestCase {
+  id: number;
+  input: string;
+  expected: string;
+  source: string;
+  complexity: string;
+}
+
+interface BalancedDataset {
+  metadata: {
+    created: string;
+    totalSamples: number;
+    samplesPerCategory: number;
+    distribution: {
+      command: number;
+      prompt: number;
+      workflow: number;
+    };
+    sources: {
+      [key: string]: number;
+    };
+  };
+  samples: TestCase[];
+}
+import { dataDir } from './data-ops/download-datasets.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -73,7 +99,7 @@ interface ModelEvaluation {
 
 class ComprehensiveTestRunner {
   private stateManager: any;
-  private dataset?: AdaptedDataset;
+  private dataset?: BalancedDataset;
   private models: Map<string, any> = new Map();
 
   constructor() {
@@ -134,44 +160,44 @@ class ComprehensiveTestRunner {
   private async initializeModels(): Promise<void> {
     console.log('🤖 Initializing classification models...');
 
-    // Rule-based classifier - uses centralized InputClassifier
-    const ruleClassifier = new InputClassifier({
-      defaultMethod: 'rule-based',
+    // Rule-based classifier - uses factory pattern
+    const ruleClassifier = createInputClassifier({ 
+      method: 'rule-based',
       confidenceThreshold: 0.8,
     });
     this.models.set('rule-based', ruleClassifier);
     
-    // LLM-based classifier - check availability but wrap in InputClassifier for centralized command detection
+    // LLM-based classifier - uses factory pattern (proper layered architecture)
     try {
       const classifierConfig = this.stateManager.getClassifierConfig();
       const llmConfig = this.stateManager.getLLMConfigForPromptModule();
       
       if (classifierConfig && llmConfig?.llm?.providers?.ollama) {
-        const llmMethod = new LLMClassificationMethod({
-          modelId: process.env.MODEL_ID || classifierConfig.model,
-          baseUrl: llmConfig.llm.providers.ollama.baseURL,
-          temperature: classifierConfig.temperature,
-          maxTokens: classifierConfig.maxTokens,
+        const baseUrl = llmConfig.llm.providers.ollama.baseURL;
+        const modelId = process.env.MODEL_ID || classifierConfig.model;
+        
+        // Use InputClassifier factory with LangChain method (proper layered architecture)
+        const llmClassifier = createInputClassifier({
+          method: 'langchain-structured',
+          baseUrl: baseUrl + '/v1', // Use OpenAI-compatible endpoint
+          modelId: modelId,
+          temperature: classifierConfig.temperature || 0.1,
+          maxTokens: classifierConfig.maxTokens || 1000,
+          apiKey: 'ollama', // Required by OpenAI client but not used by Ollama
         });
         
-        const isAvailable = await llmMethod.isAvailable();
-        if (isAvailable) {
-          // Store the raw LLM method for direct testing
-          this.models.set('llm-based-direct', llmMethod);
-          
-          // Also create an InputClassifier that delegates to LLM for non-commands
-          // Note: This would require InputClassifier to support method injection
-          // For now, we'll test the LLM method directly but understand it should be wrapped
-          this.models.set('llm-based', llmMethod);
-          const modelId = process.env.MODEL_ID || classifierConfig.model;
-          console.log(`✅ LLM model available: ${modelId}`);
-          console.log(`⚠️  Note: LLM method should be wrapped in InputClassifier for centralized command detection`);
-        } else {
-          console.log('⚠️  LLM model not available (Ollama not ready)');
+        // Test availability by attempting classification
+        try {
+          await llmClassifier.classify('test');
+          this.models.set('llm-based', llmClassifier);
+          console.log(`✅ LangChain classifier available: ${modelId}`);
+          console.log(`🔧 Using InputClassifier with LangChain method: ${baseUrl}/v1`);
+        } catch (error) {
+          console.log(`⚠️  LangChain classifier not available (Ollama not ready)`);
         }
       }
     } catch (error) {
-      console.log(`⚠️  LLM model initialization failed: ${error}`);
+      console.log(`⚠️  LangChain classifier initialization failed: ${error}`);
     }
 
     console.log(`📋 Initialized ${this.models.size} models\n`);
@@ -191,11 +217,8 @@ class ComprehensiveTestRunner {
       try {
         let result: ClassificationResult;
         
-        if (modelName === 'rule-based') {
-          result = await (model as InputClassifier).classify(testCase.input);
-        } else {
-          result = await (model as LLMClassificationMethod).classify(testCase.input);
-        }
+        // All models now use the same IClassifier interface
+        result = await (model as IClassifier).classify(testCase.input);
         
         const latency = Date.now() - testStart;
         
@@ -504,6 +527,13 @@ class ComprehensiveTestRunner {
       throw new Error('Dataset not loaded');
     }
 
+    // Handle legacy method names for backward compatibility  
+    if (methodFilter === 'llm') {
+      const originalFilter = methodFilter;
+      methodFilter = 'llm-based';
+      console.log(`🔄 Legacy method '${originalFilter}' mapped to 'llm-based'`);
+    }
+
     // Limit samples for faster testing during development
     const allSamples = this.dataset.samples;
     const sampleLimit = process.env.SAMPLE_LIMIT ? parseInt(process.env.SAMPLE_LIMIT) : allSamples.length;
@@ -563,7 +593,14 @@ async function main(): Promise<void> {
   await runner.initialize();
   
   // Check for method filter from command line
-  const methodFilter = process.argv[2];
+  let methodFilter = process.argv[2];
+  
+  // Handle legacy method names for backward compatibility
+  if (methodFilter === 'llm' || methodFilter === 'llm-based') {
+    methodFilter = 'llm-based';
+    console.log(`🔄 Legacy method '${process.argv[2]}' mapped to 'llm-based'`);
+  }
+  
   if (methodFilter) {
     console.log(`🔍 Method filter: ${methodFilter}`);
   }

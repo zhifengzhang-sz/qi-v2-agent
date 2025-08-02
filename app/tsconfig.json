@@ -16,12 +16,6 @@
       "@/*": ["./src/*"],
       "@qi/agent": ["../lib/src/agent"],
       "@qi/agent/*": ["../lib/src/*"],
-      "@qi/classifier": ["../lib/src/classifier"],
-      "@qi/classifier/*": ["../lib/src/classifier/*"],
-      "@qi/prompt": ["../lib/src/prompt"],
-      "@qi/prompt/*": ["../lib/src/prompt/*"],
-      "@qi/cli": ["../lib/src/cli"],
-      "@qi/cli/*": ["../lib/src/cli/*"],
       "@qi/base": ["../../qi-v2-qicore/typescript/lib/src/base"],
       "@qi/core": ["../../qi-v2-qicore/typescript/lib/src/core"]
     },
