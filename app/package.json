@@ -32,6 +32,7 @@
     "study:langchain": "bun run src/study/langchain.ts",
     "study:langchain-prompts": "bun run src/study/langchain-prompts.ts",
     "study:langchain-schemas": "bun run src/study/langchain-schemas.ts",
+    "study:langchain-variants": "bun run src/study/langchain-variants.ts",
     "study:comprehensive": "bun run src/study/comprehensive.ts",
     "study:download": "bun run src/study/data-ops/download-datasets.ts",
     "study:download-pw": "bun run src/study/data-ops/download-prompt-workflow-datasets.ts",

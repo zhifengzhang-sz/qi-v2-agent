@@ -36,30 +36,14 @@ export class InputClassifier implements IClassifier {
   async classify(input: string, options?: ClassificationOptions): Promise<ClassificationResult> {
     const startTime = Date.now();
     
-    try {
-      const result = await this.method.classify(input, options?.context);
-      
-      // Interface layer expects ClassificationResult directly
-      // Internal layer should handle all QiCore complexity
-      const classification = result as ClassificationResult;
-      
-      // Update stats
-      this.updateStats(classification, Date.now() - startTime);
-      
-      return classification;
-    } catch (error) {
-      // Fallback classification on any error
-      const fallback: ClassificationResult = {
-        type: 'prompt',
-        confidence: 0.0,
-        method: this.method.getMethodName?.() || 'unknown',
-        metadata: new Map([['error', error instanceof Error ? error.message : String(error)]]),
-        extractedData: new Map(),
-      };
-      
-      this.updateStats(fallback, Date.now() - startTime);
-      return fallback;
-    }
+    // Interface layer delegates to internal method and receives ClassificationResult directly
+    // Internal methods handle all QiCore Result<T> complexity and return unwrapped results
+    const result = await this.method.classify(input, options?.context);
+    
+    // Update stats with the result
+    this.updateStats(result, Date.now() - startTime);
+    
+    return result;
   }
 
   // Interface layer provides simple API only - no QiCore exposure

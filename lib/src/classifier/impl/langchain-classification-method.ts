@@ -8,6 +8,12 @@
 import { create, failure, flatMap, fromAsyncTryCatch, match, Ok, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { z } from 'zod';
+import { 
+  globalSchemaRegistry, 
+  selectOptimalClassificationSchema,
+  type SchemaSelectionCriteria,
+  type SchemaEntry 
+} from '../schema-registry.js';
 import type {
   ClassificationMethod,
   ClassificationResult,
@@ -15,16 +21,8 @@ import type {
   ProcessingContext,
 } from '../abstractions/index.js';
 
-// Zod schema for LangChain structured output
-const LangChainClassificationSchema = z.object({
-  type: z.enum(['command', 'prompt', 'workflow']).describe('The input type classification'),
-  confidence: z.number().min(0).max(1).describe('Confidence score from 0.0 to 1.0'),
-  reasoning: z.string().describe('Brief explanation of why this classification was chosen'),
-  indicators: z.array(z.string()).describe('Key indicators that led to this classification'),
-  extracted_data: z.record(z.any()).describe('Any extracted data from the input').optional(),
-});
-
-type LangChainClassificationOutput = z.infer<typeof LangChainClassificationSchema>;
+// Dynamic schema selection will replace the hardcoded schema
+// This will be determined at runtime based on configuration and performance criteria
 
 /**
  * Classification error interface with structured context
@@ -59,6 +57,10 @@ export interface LangChainClassificationConfig {
   temperature?: number;
   maxTokens?: number;
   apiKey?: string; // For non-local providers
+  
+  // Schema selection options
+  schemaName?: string; // Explicit schema name to use
+  schemaSelectionCriteria?: SchemaSelectionCriteria; // Criteria for automatic schema selection
 }
 
 /**
@@ -69,6 +71,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
   private llmWithStructuredOutput: any;
   private config: LangChainClassificationConfig;
   private initialized: boolean = false;
+  private selectedSchema: SchemaEntry | null = null;
 
   constructor(config: LangChainClassificationConfig) {
     this.config = config;
@@ -78,6 +81,12 @@ export class LangChainClassificationMethod implements IClassificationMethod {
   private async initializeLLM(): Promise<void> {
     // Use OpenAI-compatible API with Ollama to avoid ChatOllama issues
     try {
+      // Select schema based on configuration or criteria
+      const schemaResult = this.selectSchema();
+      if (schemaResult.tag === 'failure') {
+        throw new Error(`Schema selection failed: ${schemaResult.error.message}`);
+      }
+      this.selectedSchema = schemaResult.value;
       
       // Use dynamic imports for better compatibility
       const { ChatOpenAI } = await import('@langchain/openai');
@@ -92,15 +101,40 @@ export class LangChainClassificationMethod implements IClassificationMethod {
         },
       });
 
-      // Use LangChain's withStructuredOutput - this is the proper pattern!
-      this.llmWithStructuredOutput = llm.withStructuredOutput(LangChainClassificationSchema, {
-        name: 'inputClassifier',
+      // Use LangChain's withStructuredOutput with dynamically selected schema
+      this.llmWithStructuredOutput = llm.withStructuredOutput(this.selectedSchema!.schema, {
+        name: this.selectedSchema!.metadata.name,
       });
     } catch (error) {
       throw new Error(
         `Failed to initialize LangChain classification: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  /**
+   * Select schema based on configuration or automatic criteria
+   */
+  private selectSchema(): Result<SchemaEntry, QiError> {
+    // If explicit schema name provided, use it
+    if (this.config.schemaName) {
+      return globalSchemaRegistry.getSchema(this.config.schemaName);
+    }
+
+    // Use selection criteria if provided
+    if (this.config.schemaSelectionCriteria) {
+      return selectOptimalClassificationSchema(this.config.schemaSelectionCriteria);
+    }
+
+    // Default to optimized schema for production use
+    const defaultCriteria: SchemaSelectionCriteria = {
+      use_case: 'production',
+      model_supports_function_calling: true, // Assume function calling support
+      prioritize_accuracy: false, // Balanced approach
+      prioritize_speed: false
+    };
+
+    return selectOptimalClassificationSchema(defaultCriteria);
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
@@ -203,28 +237,26 @@ export class LangChainClassificationMethod implements IClassificationMethod {
       const contextStr = this.formatContext(context);
       
       // Build prompt manually to avoid async template issues
-      const prompt = `Classify the following user input into one of three categories with high accuracy:
+      // Note: Commands are pre-filtered by rule-based classifier, so we only handle prompt vs workflow
+      const prompt = `Classify the following user input into one of two categories with high accuracy:
 
 **Categories:**
-1. **command** - System commands starting with "/" (e.g., "/help", "/status", "/config")
-2. **prompt** - Simple conversational requests, questions, or single-step tasks (e.g., "hi", "what is recursion?", "write a function")  
-3. **workflow** - Complex multi-step tasks requiring orchestration (e.g., "fix the bug in auth.js and run tests", "create a new feature with tests and documentation")
+1. **prompt** - Single-step requests, questions, or conversational inputs (e.g., "hi", "what is recursion?", "write a function", "explain this concept")  
+2. **workflow** - Multi-step tasks requiring orchestration (e.g., "fix the bug in auth.js and run tests", "create a new feature with tests and documentation", "analyze this codebase and suggest improvements")
 
 **Classification Rules:**
-- Commands start with "/" and are system operations
-- Prompts are single-step requests, questions, or conversational inputs
-- Workflows involve multiple steps, file operations, testing, or complex task orchestration
+- Prompts are single-step requests, questions, or conversational inputs that can be answered directly
+- Workflows involve multiple steps, file operations, testing, analysis, or complex task orchestration
+- Look for indicators like: multiple actions, file references, testing requirements, "and then", coordination needs
 
 **User Input:** "${input}"
 ${contextStr}
 
 **Instructions:**
-- Analyze the input carefully for complexity indicators
-- Look for file references, multiple actions, testing requirements
-- Consider the user's intent and task complexity
+- Analyze the input carefully for complexity and multi-step indicators
+- Consider whether this requires orchestration across multiple tools/steps
 - Provide a confidence score based on how clear the classification is
-- Give specific reasoning for your choice
-- Extract any relevant data (file names, commands, etc.)`;
+- Give specific reasoning for your choice`;
 
       return success(prompt);
     } catch (error) {
@@ -237,12 +269,12 @@ ${contextStr}
     }
   }
 
-  private performClassificationInternal(prompt: string): Promise<Result<LangChainClassificationOutput, QiError>> {
+  private performClassificationInternal(prompt: string): Promise<Result<any, QiError>> {
     return fromAsyncTryCatch(
       async () => {
         // Use the prompt string directly - LangChain withStructuredOutput expects a string
         const result = await this.llmWithStructuredOutput.invoke(prompt);
-        return result as LangChainClassificationOutput;
+        return result; // Dynamic schema output type
       },
       (error: unknown) => {
         return {
@@ -256,23 +288,57 @@ ${contextStr}
   }
 
   private processLangChainResult(
-    result: LangChainClassificationOutput,
+    result: any,
     originalInput: string
   ): Result<ClassificationResult, QiError> {
     try {
+      if (!this.selectedSchema) {
+        return failure(createClassificationError(
+          'SCHEMA_NOT_SELECTED',
+          'No schema selected for result processing',
+          'SYSTEM',
+          { operation: 'processResult' }
+        ));
+      }
+
+      // Create mutable maps for metadata and extracted data
+      const metadata = new Map<string, string>([
+        ['model', this.config.modelId || 'qwen2.5:7b'],
+        ['provider', 'ollama-openai-compatible'],
+        ['timestamp', new Date().toISOString()],
+        ['input_length', originalInput.length.toString()],
+        ['schema_used', this.selectedSchema!.metadata.name],
+        ['schema_complexity', this.selectedSchema!.metadata.complexity],
+      ]);
+
+      const extractedData = new Map<string, unknown>();
+
+      // Extract additional data based on schema structure
+      if (result.indicators && Array.isArray(result.indicators)) {
+        metadata.set('indicators', JSON.stringify(result.indicators));
+      }
+      
+      if (result.complexity_score) {
+        metadata.set('complexity_score', result.complexity_score.toString());
+      }
+      
+      if (result.task_steps) {
+        metadata.set('task_steps', result.task_steps.toString());
+      }
+
+      if (result.extracted_data && typeof result.extracted_data === 'object') {
+        Object.entries(result.extracted_data).forEach(([key, value]) => {
+          extractedData.set(key, value);
+        });
+      }
+
       const classificationResult: ClassificationResult = {
         type: result.type,
         confidence: result.confidence,
         method: 'langchain-structured',
-        reasoning: result.reasoning,
-        extractedData: new Map(Object.entries(result.extracted_data || {})),
-        metadata: new Map([
-          ['model', this.config.modelId || 'qwen2.5:7b'],
-          ['provider', 'ollama-openai-compatible'],
-          ['timestamp', new Date().toISOString()],
-          ['indicators', JSON.stringify(result.indicators)],
-          ['input_length', originalInput.length.toString()],
-        ]),
+        reasoning: result.reasoning || 'No reasoning provided',
+        extractedData,
+        metadata,
       };
 
       return success(classificationResult);
@@ -319,11 +385,17 @@ ${contextStr}
   }
 
   getExpectedAccuracy(): number {
-    return 0.94; // Higher accuracy with proper LangChain structured output
+    if (this.selectedSchema) {
+      return this.selectedSchema.metadata.performance_profile.expected_accuracy;
+    }
+    return 0.89; // Default optimized schema accuracy
   }
 
   getAverageLatency(): number {
-    return 400; // Slightly higher due to structured output processing
+    if (this.selectedSchema) {
+      return this.selectedSchema.metadata.performance_profile.expected_latency_ms;
+    }
+    return 320; // Default optimized schema latency
   }
 
   async isAvailable(): Promise<boolean> {

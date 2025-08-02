@@ -21,6 +21,7 @@ export type {
 import type { ClassificationConfig, ClassificationMethod } from './abstractions/index.js';
 import { InputClassifier } from './impl/input-classifier.js';
 import { LangChainClassificationMethod } from './impl/langchain-classification-method.js';
+import { LLMClassificationMethod } from './impl/llm-classification-method.js';
 import { RuleBasedClassificationMethod } from './impl/rule-based-classification-method.js';
 
 /**
@@ -75,23 +76,6 @@ export function createRuleBasedClassifier(
   return new InputClassifier(method);
 }
 
-/**
- * Create LLM-based classifier (LEGACY - use createLangChainClassifier instead)
- */
-export function createLLMClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-  }> = {}
-): LangChainClassificationMethod {
-  // Redirect to LangChain implementation since LLMClassificationMethod was removed
-  return createLangChainClassifier({
-    baseUrl: (config.baseUrl || 'http://localhost:11434') + '/v1',
-    modelId: config.modelId,
-    temperature: config.temperature,
-  });
-}
 
 /**
  * Create LangChain-based classifier with withStructuredOutput (RECOMMENDED)
@@ -116,6 +100,8 @@ export function createLangChainClassifier(
     temperature: number;
     maxTokens: number;
     apiKey: string;
+    schemaName: string;
+    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
   }> = {}
 ): LangChainClassificationMethod {
   const defaultConfig = {
@@ -175,13 +161,14 @@ export function createEnsembleClassifier(
  * 
  * // Specify method explicitly
  * const classifier = createInputClassifier({ method: 'rule-based' })
+ * const classifier = createInputClassifier({ method: 'llm-based' })
  * const classifier = createInputClassifier({ method: 'langchain-structured' })
  * const classifier = createInputClassifier({ method: 'hybrid' })
  * 
  * // With method-specific config
  * const classifier = createInputClassifier({
- *   method: 'langchain-structured',
- *   baseUrl: 'http://localhost:11434/v1',
+ *   method: 'llm-based',
+ *   baseUrl: 'http://localhost:11434',
  *   modelId: 'qwen2.5:7b'
  * })
  * ```
@@ -197,6 +184,10 @@ export function createInputClassifier(
     temperature: number;
     maxTokens: number;
     apiKey: string;
+    
+    // Schema selection options (for LangChain methods)
+    schemaName: string;
+    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
     
     // Rule-based specific config  
     commandPrefix: string;
@@ -231,17 +222,17 @@ export function createInputClassifier(
         temperature: config.temperature,
         maxTokens: config.maxTokens,
         apiKey: config.apiKey,
+        schemaName: config.schemaName,
+        schemaSelectionCriteria: config.schemaSelectionCriteria,
       });
       return new InputClassifier(langchainMethod);
       
     case 'llm-based':
-      // Redirect to LangChain since LLM method was removed
-      const llmMethod = createLangChainClassifier({
-        baseUrl: (config.baseUrl || 'http://localhost:11434') + '/v1',
+      const llmMethod = new LLMClassificationMethod({
+        baseUrl: config.baseUrl || 'http://localhost:11434',
         modelId: config.modelId,
         temperature: config.temperature,
         maxTokens: config.maxTokens,
-        apiKey: config.apiKey,
       });
       return new InputClassifier(llmMethod);
       
@@ -254,6 +245,8 @@ export function createInputClassifier(
         temperature: config.temperature,
         maxTokens: config.maxTokens,
         apiKey: config.apiKey,
+        schemaName: config.schemaName,
+        schemaSelectionCriteria: config.schemaSelectionCriteria,
       });
       return new InputClassifier(simplifiedMethod);
       
@@ -314,15 +307,18 @@ export const createBasicClassifier = createRuleBasedClassifier;
 export const createCompleteClassifier = createInputClassifier; // Now points to main factory
 
 // Export implementation classes for demos and testing  
-export { RuleBasedClassificationMethod, LangChainClassificationMethod };
-export { LLMClassificationMethod } from './impl/llm-classification-method.js';
+export { RuleBasedClassificationMethod, LangChainClassificationMethod, LLMClassificationMethod, InputClassifier };
 
-// Export new LangChain classifiers
-export { GenericLangChainClassifier } from './impl/generic-langchain-classifier.js';
-export { FewShotLangChainClassifier } from './impl/few-shot-langchain-classifier.js';
-export { OutputParserLangChainClassifier } from './impl/output-parser-langchain-classifier.js';
-export { ChatPromptTemplateLangChainClassifier } from './impl/chat-prompt-langchain-classifier.js';
-export { OutputFixingParserLangChainClassifier } from './impl/output-fixing-langchain-classifier.js';
+// Export schema registry for advanced usage
+export { 
+  globalSchemaRegistry, 
+  getClassificationSchema, 
+  selectOptimalClassificationSchema,
+  type SchemaComplexity,
+  type SchemaEntry,
+  type SchemaMetadata,
+  type SchemaSelectionCriteria 
+} from './schema-registry.js';
 
 // Export the main factory as default for easy imports
 export { createInputClassifier as default };

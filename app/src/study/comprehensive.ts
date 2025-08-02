@@ -9,7 +9,10 @@
 
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
-import { createInputClassifier } from '@qi/agent/classifier';
+import { 
+  createInputClassifier,
+  InputClassifier
+} from '@qi/agent/classifier';
 import { createStateManager } from '@qi/agent/state';
 
 interface TestCase {
@@ -29,6 +32,7 @@ interface BalancedDataset {
 
 interface MethodResult {
   name: string;
+  description: string;
   accuracy: number;
   avgConfidence: number;
   avgLatency: number;
@@ -42,6 +46,13 @@ interface MethodResult {
     latency: number;
     correct: boolean;
   }>;
+}
+
+interface MethodConfig {
+  name: string;
+  description: string;
+  classifier?: InputClassifier;
+  config?: any;
 }
 
 async function runComprehensiveStudy(): Promise<void> {
@@ -85,8 +96,56 @@ async function runComprehensiveStudy(): Promise<void> {
   console.log(`🤖 Model: ${modelId}`);
   console.log(`🔗 Base URL: ${baseUrl}\\n`);
 
-  // Define classification methods to test
-  const methods = [
+  // Helper function to create Zod schema for LangChain (modern approach)
+  const { z } = await import('zod');
+  const createZodClassificationSchema = () => {
+    return z.object({
+      type: z.enum(['command', 'prompt', 'workflow'])
+        .describe('The input type classification'),
+      confidence: z.number()
+        .min(0)
+        .max(1)
+        .describe('Confidence score from 0.0 to 1.0'),
+      reasoning: z.string()
+        .describe('Brief explanation of why this classification was chosen')
+    });
+  };
+
+  // Helper function for JSON schema (legacy approach)
+  const createJsonSchema = () => {
+    return {
+      type: 'object',
+      properties: {
+        type: { 
+          type: 'string', 
+          enum: ['command', 'prompt', 'workflow'],
+          description: 'The input type classification'
+        },
+        confidence: { 
+          type: 'number', 
+          minimum: 0, 
+          maximum: 1,
+          description: 'Confidence score from 0.0 to 1.0'
+        },
+        reasoning: { 
+          type: 'string',
+          description: 'Brief explanation of why this classification was chosen'
+        }
+      },
+      required: ['type', 'confidence', 'reasoning']
+    };
+  };
+
+  const langchainConfig = {
+    modelId: modelId,
+    baseUrl: baseUrl + '/v1',
+    apiKey: 'ollama',
+    temperature: 0.1,
+    maxTokens: 1000
+  };
+
+  // Define classification methods to test - now including ALL LangChain variants
+  const methods: MethodConfig[] = [
     {
       name: 'rule-based',
       description: 'Pattern matching (no LLM)',
@@ -103,8 +162,8 @@ async function runComprehensiveStudy(): Promise<void> {
       }
     },
     {
-      name: 'langchain',
-      description: 'LangChain structured output',
+      name: 'langchain-structured',
+      description: 'LangChain withStructuredOutput',
       config: { 
         method: 'langchain-structured' as const,
         baseUrl: baseUrl + '/v1',
@@ -112,7 +171,14 @@ async function runComprehensiveStudy(): Promise<void> {
         temperature: 0.1,
         apiKey: 'ollama'
       }
-    }
+    },
+    // Note: Additional LangChain variants temporarily disabled pending proper IClassificationMethod implementation
+    // TODO: Implement IClassificationMethod interface for:
+    // - GenericLangChainClassifier 
+    // - FewShotLangChainClassifier
+    // - OutputParserLangChainClassifier  
+    // - ChatPromptTemplateLangChainClassifier
+    // - OutputFixingParserLangChainClassifier
   ];
 
   const methodResults: MethodResult[] = [];
@@ -123,7 +189,8 @@ async function runComprehensiveStudy(): Promise<void> {
     console.log(`   Description: ${method.description}`);
     
     try {
-      const classifier = createInputClassifier(method.config);
+      // Use pre-created classifier or create one from config
+      const classifier = method.classifier || createInputClassifier(method.config!);
       
       let correct = 0;
       let totalConfidence = 0;
@@ -196,6 +263,7 @@ async function runComprehensiveStudy(): Promise<void> {
 
       methodResults.push({
         name: method.name,
+        description: method.description,
         accuracy,
         avgConfidence,
         avgLatency,
@@ -220,17 +288,18 @@ async function runComprehensiveStudy(): Promise<void> {
 
   console.log('📋 Overall Performance Ranking');
   console.log('------------------------------');
-  console.log('| Method      | Accuracy | Confidence | Avg Latency | Errors |');
-  console.log('|-------------|----------|------------|-------------|--------|');
+  console.log('| Method               | Description                    | Accuracy | Confidence | Latency | Errors |');
+  console.log('|----------------------|--------------------------------|----------|------------|---------|--------|');
   
   sortedMethods.forEach(method => {
-    const name = method.name.padEnd(11);
+    const name = method.name.padEnd(20);
+    const desc = method.description.substring(0, 30).padEnd(30);
     const accuracy = `${(method.accuracy * 100).toFixed(1)}%`.padStart(8);
     const confidence = `${(method.avgConfidence * 100).toFixed(1)}%`.padStart(10);
-    const latency = `${method.avgLatency.toFixed(0)}ms`.padStart(11);
+    const latency = `${method.avgLatency.toFixed(0)}ms`.padStart(7);
     const errors = method.errors.toString().padStart(6);
     
-    console.log(`| ${name} | ${accuracy} | ${confidence} | ${latency} | ${errors} |`);
+    console.log(`| ${name} | ${desc} | ${accuracy} | ${confidence} | ${latency} | ${errors} |`);
   });
 
   console.log('\\n📈 Per-Category Performance');
@@ -265,6 +334,7 @@ async function runComprehensiveStudy(): Promise<void> {
   
   methodResults.forEach(method => {
     console.log(`\\n${method.name.toUpperCase()}:`);
+    console.log(`  Description: ${method.description}`);
     
     if (method.name === 'rule-based') {
       console.log('• Fastest method (< 1ms per classification)');
@@ -276,17 +346,30 @@ async function runComprehensiveStudy(): Promise<void> {
       console.log('• JSON prompting approach');
       console.log('• Good balance of accuracy and reliability');
       console.log(`• Average confidence: ${(method.avgConfidence * 100).toFixed(1)}%`);
-    } else if (method.name === 'langchain') {
+    } else if (method.name.startsWith('langchain')) {
       if (method.accuracy < 0.7) {
         console.log('• ⚠️  Underperforming - likely function calling issues');
         console.log('• Check model compatibility with ./scripts/test-function-calling.sh');
         console.log('• Consider using function calling models (qwen3:8b, llama3.1:8b)');
       } else {
         console.log('• ✅ Working correctly with structured output');
-        console.log('• Best method for function calling models');
-        console.log('• Highest potential accuracy when properly configured');
+        console.log('• Good performance for function calling models');
+        console.log('• Structured output provides reliable format');
       }
       console.log(`• Error rate: ${((method.errors / dataset.samples.length) * 100).toFixed(1)}%`);
+      console.log(`• Average latency: ${method.avgLatency.toFixed(0)}ms`);
+      
+      // Special insights for specific LangChain variants
+      if (method.name === 'langchain-few-shot') {
+        console.log('• Uses examples to guide classification');
+        console.log('• Should perform better on edge cases');
+      } else if (method.name === 'langchain-output-parser') {
+        console.log('• Custom parsing logic for output processing');
+        console.log('• More flexible than structured output');
+      } else if (method.name === 'langchain-fixing-parser') {
+        console.log('• Self-fixing parser for malformed outputs');
+        console.log('• Higher reliability at cost of latency');
+      }
     }
   });
 
@@ -314,17 +397,32 @@ async function runComprehensiveStudy(): Promise<void> {
   console.log('\\n🎯 Use Case Recommendations:');
   console.log(`• Development/Testing: rule-based (${methodResults.find(m => m.name === 'rule-based')?.avgLatency.toFixed(0) || '~1'}ms latency)`);
   console.log(`• Universal Production: llm-direct (works with any model)`);
-  console.log(`• Function Calling Models: langchain (highest potential accuracy)`);
+  console.log(`• Function Calling Models: Best LangChain variant based on results above`);
+
+  // LangChain method comparison
+  const langchainMethods = methodResults.filter(m => m.name.startsWith('langchain')).sort((a, b) => b.accuracy - a.accuracy);
+  if (langchainMethods.length > 0) {
+    console.log('\\n🏆 LangChain Method Ranking:');
+    langchainMethods.forEach((method, index) => {
+      const rank = index + 1;
+      const accuracy = (method.accuracy * 100).toFixed(1);
+      const latency = method.avgLatency.toFixed(0);
+      console.log(`   ${rank}. ${method.name}: ${accuracy}% accuracy, ${latency}ms avg`);
+    });
+  }
 
   console.log('\\n📝 Next Research Priorities:');
-  if (methodResults.find(m => m.name === 'langchain')?.accuracy || 0 < 0.7) {
-    console.log('1. 🔧 Investigate LangChain underperformance');
+  const bestLangChain = langchainMethods[0];
+  if (!bestLangChain || bestLangChain.accuracy < 0.7) {
+    console.log('1. 🔧 Investigate LangChain underperformance across all variants');
     console.log('2. ✅ Verify model function calling support');  
-    console.log('3. 🧪 Test LangChain prompt/schema optimizations');
+    console.log('3. 🧪 Test different models with function calling');
+    console.log('4. 📝 Optimize prompts and schemas for best variant');
   } else {
-    console.log('1. 🔬 Optimize winning method performance');
+    console.log(`1. 🔬 Optimize best LangChain method (${bestLangChain.name})`);
     console.log('2. 📊 Scale testing to larger datasets');
     console.log('3. 🚀 Implement production monitoring');
+    console.log('4. 🧪 Fine-tune configurations for top performers');
   }
 }
 

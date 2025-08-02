@@ -11,6 +11,7 @@ import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { createInputClassifier } from '@qi/agent/classifier';
 import { createStateManager } from '@qi/agent/state';
+import { globalSchemaRegistry, type SchemaComplexity } from '@qi/agent/classifier/schema-registry';
 
 interface TestCase {
   input: string;
@@ -21,19 +22,22 @@ interface TestCase {
 interface BalancedDataset {
   samples: TestCase[];
   metadata: {
-    total: number;
-    sources: string[];
+    totalSamples: number;
+    sources: Record<string, number>;
     distribution: Record<string, number>;
   };
 }
 
-// Different schema strategies to test
-const SCHEMA_STRATEGIES = {
-  'minimal': 'Type and confidence only',
-  'standard': 'Type, confidence, reasoning',  
-  'detailed': 'Full structured output with indicators',
-  'verbose': 'Maximum detail with metadata',
-  'optimized': 'Balanced approach based on research',
+// Schema strategies from the registry
+const getSchemaStrategies = () => {
+  const schemaEntries = globalSchemaRegistry.listSchemas();
+  const strategies: Record<string, string> = {};
+  
+  schemaEntries.forEach(entry => {
+    strategies[entry.metadata.name] = entry.metadata.description;
+  });
+  
+  return strategies;
 };
 
 async function runLangChainSchemasStudy(): Promise<void> {
@@ -53,7 +57,9 @@ async function runLangChainSchemasStudy(): Promise<void> {
 
   const dataset: BalancedDataset = JSON.parse(readFileSync(datasetPath, 'utf-8'));
   
-  console.log(`📊 Dataset: ${datasetName} (${dataset.metadata.total} samples)`);
+  console.log(`📊 Dataset: ${datasetName} (${dataset.metadata.totalSamples} samples)`);
+  
+  const SCHEMA_STRATEGIES = getSchemaStrategies();
   console.log(`📋 Testing ${Object.keys(SCHEMA_STRATEGIES).length} schema strategies\\n`);
 
   // Initialize configuration
@@ -84,14 +90,23 @@ async function runLangChainSchemasStudy(): Promise<void> {
     schemaComplexity: number;
     parseErrors: number;
     results: Array<{ input: string; expected: string; predicted: string; correct: boolean; latency: number }>;
+    schemaMetadata: any;
   }> = {};
 
   for (const [schemaName, description] of Object.entries(SCHEMA_STRATEGIES)) {
     console.log(`🧪 Testing Schema: ${schemaName}`);
     console.log(`   Description: ${description}`);
     
-    // For now, use the current implementation (all schemas will be the same)
-    // TODO: Implement different schema variations in the classifier
+    // Get schema details from registry
+    const schemaResult = globalSchemaRegistry.getSchema(schemaName);
+    if (schemaResult.tag === 'failure') {
+      console.log(`   ❌ Schema not found in registry: ${schemaName}\\n`);
+      continue;
+    }
+    
+    const schemaEntry = schemaResult.value;
+    
+    // Create classifier with specific schema
     const classifier = createInputClassifier({
       method: 'langchain-structured',
       baseUrl: baseUrl + '/v1',
@@ -99,6 +114,7 @@ async function runLangChainSchemasStudy(): Promise<void> {
       temperature: 0.1,
       maxTokens: 1000,
       apiKey: 'ollama',
+      schemaName: schemaName, // Use specific schema from registry
     });
 
     let correct = 0;
@@ -108,8 +124,9 @@ async function runLangChainSchemasStudy(): Promise<void> {
     let parseErrors = 0;
     const results: Array<{ input: string; expected: string; predicted: string; correct: boolean; latency: number }> = [];
 
-    // Test on subset for schema comparison
-    const testSamples = dataset.samples.slice(0, Math.min(15, dataset.samples.length));
+    // Test on subset for schema comparison (filter out commands since they're handled by rule-based)
+    const nonCommandSamples = dataset.samples.filter(sample => sample.expected !== 'command');
+    const testSamples = nonCommandSamples.slice(0, Math.min(15, nonCommandSamples.length));
     
     for (let i = 0; i < testSamples.length; i++) {
       const testCase = testSamples[i];
@@ -150,14 +167,14 @@ async function runLangChainSchemasStudy(): Promise<void> {
     const avgConfidence = errors < testSamples.length ? totalConfidence / (testSamples.length - errors) : 0;
     const avgLatency = totalLatency / testSamples.length;
     
-    // Mock schema complexity (would be calculated from actual schema)
-    const schemaComplexity = {
+    // Use actual schema complexity from registry
+    const complexityMap: Record<string, number> = {
       'minimal': 0.2,
       'standard': 0.4, 
       'detailed': 0.7,
-      'verbose': 0.9,
       'optimized': 0.5,
-    }[schemaName] || 0.5;
+    };
+    const schemaComplexity = complexityMap[schemaEntry.metadata.complexity] || 0.5;
 
     schemaResults[schemaName] = {
       accuracy,
@@ -167,6 +184,7 @@ async function runLangChainSchemasStudy(): Promise<void> {
       schemaComplexity,
       parseErrors,
       results,
+      schemaMetadata: schemaEntry.metadata,
     };
 
     console.log(`   ✅ Accuracy: ${(accuracy * 100).toFixed(1)}% | Complexity: ${(schemaComplexity * 100).toFixed(0)}% | Latency: ${avgLatency.toFixed(0)}ms`);
@@ -181,6 +199,16 @@ async function runLangChainSchemasStudy(): Promise<void> {
   // Sort by accuracy
   const sortedSchemas = Object.entries(schemaResults)
     .sort(([, a], [, b]) => b.accuracy - a.accuracy);
+
+  console.log('📋 Schema Registry Information')
+  console.log('------------------------------')
+  console.log('Available schemas in registry:')
+  const allSchemas = globalSchemaRegistry.listSchemas();
+  allSchemas.forEach(schema => {
+    console.log(`• ${schema.metadata.name}: ${schema.metadata.description}`);
+    console.log(`  Complexity: ${schema.metadata.complexity} | Expected accuracy: ${(schema.metadata.performance_profile.expected_accuracy * 100).toFixed(1)}%`);
+  });
+  console.log();
 
   console.log('📋 Schema Performance Ranking');
   console.log('-----------------------------');
@@ -279,10 +307,22 @@ async function runLangChainSchemasStudy(): Promise<void> {
   console.log('• Optimal balance depends on model capabilities');
   console.log('• Parse errors indicate schema-model compatibility issues');
 
-  console.log('\\n📋 Current Study Limitation:');
-  console.log('This study tests the same schema implementation multiple times.');
-  console.log('For real schema variations, implement multiple Zod schemas in the classifier.');
-  console.log('Next step: Create schema variants in LangChainClassificationMethod.');
+  console.log('\\n📋 Schema Registry Implementation Status:');
+  console.log('✅ Schema registry implemented with 4 distinct schemas');
+  console.log('✅ LangChainClassificationMethod updated to use dynamic schema selection');
+  console.log('✅ Real schema variations now tested (no longer mock data)');
+  console.log('✅ Performance profiles tracked per schema complexity level');
+
+  console.log('\\n🎯 Schema Selection Recommendations:');
+  const bestSchema = sortedSchemas[0];
+  if (bestSchema) {
+    const [name, results] = bestSchema;
+    console.log(`🥇 Best performing schema: ${name}`);
+    console.log(`   Actual accuracy: ${(results.accuracy * 100).toFixed(1)}%`);
+    console.log(`   Expected accuracy: ${(results.schemaMetadata.performance_profile.expected_accuracy * 100).toFixed(1)}%`);
+    console.log(`   Performance delta: ${((results.accuracy - results.schemaMetadata.performance_profile.expected_accuracy) * 100).toFixed(1)}% points`);
+    console.log(`   Recommended for: ${results.schemaMetadata.recommended_for.join(', ')}`);
+  }
 }
 
 // Execute if run directly

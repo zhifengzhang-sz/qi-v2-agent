@@ -26,17 +26,14 @@ export {
   createHybridClassifier,
   createInputClassifier,
   createLangChainClassifier,
-  createLLMClassifier,
   createRuleBasedClassifier,
   IClassificationMethod,
   IClassifier,
   ProcessingContext as ClassificationProcessingContext,
-  // New LangChain classifiers
-  GenericLangChainClassifier,
-  FewShotLangChainClassifier,
-  OutputParserLangChainClassifier,
-  ChatPromptTemplateLangChainClassifier,
-  OutputFixingParserLangChainClassifier,
+  // Schema registry exports
+  globalSchemaRegistry,
+  getClassificationSchema,
+  selectOptimalClassificationSchema,
 } from './classifier/index.js';
 
 // Classification Schemas

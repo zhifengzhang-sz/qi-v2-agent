@@ -1,8 +1,12 @@
-// LLM-Based Classification Method
-//
-// Uses working OllamaStructuredWrapper with JSON schemas for accurate input classification
-// Provides much higher accuracy than rule-based methods with reliable confidence scores
+/**
+ * LLM-Based Classification Method - QiCore Implementation
+ *
+ * Uses OllamaStructuredWrapper with proper QiCore Result<T> patterns.
+ * Provides higher accuracy than rule-based methods with reliable confidence scores.
+ * Internal layer implementation - uses proper QiCore Result<T> patterns.
+ */
 
+import { create, failure, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
 import { createOllamaStructuredWrapper, type OllamaStructuredWrapper } from '../../llm/index.js';
 import { detectCommand } from './command-detection-utils.js';
 import type {
@@ -44,6 +48,30 @@ const ClassificationSchema = {
   required: ["type", "confidence", "reasoning", "indicators", "extracted_data"]
 };
 
+/**
+ * LLM classification error interface with structured context
+ */
+interface LLMClassificationError extends QiError {
+  context: {
+    input?: string;
+    operation?: string;
+    model?: string;
+    provider?: string;
+    error?: string;
+    length?: number;
+  };
+}
+
+/**
+ * Custom error factory for LLM classification errors
+ */
+const createLLMClassificationError = (
+  code: string,
+  message: string,
+  category: ErrorCategory,
+  context: LLMClassificationError['context'] = {}
+): LLMClassificationError => create(code, message, category, context) as LLMClassificationError;
+
 export class LLMClassificationMethod implements IClassificationMethod {
   private wrapper: OllamaStructuredWrapper;
 
@@ -57,31 +85,150 @@ export class LLMClassificationMethod implements IClassificationMethod {
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+    // Use proper fromAsyncTryCatch for exception boundary like other QiCore methods
+    const classificationResult = await fromAsyncTryCatch(
+      async () => {
+        return await this.classifyInternal(input, context);
+      },
+      (error: unknown) => createLLMClassificationError(
+        'LLM_CLASSIFICATION_FAILED',
+        `LLM classification failed: ${error instanceof Error ? error.message : String(error)}`,
+        'SYSTEM',
+        { error: String(error) }
+      )
+    );
+
+    // Convert Result<T> to ClassificationResult for interface layer
+    return match(
+      (result: ClassificationResult) => result,
+      (error) => this.createFallbackResult(error.message),
+      classificationResult
+    );
+  }
+
+  private async classifyInternal(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
     const startTime = Date.now();
     
-    // First, check if it's a command using fast rule-based detection
-    const commandResult = detectCommand(input);
-    if (commandResult) {
-      // Return command result with updated metadata to show LLM method optimization
-      return {
-        ...commandResult,
-        method: 'llm-based',
-        metadata: new Map([
-          ...Array.from(commandResult.metadata || []),
-          ['optimizedBy', 'command-detection-shortcut'],
-          ['originalMethod', 'rule-based'],
-          ['skipLLM', 'true']
-        ])
-      };
-    }
+    // Use flatMap chains for proper error propagation
+    const validationResult = this.validateInputInternal(input);
     
+    return await match(
+      async (validatedInput: string) => {
+        // First, check if it's a command using fast rule-based detection
+        const commandResult = detectCommand(validatedInput);
+        if (commandResult) {
+          // Return command result with updated metadata to show LLM method optimization
+          return {
+            ...commandResult,
+            method: 'llm-based',
+            metadata: new Map([
+              ...Array.from(commandResult.metadata || []),
+              ['optimizedBy', 'command-detection-shortcut'],
+              ['originalMethod', 'rule-based'],
+              ['skipLLM', 'true']
+            ])
+          };
+        }
+
+        const promptResult = this.buildPromptInternal(validatedInput, context);
+        
+        return await match(
+          async (prompt: string) => {
+            const llmResult = await this.performLLMClassificationInternal(prompt, startTime);
+            
+            return match(
+              (llmOutput) => {
+                const processedResult = this.processLLMResult(llmOutput, validatedInput, startTime);
+                return match(
+                  (classification: ClassificationResult) => classification,
+                  (error) => { throw new Error(error.message); },
+                  processedResult
+                );
+              },
+              (error) => { throw new Error(error.message); },
+              llmResult
+            );
+          },
+          async (error) => { throw new Error(error.message); },
+          promptResult
+        );
+      },
+      async (error) => { throw new Error(error.message); },
+      validationResult
+    );
+  }
+
+  private validateInputInternal(input: string): Result<string, QiError> {
+    if (!input || typeof input !== 'string') {
+      return failure(createLLMClassificationError(
+        'INVALID_INPUT',
+        'Input must be a non-empty string',
+        'VALIDATION',
+        { input: String(input), operation: 'validation' }
+      ));
+    }
+
+    const trimmed = input.trim();
+    if (trimmed.length === 0) {
+      return failure(createLLMClassificationError(
+        'EMPTY_INPUT',
+        'Input cannot be empty or only whitespace',
+        'VALIDATION',
+        { input, operation: 'validation' }
+      ));
+    }
+
+    if (trimmed.length > 10000) {
+      return failure(createLLMClassificationError(
+        'INPUT_TOO_LONG',
+        'Input exceeds maximum length of 10,000 characters',
+        'VALIDATION',
+        { length: trimmed.length, operation: 'validation' }
+      ));
+    }
+
+    return success(trimmed);
+  }
+
+  private buildPromptInternal(input: string, context?: ProcessingContext): Result<string, QiError> {
     try {
       const prompt = this.buildClassificationPrompt(input, context);
-      
-      // Use the working OllamaStructuredWrapper instead of broken ChatOllama
-      const result = await this.wrapper.generateStructured(prompt, ClassificationSchema) as any;
-      
-      return {
+      return success(prompt);
+    } catch (error) {
+      return failure(createLLMClassificationError(
+        'PROMPT_BUILD_FAILED',
+        `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
+        'SYSTEM',
+        { input, error: String(error), operation: 'buildPrompt' }
+      ));
+    }
+  }
+
+  private performLLMClassificationInternal(prompt: string, startTime: number): Promise<Result<any, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Use the working OllamaStructuredWrapper instead of broken ChatOllama
+        const result = await this.wrapper.generateStructured(prompt, ClassificationSchema) as any;
+        return result;
+      },
+      (error: unknown) => {
+        return {
+          code: 'LLM_GENERATION_FAILED',
+          message: `LLM generation failed: ${error instanceof Error ? error.message : String(error)}`,
+          category: 'NETWORK' as const,
+          context: { error: String(error), prompt_tokens: this.estimateTokens(prompt).toString() },
+        };
+      }
+    );
+  }
+
+  private processLLMResult(
+    result: any,
+    originalInput: string,
+    startTime: number
+  ): Result<ClassificationResult, QiError> {
+    try {
+      const classificationResult: ClassificationResult = {
         type: result.type,
         confidence: result.confidence,
         method: 'llm-based',
@@ -91,25 +238,35 @@ export class LLMClassificationMethod implements IClassificationMethod {
           ['model', 'ollama-structured-wrapper'],
           ['latency', (Date.now() - startTime).toString()],
           ['indicators', JSON.stringify(result.indicators || [])],
-          ['prompt_tokens', this.estimateTokens(prompt).toString()],
+          ['prompt_tokens', this.estimateTokens(originalInput).toString()],
           ['timestamp', new Date().toISOString()]
         ])
       };
+
+      return success(classificationResult);
     } catch (error) {
-      // Fallback with low confidence on error
-      return {
-        type: 'prompt', // Safe default
-        confidence: 0.1,
-        method: 'llm-based',
-        reasoning: `Classification failed: ${error instanceof Error ? error.message : String(error)}`,
-        extractedData: new Map(),
-        metadata: new Map([
-          ['error', 'true'],
-          ['latency', (Date.now() - startTime).toString()],
-          ['error_message', error instanceof Error ? error.message : String(error)]
-        ])
-      };
+      return failure(createLLMClassificationError(
+        'RESULT_PROCESSING_FAILED',
+        `Failed to process LLM classification result: ${error instanceof Error ? error.message : String(error)}`,
+        'SYSTEM',
+        { error: String(error), operation: 'processResult' }
+      ));
     }
+  }
+
+  private createFallbackResult(errorMessage: string): ClassificationResult {
+    return {
+      type: 'prompt',
+      confidence: 0.0,
+      method: 'llm-based',
+      reasoning: `LLM classification failed: ${errorMessage}`,
+      extractedData: new Map(),
+      metadata: new Map([
+        ['error', errorMessage],
+        ['fallback', 'true'],
+        ['timestamp', new Date().toISOString()],
+      ]),
+    };
   }
 
   getMethodName(): ClassificationMethod {
