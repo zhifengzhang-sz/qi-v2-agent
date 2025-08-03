@@ -1,25 +1,39 @@
-# Study Framework
+# Classification Study Framework
 
-Clean, functional testing for various components.
+Clean, functional testing framework comparing different classification approaches.
 
-## Classification Study
+## Available Implementations
 
+### 1. Pure Functional Programming
 ```bash
-# Run classification study
-bun run src/study/classification.ts
-
-# Or import and use programmatically
-import { runStudy } from './classification.js';
-await runStudy(config);
+# Simple YAML loading with minimal abstractions
+bun run src/study/classification.fp.ts
 ```
 
-## Design
+### 2. QiCore Functional Composition
+```bash
+# Uses @qi/core with proper Result composition patterns
+bun run src/study/classification.qicore.ts
+```
+
+### 3. Core Implementation
+```bash
+# Shared logic used by both approaches
+bun run src/study/classification.ts
+```
+
+## Configuration
+
+- **Config**: `classification-config.yaml` - models, methods, test inputs
+- **Schema**: `classification-schema.json` - JSON schema validation
+- **Comparison**: `CONFIG_APPROACHES_COMPARISON.md` - detailed analysis
+
+## Architecture
 
 - **Two functions**: `testClassification()`, `reportResults()`
-- **One statement**: FP pipeline with flatMap
-- **Clean output**: Table format with summary
-
-Replaces the overcomplicated comprehensive study framework with 100 lines of readable code.
+- **Clean functional composition**: Load → Validate → Execute → Report
+- **Identical results**: Both QiCore and pure FP produce same outputs
+- **Schema validation**: Built-in type safety and error handling
 
 ## Example Output
 
