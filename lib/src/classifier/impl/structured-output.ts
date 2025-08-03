@@ -5,15 +5,15 @@
  * and flatMap chains. Avoids ChatOllama issues by using OpenAI-compatible API.
  */
 
-import { create, failure, flatMap, fromAsyncTryCatch, match, Ok, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { z } from 'zod';
+import { create, failure, flatMap, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
+import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
 import { 
   globalSchemaRegistry, 
   selectOptimalClassificationSchema,
   type SchemaSelectionCriteria,
   type SchemaEntry 
 } from '../schema-registry.js';
+import { detectCommand } from './command-detection-utils.js';
 import type {
   ClassificationMethod,
   ClassificationResult,
@@ -24,29 +24,17 @@ import type {
 // Dynamic schema selection will replace the hardcoded schema
 // This will be determined at runtime based on configuration and performance criteria
 
-/**
- * Classification error interface with structured context
- */
-interface ClassificationError extends QiError {
-  context: {
-    input?: string;
-    operation?: string;
-    model?: string;
-    provider?: string;
-    error?: string;
-    length?: number;
-  };
-}
+// Using standardized error types from shared module
 
 /**
- * Custom error factory for classification errors
+ * Custom error factory for classification errors using standardized error types
  */
-const createClassificationError = (
+const createLangChainClassificationError = (
   code: string,
   message: string,
   category: ErrorCategory,
-  context: ClassificationError['context'] = {}
-): ClassificationError => create(code, message, category, context) as ClassificationError;
+  context: Partial<BaseClassificationErrorContext> = {}
+): QiError => createClassificationError('langchain-structured', code, message, category, context);
 
 /**
  * Configuration for LangChain classification method
@@ -83,10 +71,14 @@ export class LangChainClassificationMethod implements IClassificationMethod {
     try {
       // Select schema based on configuration or criteria
       const schemaResult = this.selectSchema();
-      if (schemaResult.tag === 'failure') {
-        throw new Error(`Schema selection failed: ${schemaResult.error.message}`);
-      }
-      this.selectedSchema = schemaResult.value;
+      const selectedSchema = await match(
+        async (schema) => schema,
+        async (error) => {
+          throw new Error(`Schema selection failed: ${error.message}`);
+        },
+        schemaResult
+      );
+      this.selectedSchema = selectedSchema;
       
       // Use dynamic imports for better compatibility
       const { ChatOpenAI } = await import('@langchain/openai');
@@ -150,7 +142,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
         // Use proper flatMap chains for sequential operations
         return await this.classifyInternal(input, context);
       },
-      (error: unknown) => createClassificationError(
+      (error: unknown) => createLangChainClassificationError(
         'CLASSIFICATION_FAILED',
         `Classification failed: ${error instanceof Error ? error.message : String(error)}`,
         'SYSTEM',
@@ -167,11 +159,29 @@ export class LangChainClassificationMethod implements IClassificationMethod {
   }
 
   private async classifyInternal(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+    const startTime = Date.now();
+    
     // Use flatMap chains for proper error propagation
     const validationResult = this.validateInputInternal(input);
     
     return await match(
       async (validatedInput: string) => {
+        // First, check if it's a command using fast rule-based detection
+        const commandResult = detectCommand(validatedInput);
+        if (commandResult) {
+          // Return command result with updated metadata to show LangChain method optimization
+          return {
+            ...commandResult,
+            method: 'langchain-structured',
+            metadata: new Map([
+              ...Array.from(commandResult.metadata || []),
+              ['optimizedBy', 'command-detection-shortcut'],
+              ['originalMethod', 'rule-based'],
+              ['skipLLM', 'true']
+            ])
+          };
+        }
+
         const promptResult = this.buildPromptInternal(validatedInput, context);
         
         return await match(
@@ -182,27 +192,47 @@ export class LangChainClassificationMethod implements IClassificationMethod {
               (llmOutput) => {
                 const processedResult = this.processLangChainResult(llmOutput, validatedInput);
                 return match(
-                  (classification: ClassificationResult) => classification,
-                  (error) => { throw new Error(error.message); },
+                  (classification: ClassificationResult) => {
+                    // Track successful classification performance
+                    this.trackPerformance(startTime, true, true);
+                    return classification;
+                  },
+                  (error) => {
+                    // Track failed classification (parsing failed)
+                    this.trackPerformance(startTime, false, false);
+                    return this.createFallbackResult(error.message);
+                  },
                   processedResult
                 );
               },
-              (error) => { throw new Error(error.message); },
+              (error) => {
+                // Track failed classification (LLM failed)
+                this.trackPerformance(startTime, false, false);
+                return this.createFallbackResult(error.message);
+              },
               llmResult
             );
           },
-          async (error) => { throw new Error(error.message); },
+          async (error) => {
+            // Track failed classification (prompt building failed)
+            this.trackPerformance(startTime, false, false);
+            return this.createFallbackResult(error.message);
+          },
           promptResult
         );
       },
-      async (error) => { throw new Error(error.message); },
+      async (error) => {
+        // Track failed classification (validation failed)
+        this.trackPerformance(startTime, false, false);
+        return this.createFallbackResult(error.message);
+      },
       validationResult
     );
   }
 
   private validateInputInternal(input: string): Result<string, QiError> {
     if (!input || typeof input !== 'string') {
-      return failure(createClassificationError(
+      return failure(createLangChainClassificationError(
         'INVALID_INPUT',
         'Input must be a non-empty string',
         'VALIDATION',
@@ -212,7 +242,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
 
     const trimmed = input.trim();
     if (trimmed.length === 0) {
-      return failure(createClassificationError(
+      return failure(createLangChainClassificationError(
         'EMPTY_INPUT',
         'Input cannot be empty or only whitespace',
         'VALIDATION',
@@ -221,7 +251,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
     }
 
     if (trimmed.length > 10000) {
-      return failure(createClassificationError(
+      return failure(createLangChainClassificationError(
         'INPUT_TOO_LONG',
         'Input exceeds maximum length of 10,000 characters',
         'VALIDATION',
@@ -237,7 +267,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
       const contextStr = this.formatContext(context);
       
       // Build prompt manually to avoid async template issues
-      // Note: Commands are pre-filtered by rule-based classifier, so we only handle prompt vs workflow
+      // Note: Commands are pre-filtered by command detection, so we only handle prompt vs workflow
       const prompt = `Classify the following user input into one of two categories with high accuracy:
 
 **Categories:**
@@ -260,7 +290,7 @@ ${contextStr}
 
       return success(prompt);
     } catch (error) {
-      return failure(createClassificationError(
+      return failure(createLangChainClassificationError(
         'PROMPT_BUILD_FAILED',
         `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
         'SYSTEM',
@@ -293,7 +323,7 @@ ${contextStr}
   ): Result<ClassificationResult, QiError> {
     try {
       if (!this.selectedSchema) {
-        return failure(createClassificationError(
+        return failure(createLangChainClassificationError(
           'SCHEMA_NOT_SELECTED',
           'No schema selected for result processing',
           'SYSTEM',
@@ -343,7 +373,7 @@ ${contextStr}
 
       return success(classificationResult);
     } catch (error) {
-      return failure(createClassificationError(
+      return failure(createLangChainClassificationError(
         'RESULT_PROCESSING_FAILED',
         `Failed to process classification result: ${error instanceof Error ? error.message : String(error)}`,
         'SYSTEM',
@@ -379,6 +409,30 @@ ${contextStr}
     };
   }
 
+  /**
+   * Track performance metrics for this classification attempt
+   */
+  private trackPerformance(startTime: number, classificationSuccess: boolean, parsingSuccess: boolean): void {
+    if (!this.selectedSchema) {
+      return; // Can't track without schema
+    }
+
+    const latencyMs = Date.now() - startTime;
+    const trackingResult = globalSchemaRegistry.trackSchemaUsage(
+      this.selectedSchema.metadata.name,
+      latencyMs,
+      classificationSuccess,
+      parsingSuccess
+    );
+
+    // Log tracking errors for debugging but don't fail the classification
+    match(
+      () => {}, // Success - do nothing
+      (error) => console.warn(`Failed to track schema performance: ${error.message}`),
+      trackingResult
+    );
+  }
+
   // Interface implementation methods
   getMethodName(): ClassificationMethod {
     return 'langchain-structured';
@@ -386,16 +440,20 @@ ${contextStr}
 
   getExpectedAccuracy(): number {
     if (this.selectedSchema) {
-      return this.selectedSchema.metadata.performance_profile.expected_accuracy;
+      // Use measured performance if available, baseline otherwise
+      return this.selectedSchema.metadata.performance_profile.measured_accuracy ?? 
+             this.selectedSchema.metadata.performance_profile.baseline_accuracy_estimate;
     }
-    return 0.89; // Default optimized schema accuracy
+    return 0.89; // Default estimate for LangChain structured output
   }
 
   getAverageLatency(): number {
     if (this.selectedSchema) {
-      return this.selectedSchema.metadata.performance_profile.expected_latency_ms;
+      // Use measured performance if available, baseline otherwise
+      return this.selectedSchema.metadata.performance_profile.measured_latency_ms ?? 
+             this.selectedSchema.metadata.performance_profile.baseline_latency_estimate_ms;
     }
-    return 320; // Default optimized schema latency
+    return 320; // Default estimate for LangChain structured output
   }
 
   async isAvailable(): Promise<boolean> {

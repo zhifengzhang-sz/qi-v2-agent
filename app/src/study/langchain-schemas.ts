@@ -206,7 +206,7 @@ async function runLangChainSchemasStudy(): Promise<void> {
   const allSchemas = globalSchemaRegistry.listSchemas();
   allSchemas.forEach(schema => {
     console.log(`• ${schema.metadata.name}: ${schema.metadata.description}`);
-    console.log(`  Complexity: ${schema.metadata.complexity} | Expected accuracy: ${(schema.metadata.performance_profile.expected_accuracy * 100).toFixed(1)}%`);
+    console.log(`  Complexity: ${schema.metadata.complexity} | Expected accuracy: ${(schema.metadata.performance_profile.baseline_accuracy_estimate * 100).toFixed(1)}%`);
   });
   console.log();
 

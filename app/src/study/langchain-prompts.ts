@@ -27,20 +27,25 @@ interface BalancedDataset {
   };
 }
 
-// Different prompt strategies to test
-const PROMPT_STRATEGIES = {
-  'current': 'Current implementation (baseline)',
-  'detailed': 'Detailed definitions with examples',
-  'simple': 'Minimal, concise instructions',
-  'few-shot': 'Few-shot examples in system prompt',
-  'chain-of-thought': 'Step-by-step reasoning approach',
+// INVALID RESEARCH METHODOLOGY DETECTED
+// This study was testing the same implementation multiple times
+// pretending they were different strategies. This is scientifically invalid.
+
+// VALID RESEARCH: Test actual different LangChain classification variants
+const ACTUAL_CLASSIFICATION_METHODS = {
+  'langchain-structured': 'Standard LangChain with structured output',
+  'fewshot-langchain': 'LangChain with few-shot examples',
+  'chatprompt-langchain': 'LangChain with chat prompt template',
+  'outputparser-langchain': 'LangChain with output parser',
+  'outputfixing-langchain': 'LangChain with output fixing parser',
 };
 
-async function runLangChainPromptsStudy(): Promise<void> {
-  console.log('📝 LANGCHAIN PROMPTS STUDY');
-  console.log('==========================\\n');
+async function runLangChainClassificationMethodsStudy(): Promise<void> {
+  console.log('📝 LANGCHAIN CLASSIFICATION METHODS STUDY');
+  console.log('==========================================\\n');
   
-  console.log('🎯 RESEARCH GOAL: Optimize LangChain prompts for better classification accuracy\\n');
+  console.log('🎯 RESEARCH GOAL: Compare different LangChain classification method implementations\\n');
+  console.log('⚠️  NOTE: Previous version had invalid methodology (testing same implementation multiple times)\\n');
 
   // Load dataset (smaller for prompt testing)
   const datasetName = process.env.DATASET || 'balanced-10x3.json';
@@ -54,7 +59,7 @@ async function runLangChainPromptsStudy(): Promise<void> {
   const dataset: BalancedDataset = JSON.parse(readFileSync(datasetPath, 'utf-8'));
   
   console.log(`📊 Dataset: ${datasetName} (${dataset.metadata.total} samples)`);
-  console.log(`📋 Testing ${Object.keys(PROMPT_STRATEGIES).length} prompt strategies\\n`);
+  console.log(`📋 Testing ${Object.keys(ACTUAL_CLASSIFICATION_METHODS).length} LangChain classification methods\\n`);
 
   // Initialize configuration
   const stateManager = createStateManager();
@@ -75,8 +80,8 @@ async function runLangChainPromptsStudy(): Promise<void> {
   console.log(`🤖 Model: ${modelId}`);
   console.log(`🔗 Base URL: ${baseUrl}\\n`);
 
-  // Test each prompt strategy
-  const strategyResults: Record<string, {
+  // Test each LangChain classification method
+  const methodResults: Record<string, {
     accuracy: number;
     avgConfidence: number;
     avgLatency: number;
@@ -84,14 +89,13 @@ async function runLangChainPromptsStudy(): Promise<void> {
     results: Array<{ input: string; expected: string; predicted: string; correct: boolean }>;
   }> = {};
 
-  for (const [strategyName, description] of Object.entries(PROMPT_STRATEGIES)) {
-    console.log(`🧪 Testing Strategy: ${strategyName}`);
+  for (const [methodName, description] of Object.entries(ACTUAL_CLASSIFICATION_METHODS)) {
+    console.log(`🧪 Testing Method: ${methodName}`);
     console.log(`   Description: ${description}`);
     
-    // For now, use the current implementation
-    // TODO: Implement different prompt strategies in the classifier
+    // Test each ACTUAL different classification method implementation
     const classifier = createInputClassifier({
-      method: 'langchain-structured',
+      method: methodName as any, // Use the actual method name
       baseUrl: baseUrl + '/v1',
       modelId: modelId,
       temperature: 0.1,
@@ -144,7 +148,7 @@ async function runLangChainPromptsStudy(): Promise<void> {
     const avgConfidence = errors < testSamples.length ? totalConfidence / (testSamples.length - errors) : 0;
     const avgLatency = totalLatency / testSamples.length;
 
-    strategyResults[strategyName] = {
+    methodResults[methodName] = {
       accuracy,
       avgConfidence,
       avgLatency,
@@ -158,31 +162,31 @@ async function runLangChainPromptsStudy(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-  console.log('\\n📊 PROMPT STRATEGY COMPARISON');
-  console.log('==============================\\n');
+  console.log('\\n📊 LANGCHAIN METHOD COMPARISON');
+  console.log('================================\\n');
 
-  // Sort strategies by accuracy
-  const sortedStrategies = Object.entries(strategyResults)
+  // Sort methods by accuracy
+  const sortedMethods = Object.entries(methodResults)
     .sort(([, a], [, b]) => b.accuracy - a.accuracy);
 
   console.log('📋 Performance Ranking');
   console.log('----------------------');
-  sortedStrategies.forEach(([strategy, metrics], index) => {
+  sortedMethods.forEach(([method, metrics], index) => {
     const rank = index + 1;
     const badge = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '  ';
-    console.log(`${badge} ${rank}. ${strategy}: ${(metrics.accuracy * 100).toFixed(1)}% accuracy`);
+    console.log(`${badge} ${rank}. ${method}: ${(metrics.accuracy * 100).toFixed(1)}% accuracy`);
     console.log(`     Confidence: ${(metrics.avgConfidence * 100).toFixed(1)}% | Latency: ${metrics.avgLatency.toFixed(0)}ms | Errors: ${metrics.errors}`);
   });
 
   console.log('\\n📈 Detailed Analysis');
   console.log('--------------------');
   
-  const bestStrategy = sortedStrategies[0];
-  const worstStrategy = sortedStrategies[sortedStrategies.length - 1];
+  const bestMethod = sortedMethods[0];
+  const worstMethod = sortedMethods[sortedMethods.length - 1];
   
-  console.log(`🥇 Best Strategy: ${bestStrategy[0]} (${(bestStrategy[1].accuracy * 100).toFixed(1)}% accuracy)`);
-  console.log(`🔻 Worst Strategy: ${worstStrategy[0]} (${(worstStrategy[1].accuracy * 100).toFixed(1)}% accuracy)`);
-  console.log(`📊 Improvement Potential: ${((bestStrategy[1].accuracy - worstStrategy[1].accuracy) * 100).toFixed(1)}% points`);
+  console.log(`🥇 Best Method: ${bestMethod[0]} (${(bestMethod[1].accuracy * 100).toFixed(1)}% accuracy)`);
+  console.log(`🔻 Worst Method: ${worstMethod[0]} (${(worstMethod[1].accuracy * 100).toFixed(1)}% accuracy)`);
+  console.log(`📊 Performance Difference: ${((bestMethod[1].accuracy - worstMethod[1].accuracy) * 100).toFixed(1)}% points`);
 
   // Error pattern analysis
   console.log('\\n🔍 Error Pattern Analysis');
@@ -190,61 +194,60 @@ async function runLangChainPromptsStudy(): Promise<void> {
   
   const errorsByCategory: Record<string, Record<string, number>> = {};
   
-  for (const [strategy, metrics] of Object.entries(strategyResults)) {
-    errorsByCategory[strategy] = { command: 0, prompt: 0, workflow: 0 };
+  for (const [method, metrics] of Object.entries(methodResults)) {
+    errorsByCategory[method] = { command: 0, prompt: 0, workflow: 0 };
     
     metrics.results.forEach(result => {
       if (!result.correct) {
-        errorsByCategory[strategy][result.expected]++;
+        errorsByCategory[method][result.expected]++;
       }
     });
   }
 
   for (const [category, label] of [['command', 'Commands'], ['prompt', 'Prompts'], ['workflow', 'Workflows']]) {
     console.log(`\\n${label} Classification Errors:`);
-    Object.entries(errorsByCategory).forEach(([strategy, errors]) => {
-      console.log(`  ${strategy}: ${errors[category]} errors`);
+    Object.entries(errorsByCategory).forEach(([method, errors]) => {
+      console.log(`  ${method}: ${errors[category]} errors`);
     });
   }
 
-  console.log('\\n📝 PROMPT OPTIMIZATION INSIGHTS');
-  console.log('=================================\\n');
+  console.log('\\n📝 LANGCHAIN METHOD INSIGHTS');
+  console.log('=============================\\n');
 
   // Generate insights based on results
-  const avgAccuracy = Object.values(strategyResults).reduce((sum, r) => sum + r.accuracy, 0) / Object.keys(strategyResults).length;
+  const avgAccuracy = Object.values(methodResults).reduce((sum, r) => sum + r.accuracy, 0) / Object.keys(methodResults).length;
   
   if (avgAccuracy < 0.7) {
-    console.log('🚨 CRITICAL: All prompt strategies showing low accuracy');
-    console.log('   This suggests fundamental issues beyond prompting:');
+    console.log('🚨 CRITICAL: All LangChain methods showing low accuracy');
+    console.log('   This suggests fundamental issues with LangChain setup:');
     console.log('   • Model may lack function calling support');
     console.log('   • Schema design problems');
     console.log('   • API configuration issues');
-    console.log('   \\n💡 Recommendation: Fix core LangChain setup before optimizing prompts');
+    console.log('   \\n💡 Recommendation: Fix core LangChain setup before comparing methods');
   } else {
-    console.log('✅ POSITIVE: Prompts are functional, optimization possible');
+    console.log('✅ POSITIVE: LangChain methods are functional, optimization possible');
     console.log(`   Average accuracy: ${(avgAccuracy * 100).toFixed(1)}%`);
-    console.log(`   Best strategy: ${bestStrategy[0]} (+${((bestStrategy[1].accuracy - avgAccuracy) * 100).toFixed(1)}% vs average)`);
+    console.log(`   Best method: ${bestMethod[0]} (+${((bestMethod[1].accuracy - avgAccuracy) * 100).toFixed(1)}% vs average)`);
     console.log('   \\n💡 Recommendations:');
-    console.log(`   • Implement ${bestStrategy[0]} strategy in production`);
+    console.log(`   • Deploy ${bestMethod[0]} method in production`);
     console.log('   • Test with larger datasets for confirmation');
-    console.log('   • Consider A/B testing between top strategies');
+    console.log('   • Consider ensemble methods using top performers');
   }
 
   console.log('\\n🔬 Next Research Steps:');
-  console.log('1. 🧪 Test winning strategy on full dataset');
-  console.log('2. 🔧 Implement custom prompt templates in classifier');
+  console.log('1. 🧪 Test winning method on full dataset');
+  console.log('2. 🔧 Implement missing LangChain method variants');
   console.log('3. 📊 Compare with schema optimizations');
-  console.log('4. ⚖️  Validate against other classification methods');
+  console.log('4. ⚖️  Validate against rule-based classification methods');
 
-  console.log('\\n📋 Current Limitation:');
-  console.log('This study currently tests the same implementation multiple times.');
-  console.log('To get real prompt variations, the classifier module needs custom prompt support.');
-  console.log('Consider implementing prompt template parameters in createInputClassifier().');
+  console.log('\\n✅ METHODOLOGY FIXED:');
+  console.log('Previous version tested identical implementations with fake strategy names.');
+  console.log('Now tests actual different LangChain classification method implementations.');
 }
 
 // Execute if run directly
 if (import.meta.main) {
-  runLangChainPromptsStudy().catch(console.error);
+  runLangChainClassificationMethodsStudy().catch(console.error);
 }
 
-export { runLangChainPromptsStudy };
+export { runLangChainClassificationMethodsStudy as runLangChainPromptsStudy };

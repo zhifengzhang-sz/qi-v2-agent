@@ -6,19 +6,22 @@
  * Detailed comparison of all LangChain classification methods to understand
  * which approach works best for different scenarios and models.
  * 
- * Tests all 6 LangChain implementations:
+ * Tests all 5 LangChain implementations:
  * 1. LangChainClassificationMethod (withStructuredOutput)
- * 2. GenericLangChainClassifier 
- * 3. FewShotLangChainClassifier
- * 4. OutputParserLangChainClassifier
- * 5. ChatPromptTemplateLangChainClassifier
- * 6. OutputFixingParserLangChainClassifier
+ * 2. FewShotLangChainClassifier
+ * 3. OutputParserLangChainClassifier
+ * 4. ChatPromptTemplateLangChainClassifier
+ * 5. OutputFixingLangChainClassificationMethod
  */
 
 import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { 
   createInputClassifier,
+  createFewShotLangChainClassifier,
+  createOutputParserLangChainClassifier,
+  createChatPromptLangChainClassifier,
+  createOutputFixingLangChainClassifier,
   InputClassifier
 } from '@qi/agent/classifier';
 import { createStateManager } from '@qi/agent/state';
@@ -69,7 +72,7 @@ async function runLangChainVariantsStudy(): Promise<void> {
   console.log('==========================================\n');
   
   console.log('🎯 RESEARCH GOAL: Compare all LangChain classification implementations');
-  console.log('📋 Testing 6 different LangChain approaches for comprehensive analysis\n');
+  console.log('📋 Testing 5 different LangChain approaches for comprehensive analysis\n');
 
   // Load dataset
   const datasetName = process.env.DATASET || 'balanced-10x3.json';
@@ -187,20 +190,58 @@ async function runLangChainVariantsStudy(): Promise<void> {
         apiKey: 'ollama'
       })
     },
-    // Additional LangChain variants - currently under development
-    // These need proper IClassificationMethod implementation before testing:
-    //
-    // {
-    //   name: 'langchain-generic',
-    //   description: 'GenericLangChainClassifier with Zod schema',
-    //   createClassifier: async () => { /* TODO: Implement wrapper */ }
-    // },
-    // {
-    //   name: 'langchain-few-shot', 
-    //   description: 'FewShotLangChainClassifier with examples',
-    //   createClassifier: async () => { /* TODO: Implement wrapper */ }
-    // },
-    // ... other variants pending implementation
+    {
+      name: 'langchain-few-shot',
+      description: 'FewShotLangChainClassifier with built-in examples',
+      createClassifier: async () => {
+        const method = createFewShotLangChainClassifier({
+          baseUrl: baseUrl + '/v1',
+          modelId: modelId,
+          temperature: 0.1,
+          apiKey: 'ollama'
+        });
+        return new InputClassifier(method);
+      }
+    },
+    {
+      name: 'langchain-output-parser',
+      description: 'OutputParserLangChainClassifier for legacy models',
+      createClassifier: async () => {
+        const method = createOutputParserLangChainClassifier({
+          baseUrl: baseUrl + '/v1',
+          modelId: modelId,
+          temperature: 0.1,
+          apiKey: 'ollama'
+        });
+        return new InputClassifier(method);
+      }
+    },
+    {
+      name: 'langchain-chat-prompt',
+      description: 'ChatPromptTemplateLangChainClassifier for conversational AI',
+      createClassifier: async () => {
+        const method = createChatPromptLangChainClassifier({
+          baseUrl: baseUrl + '/v1',
+          modelId: modelId,
+          temperature: 0.1,
+          apiKey: 'ollama'
+        });
+        return new InputClassifier(method);
+      }
+    },
+    {
+      name: 'langchain-output-fixing',
+      description: 'OutputFixingLangChainClassificationMethod with auto-correction',
+      createClassifier: async () => {
+        const method = createOutputFixingLangChainClassifier({
+          baseUrl: baseUrl + '/v1',
+          modelId: modelId,
+          temperature: 0.1,
+          apiKey: 'ollama'
+        });
+        return new InputClassifier(method);
+      }
+    }
   ];
 
   const variantResults: VariantResult[] = [];

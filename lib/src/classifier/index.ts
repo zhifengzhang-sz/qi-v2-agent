@@ -20,9 +20,13 @@ export type {
 
 import type { ClassificationConfig, ClassificationMethod } from './abstractions/index.js';
 import { InputClassifier } from './impl/input-classifier.js';
-import { LangChainClassificationMethod } from './impl/langchain-classification-method.js';
-import { LLMClassificationMethod } from './impl/llm-classification-method.js';
-import { RuleBasedClassificationMethod } from './impl/rule-based-classification-method.js';
+import { LangChainClassificationMethod } from './impl/structured-output.js';
+import { FewShotLangChainClassificationMethod } from './impl/fewshot.js';
+import { OutputParserLangChainClassificationMethod } from './impl/output-parser.js';
+import { ChatPromptLangChainClassificationMethod } from './impl/chat-prompt.js';
+import { OutputFixingLangChainClassificationMethod } from './impl/output-fixing.js';
+import { LLMClassificationMethod } from './impl/llm-direct.js';
+import { RuleBasedClassificationMethod } from './impl/rule-based.js';
 
 /**
  * Classifier factory configuration
@@ -116,36 +120,113 @@ export function createLangChainClassifier(
 }
 
 /**
- * Create hybrid classifier (rule-based + LLM fallback)
- * Simplified implementation using existing methods
+ * Create FewShot LangChain classifier (example-driven learning)
  */
-export function createHybridClassifier(
+export function createFewShotLangChainClassifier(
   config: Partial<{
-    confidenceThreshold: number;
     baseUrl: string;
     modelId: string;
-  }> = {}
-): InputClassifier {
-  // For now, just return the LangChain method since it's most accurate
-  // TODO: Implement actual hybrid logic if needed
-  return createInputClassifier({ 
-    method: 'langchain-structured',
-    ...config 
-  });
+    temperature: number;
+    maxTokens: number;
+    apiKey: string;
+    schemaName: string;
+    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
+  }> = {},
+  customExamples?: import('./impl/fewshot.js').ClassificationExample[]
+): FewShotLangChainClassificationMethod {
+  const defaultConfig = {
+    baseUrl: 'http://localhost:11434/v1',
+    modelId: 'qwen2.5:7b',
+    temperature: 0.1,
+    maxTokens: 1000,
+    apiKey: 'ollama',
+    ...config,
+  };
+  return new FewShotLangChainClassificationMethod(defaultConfig, customExamples);
 }
 
 /**
- * Create ensemble classifier (highest accuracy, multiple LLM calls)
- * Simplified implementation using LangChain method
+ * Create OutputParser LangChain classifier (legacy model support)
  */
-export function createEnsembleClassifier(
+export function createOutputParserLangChainClassifier(
   config: Partial<{
-    minimumAgreement: number;
+    baseUrl: string;
+    modelId: string;
+    temperature: number;
+    maxTokens: number;
+    apiKey: string;
+    schemaName: string;
+    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
+    maxRetries: number;
+    temperatureIncrement: number;
   }> = {}
-): InputClassifier {
-  // For now, just return the LangChain method since ensemble was over-engineered
-  // TODO: Implement actual ensemble logic if needed
-  return createInputClassifier({ method: 'langchain-structured' });
+): OutputParserLangChainClassificationMethod {
+  const defaultConfig = {
+    baseUrl: 'http://localhost:11434/v1',
+    modelId: 'qwen2.5:7b',
+    temperature: 0.1,
+    maxTokens: 1000,
+    apiKey: 'ollama',
+    ...config,
+  };
+  return new OutputParserLangChainClassificationMethod(defaultConfig);
+}
+
+/**
+ * Create ChatPrompt LangChain classifier (conversational context)
+ */
+export function createChatPromptLangChainClassifier(
+  config: Partial<{
+    baseUrl: string;
+    modelId: string;
+    temperature: number;
+    maxTokens: number;
+    apiKey: string;
+    schemaName: string;
+    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
+    systemPrompt: string;
+    userExperienceLevel: 'beginner' | 'intermediate' | 'expert';
+    enableStreaming: boolean;
+  }> = {}
+): ChatPromptLangChainClassificationMethod {
+  const defaultConfig = {
+    baseUrl: 'http://localhost:11434/v1',
+    modelId: 'qwen2.5:7b',
+    temperature: 0.1,
+    maxTokens: 1000,
+    apiKey: 'ollama',
+    ...config,
+  };
+  return new ChatPromptLangChainClassificationMethod(defaultConfig);
+}
+
+/**
+ * Create OutputFixing LangChain classifier (auto-correction)
+ */
+export function createOutputFixingLangChainClassifier(
+  config: Partial<{
+    baseUrl: string;
+    modelId: string;
+    temperature: number;
+    maxTokens: number;
+    apiKey: string;
+    schemaName: string;
+    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
+    maxRetries: number;
+    temperatureIncrement: number;
+    maxFixingAttempts: number;
+    enableComparison: boolean;
+  }> = {}
+): OutputFixingLangChainClassificationMethod {
+  const defaultConfig = {
+    baseUrl: 'http://localhost:11434/v1',
+    modelId: 'qwen2.5:7b',
+    temperature: 0.1,
+    maxTokens: 1000,
+    apiKey: 'ollama',
+    ...config,
+  };
+  return new OutputFixingLangChainClassificationMethod(defaultConfig);
 }
 
 /**
@@ -236,19 +317,21 @@ export function createInputClassifier(
       });
       return new InputClassifier(llmMethod);
       
-    case 'hybrid':
-    case 'ensemble':
-      // Simplified: just use LangChain method for now
-      const simplifiedMethod = createLangChainClassifier({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        apiKey: config.apiKey,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(simplifiedMethod);
+    case 'fewshot-langchain':
+      const fewshotMethod = createFewShotLangChainClassifier(config);
+      return new InputClassifier(fewshotMethod);
+      
+    case 'chatprompt-langchain':
+      const chatpromptMethod = createChatPromptLangChainClassifier(config);
+      return new InputClassifier(chatpromptMethod);
+      
+    case 'outputparser-langchain':
+      const outputparserMethod = createOutputParserLangChainClassifier(config);
+      return new InputClassifier(outputparserMethod);
+      
+    case 'outputfixing-langchain':
+      const outputfixingMethod = createOutputFixingLangChainClassifier(config);
+      return new InputClassifier(outputfixingMethod);
       
     default:
       // Fallback to LangChain method
@@ -288,26 +371,22 @@ export function createAccurateClassifier(
   return createInputClassifier({ method: 'langchain-structured', ...config });
 }
 
-/**
- * Create a balanced hybrid classifier (rule-based + LLM fallback)
- * Fast for simple cases, accurate for complex ones
- */
-export function createBalancedClassifier(
-  config: Partial<{
-    confidenceThreshold: number;
-    baseUrl: string;
-    modelId: string;
-  }> = {}
-): InputClassifier {
-  return createInputClassifier({ method: 'hybrid', ...config });
-}
 
 // Legacy aliases for demos and backward compatibility
 export const createBasicClassifier = createRuleBasedClassifier;
 export const createCompleteClassifier = createInputClassifier; // Now points to main factory
 
 // Export implementation classes for demos and testing  
-export { RuleBasedClassificationMethod, LangChainClassificationMethod, LLMClassificationMethod, InputClassifier };
+export { 
+  RuleBasedClassificationMethod, 
+  LangChainClassificationMethod, 
+  FewShotLangChainClassificationMethod,
+  OutputParserLangChainClassificationMethod,
+  ChatPromptLangChainClassificationMethod,
+  OutputFixingLangChainClassificationMethod,
+  LLMClassificationMethod, 
+  InputClassifier 
+};
 
 // Export schema registry for advanced usage
 export { 

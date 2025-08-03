@@ -14,6 +14,12 @@ import {
   InputClassifier
 } from '@qi/agent/classifier';
 import { createStateManager } from '@qi/agent/state';
+import { 
+  calculateConfidenceInterval,
+  compareMultipleMethods,
+  calculateRequiredSampleSize,
+  type ClassificationResult as StatClassificationResult
+} from './statistical-analysis.js';
 
 interface TestCase {
   input: string;
@@ -24,8 +30,8 @@ interface TestCase {
 interface BalancedDataset {
   samples: TestCase[];
   metadata: {
-    total: number;
-    sources: string[];
+    totalSamples: number;
+    sources: Record<string, number>;
     distribution: Record<string, number>;
   };
 }
@@ -73,11 +79,11 @@ async function runComprehensiveStudy(): Promise<void> {
   const dataset: BalancedDataset = JSON.parse(readFileSync(datasetPath, 'utf-8'));
   
   console.log(`📊 Dataset: ${datasetName}`);
-  console.log(`📋 Total samples: ${dataset.metadata.total}`);
-  console.log(`📋 Sources: ${dataset.metadata.sources.join(', ')}`);
+  console.log(`📋 Total samples: ${dataset.metadata.totalSamples}`);
+  console.log(`📋 Sources: ${Object.keys(dataset.metadata.sources).join(', ')}`);
   console.log(`📊 Distribution:`);
   for (const [type, count] of Object.entries(dataset.metadata.distribution)) {
-    const percentage = ((count / dataset.metadata.total) * 100).toFixed(1);
+    const percentage = ((count / dataset.metadata.totalSamples) * 100).toFixed(1);
     console.log(`   ${type}: ${count} (${percentage}%)`);
   }
   console.log();
@@ -144,7 +150,7 @@ async function runComprehensiveStudy(): Promise<void> {
     maxTokens: 1000
   };
 
-  // Define classification methods to test - now including ALL LangChain variants
+  // Define classification methods to test - ALL LangChain variants now enabled
   const methods: MethodConfig[] = [
     {
       name: 'rule-based',
@@ -172,13 +178,50 @@ async function runComprehensiveStudy(): Promise<void> {
         apiKey: 'ollama'
       }
     },
-    // Note: Additional LangChain variants temporarily disabled pending proper IClassificationMethod implementation
-    // TODO: Implement IClassificationMethod interface for:
-    // - GenericLangChainClassifier 
-    // - FewShotLangChainClassifier
-    // - OutputParserLangChainClassifier  
-    // - ChatPromptTemplateLangChainClassifier
-    // - OutputFixingParserLangChainClassifier
+    {
+      name: 'fewshot-langchain',
+      description: 'LangChain with few-shot examples',
+      config: { 
+        method: 'fewshot-langchain' as const,
+        baseUrl: baseUrl + '/v1',
+        modelId: modelId,
+        temperature: 0.1,
+        apiKey: 'ollama'
+      }
+    },
+    {
+      name: 'chatprompt-langchain',
+      description: 'LangChain with chat prompt template',
+      config: { 
+        method: 'chatprompt-langchain' as const,
+        baseUrl: baseUrl + '/v1',
+        modelId: modelId,
+        temperature: 0.1,
+        apiKey: 'ollama'
+      }
+    },
+    {
+      name: 'outputparser-langchain',
+      description: 'LangChain with output parser',
+      config: { 
+        method: 'outputparser-langchain' as const,
+        baseUrl: baseUrl + '/v1',
+        modelId: modelId,
+        temperature: 0.1,
+        apiKey: 'ollama'
+      }
+    },
+    {
+      name: 'outputfixing-langchain',
+      description: 'LangChain with output fixing parser',
+      config: { 
+        method: 'outputfixing-langchain' as const,
+        baseUrl: baseUrl + '/v1',
+        modelId: modelId,
+        temperature: 0.1,
+        apiKey: 'ollama'
+      }
+    }
   ];
 
   const methodResults: MethodResult[] = [];
@@ -360,18 +403,88 @@ async function runComprehensiveStudy(): Promise<void> {
       console.log(`• Average latency: ${method.avgLatency.toFixed(0)}ms`);
       
       // Special insights for specific LangChain variants
-      if (method.name === 'langchain-few-shot') {
+      if (method.name === 'fewshot-langchain') {
         console.log('• Uses examples to guide classification');
         console.log('• Should perform better on edge cases');
-      } else if (method.name === 'langchain-output-parser') {
+      } else if (method.name === 'chatprompt-langchain') {
+        console.log('• Uses chat prompt templates for conversational context');
+        console.log('• Better handling of context and user experience levels');
+      } else if (method.name === 'outputparser-langchain') {
         console.log('• Custom parsing logic for output processing');
-        console.log('• More flexible than structured output');
-      } else if (method.name === 'langchain-fixing-parser') {
+        console.log('• More flexible than structured output for legacy models');
+      } else if (method.name === 'outputfixing-langchain') {
         console.log('• Self-fixing parser for malformed outputs');
         console.log('• Higher reliability at cost of latency');
       }
     }
   });
+
+  // Statistical Analysis
+  console.log('\\n📊 STATISTICAL SIGNIFICANCE ANALYSIS');
+  console.log('======================================\\n');
+
+  // Convert method results to statistical format
+  const statResults: Record<string, StatClassificationResult> = {};
+  methodResults.forEach(method => {
+    statResults[method.name] = {
+      correct: Math.round(method.accuracy * dataset.samples.length),
+      total: dataset.samples.length,
+      accuracy: method.accuracy,
+      confidences: method.results.map(r => r.confidence),
+      latencies: method.results.map(r => r.latency)
+    };
+  });
+
+  // Calculate confidence intervals for each method
+  console.log('📏 Confidence Intervals (95%)');
+  console.log('------------------------------');
+  methodResults.forEach(method => {
+    const correct = Math.round(method.accuracy * dataset.samples.length);
+    const ci = calculateConfidenceInterval(correct, dataset.samples.length, 0.95);
+    const lowerPercent = (ci.lower * 100).toFixed(1);
+    const upperPercent = (ci.upper * 100).toFixed(1);
+    const accuracyPercent = (method.accuracy * 100).toFixed(1);
+    
+    console.log(`${method.name.padEnd(20)}: ${accuracyPercent}% [${lowerPercent}% - ${upperPercent}%]`);
+  });
+
+  // Perform comprehensive statistical comparison
+  const statisticalComparison = compareMultipleMethods(statResults);
+
+  console.log('\\n🔬 Pairwise Method Comparisons');
+  console.log('--------------------------------');
+  
+  Object.entries(statisticalComparison.pairwiseComparisons).forEach(([comparison, result]) => {
+    const [method1, method2] = comparison.split('_vs_');
+    const significance = result.significant ? '✅ SIGNIFICANT' : '❌ Not significant';
+    const pValue = result.pValue.toFixed(4);
+    const effectSize = result.effectSize.toFixed(3);
+    
+    console.log(`\\n${method1} vs ${method2}:`);
+    console.log(`  ${significance} (p = ${pValue})`);
+    console.log(`  Effect size: ${effectSize} (${interpretEffectSize(result.effectSize)})`);
+    console.log(`  ${result.interpretation}`);
+  });
+
+  console.log('\\n📈 Statistical Power Analysis');
+  console.log('-------------------------------');
+  
+  const powerAnalysis = statisticalComparison.overallAnalysis;
+  console.log(`Sample Size: ${powerAnalysis.sampleSize}`);
+  console.log(`Statistical Power: ${(powerAnalysis.statisticalPower * 100).toFixed(1)}%`);
+  
+  // Sample size recommendations
+  const smallEffectSize = calculateRequiredSampleSize(0.05, 0.8, 0.05, 0.8); // 5% difference
+  const mediumEffectSize = calculateRequiredSampleSize(0.1, 0.8, 0.05, 0.8);  // 10% difference
+  const largeEffectSize = calculateRequiredSampleSize(0.2, 0.8, 0.05, 0.8);   // 20% difference
+  
+  console.log('\\n📊 Sample Size Recommendations:');
+  console.log(`  Small effect (5% difference): ${smallEffectSize.recommendedSampleSize} samples`);
+  console.log(`  Medium effect (10% difference): ${mediumEffectSize.recommendedSampleSize} samples`);
+  console.log(`  Large effect (20% difference): ${largeEffectSize.recommendedSampleSize} samples`);
+  
+  console.log('\\n🔍 Statistical Recommendations:');
+  powerAnalysis.recommendations.forEach(rec => console.log(`  ${rec}`));
 
   // Recommendations
   console.log('\\n💡 RECOMMENDATIONS');
@@ -424,6 +537,16 @@ async function runComprehensiveStudy(): Promise<void> {
     console.log('3. 🚀 Implement production monitoring');
     console.log('4. 🧪 Fine-tune configurations for top performers');
   }
+}
+
+/**
+ * Interpret effect size according to Cohen's conventions
+ */
+function interpretEffectSize(effectSize: number): string {
+  if (effectSize < 0.1) return 'negligible';
+  if (effectSize < 0.3) return 'small';
+  if (effectSize < 0.5) return 'medium';
+  return 'large';
 }
 
 // Execute if run directly

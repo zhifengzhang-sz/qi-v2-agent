@@ -42,11 +42,11 @@ async function runRuleBasedStudy(): Promise<void> {
   const dataset: BalancedDataset = JSON.parse(readFileSync(datasetPath, 'utf-8'));
   
   console.log(`📊 Dataset: ${datasetName}`);
-  console.log(`📋 Total samples: ${dataset.metadata.total}`);
-  console.log(`📋 Sources: ${dataset.metadata.sources.join(', ')}`);
+  console.log(`📋 Total samples: ${dataset.metadata.totalSamples}`);
+  console.log(`📋 Sources: ${Object.keys(dataset.metadata.sources).join(', ')}`);
   console.log(`📊 Distribution:`);
   for (const [type, count] of Object.entries(dataset.metadata.distribution)) {
-    const percentage = ((count / dataset.metadata.total) * 100).toFixed(1);
+    const percentage = ((count / dataset.metadata.totalSamples) * 100).toFixed(1);
     console.log(`   ${type}: ${count} (${percentage}%)`);
   }
   console.log();

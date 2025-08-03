@@ -50,8 +50,14 @@ export class InputClassifier implements IClassifier {
 
   // Interface implementation methods
   configure(config: Partial<ClassificationConfig>): void {
-    // Simple implementation - in a full implementation this would configure the underlying method
-    console.warn('configure() not implemented in InputClassifier');
+    // Interface layer method - configuration is intentionally limited
+    // Internal methods handle their own configuration through constructors
+    // This method exists for interface compatibility but delegates to internal implementations
+    if (config.defaultMethod && config.defaultMethod !== this.method.getMethodName()) {
+      console.warn(`Cannot change classification method from ${this.method.getMethodName()} to ${config.defaultMethod} after construction`);
+    }
+    // Other configuration options would require method-specific implementation
+    // For now, configuration is handled at construction time via factory functions
   }
 
   getSupportedTypes(): readonly ClassificationType[] {

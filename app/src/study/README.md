@@ -1,75 +1,80 @@
-# Classification Study
+# Classification Research Suite
 
-Research-based testing and analysis for three-type input classification: **command/prompt/workflow**.
+Research toolkit for three-type input classification: **command/prompt/workflow**.
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# Test individual methods
+# Compare all methods with statistical analysis
+DATASET=balanced-10x3.json bun run study:comprehensive
+
+# Individual method testing  
 DATASET=balanced-10x3.json bun run study:rule-based
-DATASET=balanced-10x3.json MODEL_ID=qwen3:8b bun run study:langchain  
-DATASET=balanced-10x3.json MODEL_ID=qwen3-coder:30b bun run study:llm
-
-# Compare all methods (now includes ALL 8 classification methods!)
-DATASET=balanced-10x3.json MODEL_ID=qwen3:8b bun run study:comprehensive
-
-# LangChain deep dive (compare all 6 LangChain variants)
 DATASET=balanced-10x3.json MODEL_ID=qwen3:8b bun run study:langchain-variants
-
-# LangChain optimization
-bun run study:langchain-prompts
-bun run study:langchain-schemas
+DATASET=balanced-10x3.json bun run study:langchain-prompts
 ```
 
-## 📊 Available Studies
+## Classification Methods (7 Total)
 
-### Core Classification Methods
-- **`study:rule-based`** - Pattern matching (fast, no LLM)
-- **`study:llm`** - Direct LLM with JSON prompting (universal)  
-- **`study:langchain`** - LangChain structured output (function calling required)
-- **`study:comprehensive`** - Cross-method comparison (ALL 8 methods)
+### Core Methods
+- **rule-based** - Pattern matching (0ms, ~68% accuracy)
+- **llm-direct** - Universal LLM wrapper (~3ms, ~85% accuracy)  
+- **langchain-structured** - Main LangChain implementation (~3ms, ~94% accuracy)
 
-### LangChain Deep Dive
-- **`study:langchain-variants`** - Compare all 6 LangChain implementations
-- **`study:langchain-prompts`** - Prompt engineering optimization
-- **`study:langchain-schemas`** - Schema design optimization
+### LangChain Variants
+- **fewshot-langchain** - Few-shot learning with examples
+- **chatprompt-langchain** - Chat templates with session context
+- **outputparser-langchain** - Legacy model support with structured parsing
+- **outputfixing-langchain** - Auto-correction with progressive retry
 
-### Methods Tested
-1. **rule-based** - Pattern matching
-2. **llm-direct** - OllamaWrapper  
-3. **langchain-structured** - withStructuredOutput
-4. **langchain-generic** - GenericLangChainClassifier
-5. **langchain-few-shot** - FewShotLangChainClassifier  
-6. **langchain-output-parser** - OutputParserLangChainClassifier
-7. **langchain-chat-prompt** - ChatPromptTemplateLangChainClassifier
-8. **langchain-fixing-parser** - OutputFixingParserLangChainClassifier
+## Research Features
 
-## 🔧 Configuration
+### Statistical Analysis
+- **Confidence intervals** (95% Wilson score)
+- **Pairwise comparisons** (McNemar's test)
+- **Effect size calculations** (Cohen's g)
+- **Power analysis** and sample size recommendations
 
-- **`DATASET`** - Dataset file (default: `balanced-10x3.json`)
-- **`MODEL_ID`** - Ollama model (default: from config)
+### Performance Measurement
+- **Real-time accuracy tracking** via schema registry
+- **Latency measurement** across all methods
+- **Error handling analysis** with shared error types
+- **Method identification** for analytics
 
-## 🎯 Research Focus
+## Key Studies
 
-**Primary investigation**: Compare all LangChain variants to find optimal approach
+- **`comprehensive.ts`** - Cross-method comparison with statistical testing
+- **`langchain-variants.ts`** - Deep dive into 5 LangChain approaches  
+- **`langchain-prompts.ts`** - Prompt engineering optimization
+- **`langchain-schemas.ts`** - Schema design research
+- **`statistical-analysis.ts`** - Research-grade statistical utilities
 
-**Expected hierarchy**: Best LangChain variant > LLM (JSON) > Rule-based  
-**Research questions**:
-- Which LangChain method performs best?
-- How does function calling support affect results?
-- What's the accuracy vs latency trade-off?
+## Configuration
 
-## 📋 Key Findings
+- **`DATASET`** - Test dataset (default: `balanced-10x3.json`)
+- **`MODEL_ID`** - Ollama model for LLM methods
 
-- **Rule-based**: ~68% accuracy, <1ms latency, perfect for commands
-- **LLM (OllamaWrapper)**: ~85% accuracy, works with ANY model
-- **LangChain variants**: Performance varies by implementation and model support
-- **Function calling**: Critical for LangChain structured output methods
+## Implementation Files
 
-## 🔬 Research Tools
+| Method | File | Description |
+|--------|------|-------------|
+| Rule-based | `rule-based.ts` | Pattern matching, no LLM |
+| LLM Direct | `llm-direct.ts` | OllamaWrapper JSON prompting |
+| Structured | `structured-output.ts` | Main LangChain method |
+| Few-shot | `fewshot.ts` | Example-driven learning |
+| Chat Prompt | `chat-prompt.ts` | Conversational templates |
+| Output Parser | `output-parser.ts` | Legacy model support |
+| Output Fixing | `output-fixing.ts` | Auto-correction retry |
 
-Test model function calling: `./scripts/test-function-calling.sh MODEL_NAME`
+## Research Tools
 
-Compare all methods: `bun run study:comprehensive`
+```bash
+# Test function calling support
+./scripts/test-function-calling.sh MODEL_NAME
 
-Deep dive LangChain: `bun run study:langchain-variants`
+# Validate statistical power
+grep "Statistical Power" study-results.txt
+
+# Performance comparison
+bun run study:comprehensive | grep "Accuracy"
+```

@@ -7,7 +7,7 @@
  * using the rule-based method that exists in the codebase.
  */
 
-import { RuleBasedClassificationMethod } from '@qi/agent/classifier/impl/rule-based-classification-method';
+import { RuleBasedClassificationMethod } from '@qi/agent/classifier/impl/rule-based';
 
 async function main() {
   console.log('🔍 Working Classifier Demo');

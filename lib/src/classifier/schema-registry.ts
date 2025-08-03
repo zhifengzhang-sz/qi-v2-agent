@@ -29,9 +29,23 @@ export interface SchemaMetadata {
   version: string;
   recommended_for: string[];
   performance_profile: {
-    expected_accuracy: number;
-    expected_latency_ms: number;
-    parsing_reliability: number;
+    // Real measured performance - initially null until measured
+    measured_accuracy?: number;
+    measured_latency_ms?: number;
+    measured_parsing_reliability?: number;
+    
+    // Performance tracking metadata
+    total_uses: number;
+    successful_classifications: number;
+    total_latency_ms: number;
+    successful_parsing_attempts: number;
+    total_parsing_attempts: number;
+    last_measured?: string;
+    
+    // Baseline estimates for new schemas (conservative defaults)
+    baseline_accuracy_estimate: number;
+    baseline_latency_estimate_ms: number;
+    baseline_parsing_reliability_estimate: number;
   };
   created_at: string;
   last_updated: string;
@@ -128,9 +142,17 @@ export class ClassificationSchemaRegistry {
         version: '1.0.0',
         recommended_for: ['development', 'high-throughput', 'simple-models'],
         performance_profile: {
-          expected_accuracy: 0.75,
-          expected_latency_ms: 200,
-          parsing_reliability: 0.98
+          // No measured performance yet - will be populated through real usage
+          total_uses: 0,
+          successful_classifications: 0,
+          total_latency_ms: 0,
+          successful_parsing_attempts: 0,
+          total_parsing_attempts: 0,
+          
+          // Conservative baseline estimates
+          baseline_accuracy_estimate: 0.75, // Lower complexity typically means lower accuracy
+          baseline_latency_estimate_ms: 200, // Simple schema should be fast
+          baseline_parsing_reliability_estimate: 0.98 // Simple schema is reliable to parse
         },
         created_at: currentTimestamp,
         last_updated: currentTimestamp
@@ -159,9 +181,17 @@ export class ClassificationSchemaRegistry {
         version: '1.0.0',
         recommended_for: ['production', 'general-purpose', 'function-calling-models'],
         performance_profile: {
-          expected_accuracy: 0.85,
-          expected_latency_ms: 350,
-          parsing_reliability: 0.95
+          // No measured performance yet - will be populated through real usage
+          total_uses: 0,
+          successful_classifications: 0,
+          total_latency_ms: 0,
+          successful_parsing_attempts: 0,
+          total_parsing_attempts: 0,
+          
+          // Conservative baseline estimates
+          baseline_accuracy_estimate: 0.85, // Standard complexity should have better accuracy
+          baseline_latency_estimate_ms: 350, // Moderate latency for additional reasoning field
+          baseline_parsing_reliability_estimate: 0.95 // Good parsing reliability
         },
         created_at: currentTimestamp,
         last_updated: currentTimestamp
@@ -196,9 +226,17 @@ export class ClassificationSchemaRegistry {
         version: '1.0.0',
         recommended_for: ['analysis', 'debugging', 'research', 'high-accuracy-requirements'],
         performance_profile: {
-          expected_accuracy: 0.92,
-          expected_latency_ms: 500,
-          parsing_reliability: 0.88
+          // No measured performance yet - will be populated through real usage
+          total_uses: 0,
+          successful_classifications: 0,
+          total_latency_ms: 0,
+          successful_parsing_attempts: 0,
+          total_parsing_attempts: 0,
+          
+          // Conservative baseline estimates
+          baseline_accuracy_estimate: 0.92, // Higher complexity should provide more accurate results
+          baseline_latency_estimate_ms: 500, // More complex schema takes longer
+          baseline_parsing_reliability_estimate: 0.88 // Complex schemas may have more parsing issues
         },
         created_at: currentTimestamp,
         last_updated: currentTimestamp
@@ -231,9 +269,17 @@ export class ClassificationSchemaRegistry {
         version: '1.0.0',
         recommended_for: ['production', 'recommended-default', 'balanced-performance'],
         performance_profile: {
-          expected_accuracy: 0.89,
-          expected_latency_ms: 320,
-          parsing_reliability: 0.94
+          // No measured performance yet - will be populated through real usage
+          total_uses: 0,
+          successful_classifications: 0,
+          total_latency_ms: 0,
+          successful_parsing_attempts: 0,
+          total_parsing_attempts: 0,
+          
+          // Conservative baseline estimates
+          baseline_accuracy_estimate: 0.89, // Balanced approach should provide good accuracy
+          baseline_latency_estimate_ms: 320, // Optimized for speed while maintaining quality
+          baseline_parsing_reliability_estimate: 0.94 // Well-balanced schema should be reliable
         },
         created_at: currentTimestamp,
         last_updated: currentTimestamp
@@ -296,18 +342,22 @@ export class ClassificationSchemaRegistry {
       );
     }
 
-    // Filter by latency requirements
+    // Filter by latency requirements (use measured if available, baseline otherwise)
     if (criteria.max_latency_ms) {
-      candidateSchemas = candidateSchemas.filter(entry =>
-        entry.metadata.performance_profile.expected_latency_ms <= criteria.max_latency_ms!
-      );
+      candidateSchemas = candidateSchemas.filter(entry => {
+        const latency = entry.metadata.performance_profile.measured_latency_ms ?? 
+                      entry.metadata.performance_profile.baseline_latency_estimate_ms;
+        return latency <= criteria.max_latency_ms!;
+      });
     }
 
-    // Filter by accuracy requirements
+    // Filter by accuracy requirements (use measured if available, baseline otherwise)
     if (criteria.min_accuracy_threshold) {
-      candidateSchemas = candidateSchemas.filter(entry =>
-        entry.metadata.performance_profile.expected_accuracy >= criteria.min_accuracy_threshold!
-      );
+      candidateSchemas = candidateSchemas.filter(entry => {
+        const accuracy = entry.metadata.performance_profile.measured_accuracy ?? 
+                        entry.metadata.performance_profile.baseline_accuracy_estimate;
+        return accuracy >= criteria.min_accuracy_threshold!;
+      });
     }
 
     // If no candidates remain, fall back to all schemas
@@ -319,15 +369,21 @@ export class ClassificationSchemaRegistry {
     let selectedSchema: SchemaEntry;
 
     if (criteria.prioritize_speed) {
-      selectedSchema = candidateSchemas.reduce((fastest, current) =>
-        current.metadata.performance_profile.expected_latency_ms < 
-        fastest.metadata.performance_profile.expected_latency_ms ? current : fastest
-      );
+      selectedSchema = candidateSchemas.reduce((fastest, current) => {
+        const currentLatency = current.metadata.performance_profile.measured_latency_ms ?? 
+                             current.metadata.performance_profile.baseline_latency_estimate_ms;
+        const fastestLatency = fastest.metadata.performance_profile.measured_latency_ms ?? 
+                             fastest.metadata.performance_profile.baseline_latency_estimate_ms;
+        return currentLatency < fastestLatency ? current : fastest;
+      });
     } else if (criteria.prioritize_accuracy) {
-      selectedSchema = candidateSchemas.reduce((mostAccurate, current) =>
-        current.metadata.performance_profile.expected_accuracy > 
-        mostAccurate.metadata.performance_profile.expected_accuracy ? current : mostAccurate
-      );
+      selectedSchema = candidateSchemas.reduce((mostAccurate, current) => {
+        const currentAccuracy = current.metadata.performance_profile.measured_accuracy ?? 
+                              current.metadata.performance_profile.baseline_accuracy_estimate;
+        const mostAccurateAccuracy = mostAccurate.metadata.performance_profile.measured_accuracy ?? 
+                                   mostAccurate.metadata.performance_profile.baseline_accuracy_estimate;
+        return currentAccuracy > mostAccurateAccuracy ? current : mostAccurate;
+      });
     } else {
       // Default to optimized schema or best balanced option
       selectedSchema = candidateSchemas.find(entry => entry.metadata.name === 'optimized') ||
@@ -403,6 +459,80 @@ export class ClassificationSchemaRegistry {
       ));
     }
     return success(metrics);
+  }
+
+  /**
+   * Track performance metrics for a schema usage
+   */
+  trackSchemaUsage(
+    schemaName: string, 
+    latencyMs: number, 
+    classificationSuccess: boolean, 
+    parsingSuccess: boolean
+  ): Result<void, QiError> {
+    const schemaEntry = this.schemas.get(schemaName);
+    if (!schemaEntry) {
+      return failure(createSchemaRegistryError(
+        'SCHEMA_NOT_FOUND',
+        `Cannot track performance for unknown schema '${schemaName}'`,
+        { schema_name: schemaName, operation: 'trackSchemaUsage' }
+      ));
+    }
+
+    const profile = schemaEntry.metadata.performance_profile;
+    
+    // Update tracking counters
+    profile.total_uses++;
+    profile.total_latency_ms += latencyMs;
+    profile.total_parsing_attempts++;
+    
+    if (classificationSuccess) {
+      profile.successful_classifications++;
+    }
+    
+    if (parsingSuccess) {
+      profile.successful_parsing_attempts++;
+    }
+    
+    // Calculate new measured values
+    profile.measured_accuracy = profile.successful_classifications / profile.total_uses;
+    profile.measured_latency_ms = Math.round(profile.total_latency_ms / profile.total_uses);
+    profile.measured_parsing_reliability = profile.successful_parsing_attempts / profile.total_parsing_attempts;
+    profile.last_measured = new Date().toISOString();
+    
+    // Update last_updated timestamp
+    schemaEntry.metadata.last_updated = new Date().toISOString();
+    
+    return success(undefined);
+  }
+
+  /**
+   * Get effective performance metrics (measured if available, baseline otherwise)
+   */
+  getEffectivePerformanceMetrics(schemaName: string): Result<{
+    accuracy: number;
+    latency_ms: number;
+    parsing_reliability: number;
+    is_measured: boolean;
+  }, QiError> {
+    const schemaEntry = this.schemas.get(schemaName);
+    if (!schemaEntry) {
+      return failure(createSchemaRegistryError(
+        'SCHEMA_NOT_FOUND',
+        `Cannot get performance metrics for unknown schema '${schemaName}'`,
+        { schema_name: schemaName, operation: 'getEffectivePerformanceMetrics' }
+      ));
+    }
+
+    const profile = schemaEntry.metadata.performance_profile;
+    const isMeasured = profile.total_uses > 0;
+    
+    return success({
+      accuracy: profile.measured_accuracy ?? profile.baseline_accuracy_estimate,
+      latency_ms: profile.measured_latency_ms ?? profile.baseline_latency_estimate_ms,
+      parsing_reliability: profile.measured_parsing_reliability ?? profile.baseline_parsing_reliability_estimate,
+      is_measured: isMeasured
+    });
   }
 
   /**

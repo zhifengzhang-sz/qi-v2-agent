@@ -94,7 +94,7 @@ async function runLangChainStudy(): Promise<void> {
       })
     });
     
-    const testResult = await testResponse.json();
+    const testResult: any = await testResponse.json();
     
     if (testResult.error && testResult.error.message.includes('does not support tools')) {
       console.log(`❌ Function Calling: NOT SUPPORTED`);

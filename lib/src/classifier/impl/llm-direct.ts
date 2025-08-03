@@ -8,6 +8,7 @@
 
 import { create, failure, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
 import { createOllamaStructuredWrapper, type OllamaStructuredWrapper } from '../../llm/index.js';
+import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
 import { detectCommand } from './command-detection-utils.js';
 import type {
   IClassificationMethod,
@@ -49,28 +50,14 @@ const ClassificationSchema = {
 };
 
 /**
- * LLM classification error interface with structured context
- */
-interface LLMClassificationError extends QiError {
-  context: {
-    input?: string;
-    operation?: string;
-    model?: string;
-    provider?: string;
-    error?: string;
-    length?: number;
-  };
-}
-
-/**
- * Custom error factory for LLM classification errors
+ * Custom error factory for LLM classification errors using standardized error types
  */
 const createLLMClassificationError = (
   code: string,
   message: string,
   category: ErrorCategory,
-  context: LLMClassificationError['context'] = {}
-): LLMClassificationError => create(code, message, category, context) as LLMClassificationError;
+  context: Partial<BaseClassificationErrorContext> = {}
+): QiError => createClassificationError('llm-based', code, message, category, context);
 
 export class LLMClassificationMethod implements IClassificationMethod {
   private wrapper: OllamaStructuredWrapper;
@@ -93,7 +80,7 @@ export class LLMClassificationMethod implements IClassificationMethod {
       (error: unknown) => createLLMClassificationError(
         'LLM_CLASSIFICATION_FAILED',
         `LLM classification failed: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
+        'NETWORK',
         { error: String(error) }
       )
     );

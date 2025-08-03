@@ -8,7 +8,7 @@
 /**
  * Classification method types
  */
-export type ClassificationMethod = 'rule-based' | 'llm-based' | 'langchain-structured' | 'hybrid' | 'ensemble';
+export type ClassificationMethod = 'rule-based' | 'llm-based' | 'langchain-structured' | 'fewshot-langchain' | 'chatprompt-langchain' | 'outputparser-langchain' | 'outputfixing-langchain' | 'hybrid' | 'ensemble';
 
 /**
  * Three input types for classification
