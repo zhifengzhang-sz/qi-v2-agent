@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["models", "methods", "testInputs", "llm"],
+  "properties": {
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "rule-based",
+          "llm-direct", 
+          "langchain-structured",
+          "fewshot-langchain",
+          "chatprompt-langchain",
+          "outputparser-langchain",
+          "outputfixing-langchain"
+        ]
+      },
+      "minItems": 1
+    },
+    "testInputs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "llm": {
+      "type": "object",
+      "required": ["baseUrl", "apiKey"],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "apiKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 1000
+        }
+      }
+    }
+  }
+}

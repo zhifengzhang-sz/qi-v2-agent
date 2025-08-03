@@ -1,0 +1,23 @@
+models:
+  - qwen3:8b
+  - qwen2.5-coder:7b
+
+methods:
+  - rule-based
+  - llm-direct
+  - langchain-structured
+  - fewshot-langchain
+  - chatprompt-langchain
+
+testInputs:
+  - "/exit"
+  - "write a quicksort algorithm in haskell"
+  - "write into a file foo.hs a quicksort algorithm in haskell"
+  - "fix the bug in auth.js and run tests"
+  - "explain how recursion works"
+
+llm:
+  baseUrl: "http://172.18.144.1:11434"
+  apiKey: "ollama"
+  temperature: 0.1
+  timeout: 30000
