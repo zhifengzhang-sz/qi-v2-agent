@@ -378,39 +378,42 @@ export class PromptAppOrchestrator implements IAgent {
   private extractPromptOptions(context: any): PromptOptions {
     // Extract prompt options from request context
     // This can be enhanced to support model selection, temperature, etc.
-    const currentState = this.stateManager.getCurrentState();
+    const currentModel = this.stateManager.getCurrentModel();
+    const promptConfig = this.stateManager.getPromptConfig();
     return {
-      provider: currentState?.currentProvider || 'ollama',
-      model: currentState?.currentModel || 'qwen3:8b',
-      temperature: currentState?.temperature || 0.1,
-      maxTokens: 1000,
+      provider: promptConfig?.provider || 'ollama',
+      model: currentModel || 'qwen3:8b',
+      temperature: promptConfig?.temperature || 0.1,
+      maxTokens: promptConfig?.maxTokens || 1000,
     };
   }
 
   private async handleModelCommand(args: string[]): Promise<AgentResponse> {
-    const currentState = this.stateManager.getCurrentState();
+    const currentModel = this.stateManager.getCurrentModel();
+    const promptConfig = this.stateManager.getPromptConfig();
     
     if (args.length === 0) {
       // Show current model
       return {
-        content: `Current model: ${currentState?.currentModel || 'qwen3:8b'}\nProvider: ${currentState?.currentProvider || 'ollama'}`,
+        content: `Current model: ${currentModel || 'qwen3:8b'}\nProvider: ${promptConfig?.provider || 'ollama'}`,
         type: 'command',
         confidence: 1.0,
         executionTime: 0,
         metadata: new Map([
           ['commandName', 'model'],
           ['action', 'view'],
-          ['currentModel', currentState?.currentModel || 'qwen3:8b']
+          ['currentModel', currentModel || 'qwen3:8b']
         ]),
         success: true,
       };
     }
 
     const newModel = args[0];
+    const previousModel = currentModel;
     
     try {
       // Switch model using state manager
-      await this.stateManager.switchModel(newModel);
+      this.stateManager.setCurrentModel(newModel);
       
       return {
         content: `✅ Switched to model: ${newModel}`,
@@ -421,7 +424,7 @@ export class PromptAppOrchestrator implements IAgent {
           ['commandName', 'model'],
           ['action', 'switch'],
           ['newModel', newModel],
-          ['previousModel', currentState?.currentModel || 'qwen3:8b']
+          ['previousModel', previousModel || 'qwen3:8b']
         ]),
         success: true,
       };
@@ -444,11 +447,14 @@ export class PromptAppOrchestrator implements IAgent {
 
   private async handleStatusCommand(): Promise<AgentResponse> {
     const orchestratorStatus = this.getStatus();
-    const currentState = this.stateManager.getCurrentState();
+    const currentModel = this.stateManager.getCurrentModel();
+    const promptConfig = this.stateManager.getPromptConfig();
+    const currentMode = this.stateManager.getCurrentMode();
     
     let statusContent = '📊 PromptApp Status:\n';
     statusContent += `   Initialized: ${orchestratorStatus.isInitialized}\n`;
     statusContent += `   Domain: ${orchestratorStatus.domain}\n`;
+    statusContent += `   Mode: ${currentMode}\n`;
     statusContent += `   Uptime: ${Math.floor(orchestratorStatus.uptime / 1000)}s\n`;
     statusContent += `   Requests Processed: ${orchestratorStatus.requestsProcessed}\n`;
     statusContent += `   Average Response Time: ${Math.floor(orchestratorStatus.averageResponseTime)}ms\n`;
@@ -458,9 +464,9 @@ export class PromptAppOrchestrator implements IAgent {
     }
     
     statusContent += '\n🔧 Configuration:\n';
-    statusContent += `   Current Model: ${currentState?.currentModel || 'qwen3:8b'}\n`;
-    statusContent += `   Provider: ${currentState?.currentProvider || 'ollama'}\n`;
-    statusContent += `   Temperature: ${currentState?.temperature || 0.1}\n`;
+    statusContent += `   Current Model: ${currentModel || 'qwen3:8b'}\n`;
+    statusContent += `   Provider: ${promptConfig?.provider || 'ollama'}\n`;
+    statusContent += `   Temperature: ${promptConfig?.temperature || 0.1}\n`;
     statusContent += `   Context Aware: ${this.contextAwarePromptHandler ? 'enabled' : 'disabled'}\n`;
     statusContent += `   Active Sessions: ${this.sessionContextMap.size}`;
     
@@ -473,7 +479,7 @@ export class PromptAppOrchestrator implements IAgent {
         ['commandName', 'status'],
         ['uptime', orchestratorStatus.uptime.toString()],
         ['requestsProcessed', orchestratorStatus.requestsProcessed.toString()],
-        ['currentModel', currentState?.currentModel || 'qwen3:8b']
+        ['currentModel', currentModel || 'qwen3:8b']
       ]),
       success: true,
     };
