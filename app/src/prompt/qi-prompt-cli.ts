@@ -106,8 +106,8 @@ class QiPromptCLI {
     console.log('Commands:');
     console.log('  - Type any message to send to the LLM');
     console.log('  - Type /help to see available commands');
-    console.log('  - Type /status to see current status');
-    console.log('  - Type /model [model_name] to change models');
+    console.log('  - Type /status (or /s) to see current status');
+    console.log('  - Type /model [model_name] (or /m) to change models');
     console.log('  - Type /exit to quit\n');
 
     this.isRunning = true;

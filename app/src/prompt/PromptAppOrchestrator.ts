@@ -224,6 +224,16 @@ export class PromptAppOrchestrator implements IAgent {
       parameters.set(`arg${i}`, parts[i]);
     }
 
+    // Handle PromptApp-specific commands first
+    if (commandName === 'model' || commandName === 'm') {
+      return await this.handleModelCommand(parts.slice(1));
+    }
+    
+    if (commandName === 'status' || commandName === 's') {
+      return await this.handleStatusCommand();
+    }
+
+    // Fall back to standard command handler for basic CLI commands
     const commandRequest: CommandRequest = {
       commandName,
       parameters,
@@ -368,11 +378,104 @@ export class PromptAppOrchestrator implements IAgent {
   private extractPromptOptions(context: any): PromptOptions {
     // Extract prompt options from request context
     // This can be enhanced to support model selection, temperature, etc.
+    const currentState = this.stateManager.getCurrentState();
     return {
-      provider: 'ollama',
-      model: 'qwen3:8b', // Default model, can be overridden by state manager
-      temperature: 0.1,
+      provider: currentState?.currentProvider || 'ollama',
+      model: currentState?.currentModel || 'qwen3:8b',
+      temperature: currentState?.temperature || 0.1,
       maxTokens: 1000,
+    };
+  }
+
+  private async handleModelCommand(args: string[]): Promise<AgentResponse> {
+    const currentState = this.stateManager.getCurrentState();
+    
+    if (args.length === 0) {
+      // Show current model
+      return {
+        content: `Current model: ${currentState?.currentModel || 'qwen3:8b'}\nProvider: ${currentState?.currentProvider || 'ollama'}`,
+        type: 'command',
+        confidence: 1.0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'model'],
+          ['action', 'view'],
+          ['currentModel', currentState?.currentModel || 'qwen3:8b']
+        ]),
+        success: true,
+      };
+    }
+
+    const newModel = args[0];
+    
+    try {
+      // Switch model using state manager
+      await this.stateManager.switchModel(newModel);
+      
+      return {
+        content: `✅ Switched to model: ${newModel}`,
+        type: 'command',
+        confidence: 1.0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'model'],
+          ['action', 'switch'],
+          ['newModel', newModel],
+          ['previousModel', currentState?.currentModel || 'qwen3:8b']
+        ]),
+        success: true,
+      };
+    } catch (error) {
+      return {
+        content: `❌ Failed to switch model: ${error instanceof Error ? error.message : String(error)}`,
+        type: 'command',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'model'],
+          ['action', 'switch'],
+          ['error', error instanceof Error ? error.message : String(error)]
+        ]),
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private async handleStatusCommand(): Promise<AgentResponse> {
+    const orchestratorStatus = this.getStatus();
+    const currentState = this.stateManager.getCurrentState();
+    
+    let statusContent = '📊 PromptApp Status:\n';
+    statusContent += `   Initialized: ${orchestratorStatus.isInitialized}\n`;
+    statusContent += `   Domain: ${orchestratorStatus.domain}\n`;
+    statusContent += `   Uptime: ${Math.floor(orchestratorStatus.uptime / 1000)}s\n`;
+    statusContent += `   Requests Processed: ${orchestratorStatus.requestsProcessed}\n`;
+    statusContent += `   Average Response Time: ${Math.floor(orchestratorStatus.averageResponseTime)}ms\n`;
+    
+    if (orchestratorStatus.lastActivity) {
+      statusContent += `   Last Activity: ${orchestratorStatus.lastActivity.toLocaleTimeString()}\n`;
+    }
+    
+    statusContent += '\n🔧 Configuration:\n';
+    statusContent += `   Current Model: ${currentState?.currentModel || 'qwen3:8b'}\n`;
+    statusContent += `   Provider: ${currentState?.currentProvider || 'ollama'}\n`;
+    statusContent += `   Temperature: ${currentState?.temperature || 0.1}\n`;
+    statusContent += `   Context Aware: ${this.contextAwarePromptHandler ? 'enabled' : 'disabled'}\n`;
+    statusContent += `   Active Sessions: ${this.sessionContextMap.size}`;
+    
+    return {
+      content: statusContent,
+      type: 'command',
+      confidence: 1.0,
+      executionTime: 0,
+      metadata: new Map([
+        ['commandName', 'status'],
+        ['uptime', orchestratorStatus.uptime.toString()],
+        ['requestsProcessed', orchestratorStatus.requestsProcessed.toString()],
+        ['currentModel', currentState?.currentModel || 'qwen3:8b']
+      ]),
+      success: true,
     };
   }
 }
