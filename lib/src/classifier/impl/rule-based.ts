@@ -102,7 +102,7 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     // Convert Result<T> to ClassificationResult for interface layer
     return match(
       (result: ClassificationResult) => result,
-      (error) => this.createFallbackResult(error.message),
+      (error) => { throw new Error("RuleBased classification failed: " + error.message); },
       classificationResult
     );
   }
@@ -232,20 +232,6 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     };
   }
 
-  private createFallbackResult(errorMessage: string): ClassificationResult {
-    return {
-      type: 'prompt',
-      confidence: 0.0,
-      method: 'rule-based',
-      reasoning: `Rule-based classification failed: ${errorMessage}`,
-      extractedData: new Map(),
-      metadata: new Map([
-        ['error', errorMessage],
-        ['fallback', 'true'],
-        ['timestamp', new Date().toISOString()],
-      ]),
-    };
-  }
 
   /**
    * Track performance metrics for classification

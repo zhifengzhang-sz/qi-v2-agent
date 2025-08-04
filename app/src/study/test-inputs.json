@@ -1,0 +1,29 @@
+{
+  "samples": [
+    {
+      "id": 1,
+      "input": "/exit",
+      "expected": "command"
+    },
+    {
+      "id": 2,
+      "input": "What is recursion and how does it work?",
+      "expected": "prompt"
+    },
+    {
+      "id": 3,
+      "input": "Create a new file called utils.js and implement a function to sort arrays",
+      "expected": "workflow"
+    },
+    {
+      "id": 4,
+      "input": "Fix the authentication bug in auth.js, run the tests, and deploy if they pass",
+      "expected": "workflow"
+    },
+    {
+      "id": 5,
+      "input": "Can you explain the difference between functional and object-oriented programming?",
+      "expected": "prompt"
+    }
+  ]
+}

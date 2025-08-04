@@ -14,6 +14,7 @@ import {
   type SchemaEntry 
 } from '../schema-registry.js';
 import { detectCommand } from './command-detection-utils.js';
+import { composeOpenAIEndpoint, getOllamaBaseUrl } from '../shared/url-utils.js';
 import type {
   ClassificationMethod,
   ClassificationResult,
@@ -66,7 +67,71 @@ export class LangChainClassificationMethod implements IClassificationMethod {
     // Initialize asynchronously when first used
   }
 
+  /**
+   * Validate that the model exists and supports function calling
+   */
+  private async validatePrerequisites(): Promise<void> {
+    const configBaseUrl = this.config.baseUrl || 'http://localhost:11434';
+    const modelId = this.config.modelId || 'qwen2.5:7b';
+    
+    // Get the clean Ollama base URL for direct API calls
+    const ollamaBaseUrl = getOllamaBaseUrl(configBaseUrl);
+
+    // Check if model exists
+    try {
+      const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to connect to Ollama at ${ollamaBaseUrl}: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const models = data.models || [];
+      const modelExists = models.some((model: any) => model.name === modelId || model.name.startsWith(modelId + ':'));
+      
+      if (!modelExists) {
+        const availableModels = models.map((m: any) => m.name).join(', ');
+        throw new Error(`Model '${modelId}' not found. Available models: ${availableModels}`);
+      }
+    } catch (error) {
+      throw new Error(`Model validation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Check function calling support
+    try {
+      const openaiEndpoint = composeOpenAIEndpoint(configBaseUrl);
+      const testResponse = await fetch(`${openaiEndpoint}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: 'Test' }],
+          tools: [{ type: 'function', function: { name: 'test', parameters: {} } }]
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      
+      const testResult: any = await testResponse.json();
+      
+      if (testResult.error && testResult.error.message && testResult.error.message.includes('does not support tools')) {
+        throw new Error(`Model '${modelId}' does not support function calling, which is required for withStructuredOutput`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('does not support tools')) {
+        throw error;
+      }
+      // Other errors (network, timeout) are not function calling issues
+      console.warn(`Function calling test failed (${error}), proceeding with assumption of support`);
+    }
+  }
+
   private async initializeLLM(): Promise<void> {
+    // Validate prerequisites first
+    await this.validatePrerequisites();
+    
     // Use OpenAI-compatible API with Ollama to avoid ChatOllama issues
     try {
       // Select schema based on configuration or criteria
@@ -80,7 +145,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
       );
       this.selectedSchema = selectedSchema;
       
-      // Use dynamic imports for better compatibility
+      // Use ChatOpenAI with OpenAI-compatible endpoint (works with Ollama)
       const { ChatOpenAI } = await import('@langchain/openai');
       
       const llm = new ChatOpenAI({
@@ -88,12 +153,12 @@ export class LangChainClassificationMethod implements IClassificationMethod {
         temperature: this.config.temperature || 0.1,
         maxTokens: this.config.maxTokens || 1000,
         configuration: {
-          baseURL: this.config.baseUrl || 'http://localhost:11434/v1',
+          baseURL: composeOpenAIEndpoint(this.config.baseUrl || 'http://localhost:11434'),
           apiKey: this.config.apiKey || 'ollama',
         },
       });
 
-      // Use LangChain's withStructuredOutput with dynamically selected schema
+      // Use LangChain's withStructuredOutput with selected schema
       this.llmWithStructuredOutput = llm.withStructuredOutput(this.selectedSchema!.schema, {
         name: this.selectedSchema!.metadata.name,
       });
@@ -130,15 +195,15 @@ export class LangChainClassificationMethod implements IClassificationMethod {
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
-    // Use proper fromAsyncTryCatch for exception boundary like prompt module
+    // Validate prerequisites first - these should fail fast, not fallback
+    if (!this.initialized) {
+      await this.initializeLLM(); // This will throw if prerequisites aren't met
+      this.initialized = true;
+    }
+
+    // Use proper fromAsyncTryCatch for classification errors only (not validation errors)
     const classificationResult = await fromAsyncTryCatch(
       async () => {
-        // Ensure LLM is initialized
-        if (!this.initialized) {
-          await this.initializeLLM();
-          this.initialized = true;
-        }
-
         // Use proper flatMap chains for sequential operations
         return await this.classifyInternal(input, context);
       },
@@ -153,7 +218,9 @@ export class LangChainClassificationMethod implements IClassificationMethod {
     // Convert Result<T> to ClassificationResult for interface layer
     return match(
       (result: ClassificationResult) => result,
-      (error) => this.createFallbackResult(error.message),
+      (error) => {
+        throw new Error("StructuredOutput classification failed: " + error.message);
+      },
       classificationResult
     );
   }
@@ -200,7 +267,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
                   (error) => {
                     // Track failed classification (parsing failed)
                     this.trackPerformance(startTime, false, false);
-                    return this.createFallbackResult(error.message);
+                    throw new Error("StructuredOutput classification failed: " + error.message);
                   },
                   processedResult
                 );
@@ -208,7 +275,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
               (error) => {
                 // Track failed classification (LLM failed)
                 this.trackPerformance(startTime, false, false);
-                return this.createFallbackResult(error.message);
+                throw new Error("StructuredOutput classification failed: " + error.message);
               },
               llmResult
             );
@@ -216,7 +283,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
           async (error) => {
             // Track failed classification (prompt building failed)
             this.trackPerformance(startTime, false, false);
-            return this.createFallbackResult(error.message);
+            throw new Error("StructuredOutput classification failed: " + error.message);
           },
           promptResult
         );
@@ -224,7 +291,7 @@ export class LangChainClassificationMethod implements IClassificationMethod {
       async (error) => {
         // Track failed classification (validation failed)
         this.trackPerformance(startTime, false, false);
-        return this.createFallbackResult(error.message);
+        throw new Error("StructuredOutput classification failed: " + error.message);
       },
       validationResult
     );
@@ -394,20 +461,6 @@ ${contextStr}
     return parts.length > 0 ? `**Context:** ${parts.join(' | ')}` : '';
   }
 
-  private createFallbackResult(errorMessage: string): ClassificationResult {
-    return {
-      type: 'prompt',
-      confidence: 0.0,
-      method: 'langchain-structured',
-      reasoning: `Classification failed: ${errorMessage}`,
-      extractedData: new Map(),
-      metadata: new Map([
-        ['error', errorMessage],
-        ['fallback', 'true'],
-        ['timestamp', new Date().toISOString()],
-      ]),
-    };
-  }
 
   /**
    * Track performance metrics for this classification attempt

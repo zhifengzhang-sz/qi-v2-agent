@@ -1,6 +1,6 @@
 # qi-v2-agent
 
-Local AI coding assistant. Smart input routing, multi-provider LLM support, local-first privacy.
+Local AI coding assistant with smart input classification and multi-provider LLM support.
 
 ## Install & Run
 
@@ -12,32 +12,39 @@ bun --cwd lib src/qi-code.ts
 
 **Prerequisites**: Node.js 18+, Bun, [Ollama](https://ollama.ai) running locally
 
-## What It Does
+## Classification System
 
-- **Smart routing**: Commands (`/help`) → instant execution, prompts (`"write quicksort"`) → LLM, complex tasks → workflow
-- **Local-first**: Your code stays private, uses local Ollama models primarily  
-- **Multi-provider ready**: Uses multi-llm-ts library with proper context continuation and rate limiting
-- **Fast classification**: 93% accuracy, <1ms latency for most inputs
+**7 methods** for command/prompt/workflow classification:
+- **rule-based**: Pattern matching, 0ms latency, offline capability
+- **llm-direct**: Universal model compatibility, ~50ms latency
+- **langchain-structured**: Function calling models, optimal accuracy
+- **4 langchain variants**: fewshot, chatprompt, outputparser, outputfixing
+
+## Performance Study
+
+```bash
+# Run classification performance study
+bun run src/study/classification.ts
+
+# Quick classifier demo
+bun --cwd app src/demos/classifier/demo.ts
+```
+
+## Architecture
+
+- **Interface Layer**: `InputClassifier` - simple API, no QiCore exposure
+- **Internal Layer**: 7 classification methods with proper QiCore Result<T> patterns
+- **Configuration**: YAML-based multi-provider LLM setup
+- **Local-first**: Private by design, uses local models
 
 ## Quick Test
 
-Try it:
-- `/help` - instant system command
-- `"write a quicksort in python"` - LLM prompt  
-- `"fix bug in src/app.ts and run tests"` - complex workflow
-
-## For Developers
-
-**Test classification accuracy**:
 ```bash
-bun run study:all                    # Run all classification tests
-bun --cwd app src/demos/classifier/demo.ts  # Quick demo
+/help                                           # → command
+write a quicksort algorithm in haskell          # → prompt  
+write into a file foo.hs a quicksort algorithm  # → workflow
 ```
-
-**Configuration**: `config/llm-providers.yaml` - multi-provider LLM setup
-
-**Documentation**: See `docs/` for technical details and API reference
 
 ---
 
-**Status**: Production-ready core with excellent code quality. Works as a good prompt app right now.
+**Status**: Production-ready classification system with comprehensive performance analysis.

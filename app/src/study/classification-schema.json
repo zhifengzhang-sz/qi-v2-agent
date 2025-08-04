@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["models", "methods", "testInputs", "llm"],
+  "required": ["models", "methods", "dataPath", "llm"],
   "properties": {
     "models": {
       "type": "array",
@@ -17,7 +17,7 @@
         "type": "string",
         "enum": [
           "rule-based",
-          "llm-direct", 
+          "llm-based", 
           "langchain-structured",
           "fewshot-langchain",
           "chatprompt-langchain",
@@ -27,13 +27,9 @@
       },
       "minItems": 1
     },
-    "testInputs": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "minItems": 1
+    "dataPath": {
+      "type": "string",
+      "minLength": 1
     },
     "llm": {
       "type": "object",
@@ -55,6 +51,38 @@
         "timeout": {
           "type": "number",
           "minimum": 1000
+        }
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z-]+$": {
+          "type": "object",
+          "properties": {
+            "schemaName": {
+              "type": "string",
+              "enum": ["minimal", "standard", "detailed", "optimized"]
+            },
+            "schemaSelectionCriteria": {
+              "type": "object",
+              "properties": {
+                "use_case": {
+                  "type": "string",
+                  "enum": ["development", "testing", "production"]
+                },
+                "model_supports_function_calling": {
+                  "type": "boolean"
+                },
+                "prioritize_accuracy": {
+                  "type": "boolean"
+                },
+                "prioritize_speed": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
         }
       }
     }

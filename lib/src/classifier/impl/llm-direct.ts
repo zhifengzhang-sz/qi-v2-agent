@@ -1,13 +1,13 @@
 /**
  * LLM-Based Classification Method - QiCore Implementation
  *
- * Uses OllamaStructuredWrapper with proper QiCore Result<T> patterns.
+ * Uses QiCorePromptManager for proper LLM handling with Result<T> patterns.
  * Provides higher accuracy than rule-based methods with reliable confidence scores.
  * Internal layer implementation - uses proper QiCore Result<T> patterns.
  */
 
-import { create, failure, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
-import { createOllamaStructuredWrapper, type OllamaStructuredWrapper } from '../../llm/index.js';
+import { failure, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
+import { createPromptHandler } from '../../prompt/index.js';
 import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
 import { detectCommand } from './command-detection-utils.js';
 import type {
@@ -60,18 +60,32 @@ const createLLMClassificationError = (
 ): QiError => createClassificationError('llm-based', code, message, category, context);
 
 export class LLMClassificationMethod implements IClassificationMethod {
-  private wrapper: OllamaStructuredWrapper;
+  private config: LLMClassificationConfig;
+  private promptHandler = createPromptHandler();
+  private initialized = false;
 
   constructor(config: LLMClassificationConfig) {
-    // Use working OllamaStructuredWrapper instead of broken ChatOllama
-    this.wrapper = createOllamaStructuredWrapper({
-      model: config.modelId || 'qwen2.5:7b',
-      baseURL: config.baseUrl || 'http://172.18.144.1:11434',
-      temperature: config.temperature || 0.1 // Low temperature for consistent classification
-    });
+    this.config = config;
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+    
+    // Use study framework config files
+    const configPath = './src/study/classification-config.yaml';
+    const schemaPath = './src/study/classification-schema.json';
+    
+    const result = await this.promptHandler.initialize(configPath, schemaPath);
+    if (!result.success) {
+      throw new Error(`Failed to initialize prompt handler: ${result.error}`);
+    }
+    
+    this.initialized = true;
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+    await this.ensureInitialized();
+    
     // Use proper fromAsyncTryCatch for exception boundary like other QiCore methods
     const classificationResult = await fromAsyncTryCatch(
       async () => {
@@ -88,7 +102,9 @@ export class LLMClassificationMethod implements IClassificationMethod {
     // Convert Result<T> to ClassificationResult for interface layer
     return match(
       (result: ClassificationResult) => result,
-      (error) => this.createFallbackResult(error.message),
+      (error) => {
+        throw new Error(`LLM classification failed: ${error.message}`);
+      },
       classificationResult
     );
   }
@@ -121,7 +137,7 @@ export class LLMClassificationMethod implements IClassificationMethod {
         
         return await match(
           async (prompt: string) => {
-            const llmResult = await this.performLLMClassificationInternal(prompt, startTime);
+            const llmResult = await this.performLLMClassificationInternal(prompt);
             
             return match(
               (llmOutput) => {
@@ -191,21 +207,53 @@ export class LLMClassificationMethod implements IClassificationMethod {
     }
   }
 
-  private performLLMClassificationInternal(prompt: string, startTime: number): Promise<Result<any, QiError>> {
+  private async performLLMClassificationInternal(prompt: string): Promise<Result<any, QiError>> {
     return fromAsyncTryCatch(
       async () => {
-        // Use the working OllamaStructuredWrapper instead of broken ChatOllama
-        const result = await this.wrapper.generateStructured(prompt, ClassificationSchema) as any;
-        return result;
+        // Use the prompt module instead of manual HTTP calls
+        const response = await this.promptHandler.complete(prompt, {
+          provider: 'ollama',
+          model: this.config.modelId || 'qwen3:8b',
+          temperature: this.config.temperature || 0.1,
+          maxTokens: this.config.maxTokens || 1000,
+        });
+
+        if (!response.success) {
+          throw new Error(`Prompt completion failed: ${response.error}`);
+        }
+
+        const responseText = response.data;
+        
+        // Try to parse JSON from response
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return {
+            type: this.extractTypeFromText(responseText),
+            confidence: 0.7,
+            reasoning: 'Extracted from unstructured response',
+            indicators: [],
+            extracted_data: {}
+          };
+        }
+        
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch {
+          return {
+            type: this.extractTypeFromText(responseText),
+            confidence: 0.6,
+            reasoning: 'JSON parsing failed, used text extraction',
+            indicators: [],
+            extracted_data: {}
+          };
+        }
       },
-      (error: unknown) => {
-        return {
-          code: 'LLM_GENERATION_FAILED',
-          message: `LLM generation failed: ${error instanceof Error ? error.message : String(error)}`,
-          category: 'NETWORK' as const,
-          context: { error: String(error), prompt_tokens: this.estimateTokens(prompt).toString() },
-        };
-      }
+      (error: unknown) => createLLMClassificationError(
+        'LLM_GENERATION_FAILED',
+        `LLM generation failed: ${error instanceof Error ? error.message : String(error)}`,
+        'NETWORK',
+        { error: String(error) }
+      )
     );
   }
 
@@ -222,7 +270,9 @@ export class LLMClassificationMethod implements IClassificationMethod {
         reasoning: result.reasoning,
         extractedData: new Map(Object.entries(result.extracted_data || {})),
         metadata: new Map([
-          ['model', 'ollama-structured-wrapper'],
+          ['model', this.config.modelId || 'qwen3:8b'],
+          ['provider', 'ollama'],
+          ['handler', 'QiCorePromptManager'],
           ['latency', (Date.now() - startTime).toString()],
           ['indicators', JSON.stringify(result.indicators || [])],
           ['prompt_tokens', this.estimateTokens(originalInput).toString()],
@@ -241,20 +291,6 @@ export class LLMClassificationMethod implements IClassificationMethod {
     }
   }
 
-  private createFallbackResult(errorMessage: string): ClassificationResult {
-    return {
-      type: 'prompt',
-      confidence: 0.0,
-      method: 'llm-based',
-      reasoning: `LLM classification failed: ${errorMessage}`,
-      extractedData: new Map(),
-      metadata: new Map([
-        ['error', errorMessage],
-        ['fallback', 'true'],
-        ['timestamp', new Date().toISOString()],
-      ]),
-    };
-  }
 
   getMethodName(): ClassificationMethod {
     return 'llm-based';
@@ -270,10 +306,10 @@ export class LLMClassificationMethod implements IClassificationMethod {
 
   async isAvailable(): Promise<boolean> {
     try {
-      // Use the wrapper's availability check
-      return await this.wrapper.isAvailable();
-    } catch (error) {
-      // Server not available or connection failed
+      await this.ensureInitialized();
+      const providers = await this.promptHandler.getAvailableProviders();
+      return providers.some(p => p.id === 'ollama' && p.available);
+    } catch {
       return false;
     }
   }
@@ -281,7 +317,7 @@ export class LLMClassificationMethod implements IClassificationMethod {
   private buildClassificationPrompt(input: string, context?: ProcessingContext): string {
     const contextInfo = context ? this.formatContext(context) : '';
     
-    return `Classify the following user input into one of three categories:
+    return `Classify the following user input into one of three categories. Return your answer as JSON only.
 
 **Categories:**
 1. **command** - System commands that start with "/" (e.g., "/help", "/status", "/config")
@@ -296,12 +332,16 @@ export class LLMClassificationMethod implements IClassificationMethod {
 **User Input:** "${input}"
 ${contextInfo}
 
-**Instructions:**
-- Analyze the input carefully for complexity indicators
-- Look for file references, multiple actions, testing requirements
-- Consider the user's intent and task complexity
-- Provide a confidence score based on how clear the classification is
-- Give specific reasoning for your choice`;
+**Required JSON Response Format:**
+{
+  "type": "command|prompt|workflow",
+  "confidence": 0.0-1.0,
+  "reasoning": "brief explanation",
+  "indicators": ["key", "indicators"],
+  "extracted_data": {}
+}
+
+Return only the JSON object, no other text.`;
   }
 
   private formatContext(context: ProcessingContext): string {
@@ -319,6 +359,13 @@ ${contextInfo}
   private estimateTokens(text: string): number {
     // Rough estimation: ~4 characters per token
     return Math.ceil(text.length / 4);
+  }
+
+  private extractTypeFromText(text: string): 'command' | 'prompt' | 'workflow' {
+    const lowerText = text.toLowerCase();
+    if (lowerText.includes('command')) return 'command';
+    if (lowerText.includes('workflow')) return 'workflow';
+    return 'prompt'; // default
   }
 }
 

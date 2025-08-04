@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["samples"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created": { "type": "string" },
+        "totalSamples": { "type": "number" },
+        "samplesPerCategory": { "type": "number" },
+        "distribution": { "type": "object" },
+        "sources": { "type": "object" }
+      }
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["input", "expected"],
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "input": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "string",
+            "enum": ["command", "prompt", "workflow"]
+          },
+          "source": {
+            "type": "string"
+          },
+          "complexity": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

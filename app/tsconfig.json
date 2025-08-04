@@ -16,8 +16,8 @@
       "@/*": ["./src/*"],
       "@qi/agent": ["../lib/src/agent"],
       "@qi/agent/*": ["../lib/src/*"],
-      "@qi/base": ["../../qi-v2-qicore/typescript/lib/src/base"],
-      "@qi/core": ["../../qi-v2-qicore/typescript/lib/src/core"]
+      "@qi/base": ["../../qi-v2-qicore/typescript/dist/base"],
+      "@qi/core": ["../../qi-v2-qicore/typescript/dist/core"]
     },
     "jsx": "react-jsx",
     "types": ["bun-types"]

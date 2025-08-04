@@ -334,9 +334,7 @@ export function createInputClassifier(
       return new InputClassifier(outputfixingMethod);
       
     default:
-      // Fallback to LangChain method
-      const defaultMethod = createLangChainClassifier(config);
-      return new InputClassifier(defaultMethod);
+      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, llm-based, langchain-structured, fewshot-langchain, chatprompt-langchain, outputparser-langchain, outputfixing-langchain`);
   }
 }
 

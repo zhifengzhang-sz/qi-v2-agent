@@ -15,6 +15,7 @@ import {
   type SchemaEntry 
 } from '../schema-registry.js';
 import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
+import { composeOpenAIEndpoint, getOllamaBaseUrl } from '../shared/url-utils.js';
 import { detectCommand } from './command-detection-utils.js';
 import type {
   ClassificationMethod,
@@ -117,7 +118,67 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
     this.examples = customExamples || DEFAULT_EXAMPLES;
   }
 
+  /**
+   * Validate that the model exists and supports function calling
+   */
+  private async validatePrerequisites(): Promise<void> {
+    const baseUrl = this.config.baseUrl || 'http://localhost:11434';
+    const modelId = this.config.modelId || 'qwen2.5:7b';
+
+    // Check if model exists
+    try {
+      const response = await fetch(`${baseUrl}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to connect to Ollama at ${baseUrl}: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const models = data.models || [];
+      const modelExists = models.some((model: any) => model.name === modelId || model.name.startsWith(modelId + ':'));
+      
+      if (!modelExists) {
+        const availableModels = models.map((m: any) => m.name).join(', ');
+        throw new Error(`Model '${modelId}' not found. Available models: ${availableModels}`);
+      }
+    } catch (error) {
+      throw new Error(`Model validation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Check function calling support
+    try {
+      const testResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: 'Test' }],
+          tools: [{ type: 'function', function: { name: 'test', parameters: {} } }]
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      
+      const testResult: any = await testResponse.json();
+      
+      if (testResult.error && testResult.error.message && testResult.error.message.includes('does not support tools')) {
+        throw new Error(`Model '${modelId}' does not support function calling, which is required for FewShot classification`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('does not support tools')) {
+        throw error;
+      }
+      // Other errors (network, timeout) are not function calling issues
+      console.warn(`Function calling test failed (${error}), proceeding with assumption of support`);
+    }
+  }
+
   private async initializeLLM(): Promise<void> {
+    // Validate prerequisites first
+    await this.validatePrerequisites();
+    
     try {
       // Select schema based on configuration or criteria
       const schemaResult = this.selectSchema();
@@ -138,7 +199,7 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
         temperature: this.config.temperature || 0.1,
         maxTokens: this.config.maxTokens || 1000,
         configuration: {
-          baseURL: this.config.baseUrl || 'http://localhost:11434/v1',
+          baseURL: composeOpenAIEndpoint(this.config.baseUrl || 'http://localhost:11434'),
           apiKey: this.config.apiKey || 'ollama',
         },
       });
@@ -180,15 +241,15 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
-    // Use proper fromAsyncTryCatch for exception boundary
+    // Validate prerequisites first - these should fail fast, not fallback
+    if (!this.initialized) {
+      await this.initializeLLM(); // This will throw if prerequisites aren't met
+      this.initialized = true;
+    }
+
+    // Use proper fromAsyncTryCatch for classification errors only (not validation errors)
     const classificationResult = await fromAsyncTryCatch(
       async () => {
-        // Ensure LLM is initialized
-        if (!this.initialized) {
-          await this.initializeLLM();
-          this.initialized = true;
-        }
-
         return await this.classifyInternal(input, context);
       },
       (error: unknown) => createFewShotClassificationError(
@@ -202,7 +263,9 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
     // Convert Result<T> to ClassificationResult for interface layer
     return match(
       (result: ClassificationResult) => result,
-      (error) => this.createFallbackResult(error.message),
+      (error) => {
+        throw new Error("FewShot classification failed: " + error.message);
+      },
       classificationResult
     );
   }
@@ -250,7 +313,7 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
                   (error) => {
                     // Track failed classification (parsing failed)
                     this.trackPerformance(startTime, false, false);
-                    return this.createFallbackResult(error.message);
+                    throw new Error("FewShot classification failed: " + error.message);
                   },
                   processedResult
                 );
@@ -258,7 +321,7 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
               (error) => {
                 // Track failed classification (LLM failed)
                 this.trackPerformance(startTime, false, false);
-                return this.createFallbackResult(error.message);
+                throw new Error("FewShot classification failed: " + error.message);
               },
               llmResult
             );
@@ -266,7 +329,7 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
           async (error) => {
             // Track failed classification (prompt building failed)
             this.trackPerformance(startTime, false, false);
-            return this.createFallbackResult(error.message);
+            throw new Error("FewShot classification failed: " + error.message);
           },
           promptResult
         );
@@ -274,7 +337,7 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
       async (error) => {
         // Track failed classification (validation failed)
         this.trackPerformance(startTime, false, false);
-        return this.createFallbackResult(error.message);
+        throw new Error("FewShot classification failed: " + error.message);
       },
       validationResult
     );
@@ -316,7 +379,7 @@ export class FewShotLangChainClassificationMethod implements IClassificationMeth
     try {
       const contextStr = this.formatContext(context);
       
-      // Create example template
+      // Create example template - escape JSON braces for LangChain
       const exampleTemplate = new PromptTemplate({
         inputVariables: ['input', 'output_type', 'confidence', 'reasoning'],
         template: `Input: "{input}"
@@ -458,21 +521,6 @@ Output:`,
     return parts.length > 0 ? `**Context:** ${parts.join(' | ')}` : '';
   }
 
-  private createFallbackResult(errorMessage: string): ClassificationResult {
-    return {
-      type: 'prompt',
-      confidence: 0.0,
-      method: 'fewshot-langchain',
-      reasoning: `FewShot classification failed: ${errorMessage}`,
-      extractedData: new Map(),
-      metadata: new Map([
-        ['error', errorMessage],
-        ['fallback', 'true'],
-        ['method', 'fewshot-langchain'],
-        ['timestamp', new Date().toISOString()],
-      ]),
-    };
-  }
 
   /**
    * Track performance metrics for this classification attempt

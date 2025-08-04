@@ -54,3 +54,20 @@ bun run src/study/classification.ts
 rule-based          : 100.0% success, 1ms avg
 llm-direct          : 100.0% success, 2500ms avg
 ```
+
+## Known Issues
+
+### Method Compatibility
+
+**✅ Working Methods (3/7):**
+- `rule-based`: Fast, no LLM required
+- `llm-based`: Slow but functional, real confidence scores
+- `langchain-structured`: Fast, completes (function calling warnings but works)
+
+**❌ Broken Methods (4/7):**
+- `fewshot-langchain`: **HANGS** (timeouts) - EXCLUDE from testing
+- `chatprompt-langchain`: **HANGS** (timeouts) - EXCLUDE from testing
+- `outputparser-langchain`: **BROKEN** (retry loops, not working)
+- `outputfixing-langchain`: **BROKEN** (retry loops, not working)
+
+**Root Cause:** Models (qwen3:8b, qwen2.5-coder:7b) don't properly support function calling, causing LangChain methods to fail or timeout during validation.

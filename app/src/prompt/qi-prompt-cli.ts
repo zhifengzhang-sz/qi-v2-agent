@@ -134,6 +134,12 @@ class QiPromptCLI {
     }
 
     try {
+      // Handle special CLI commands that should exit immediately
+      if (input === '/exit' || input === '/quit' || input === '/q') {
+        await this.stop();
+        return;
+      }
+
       // Create AgentRequest (same format as full agent)
       const request: AgentRequest = {
         input,
