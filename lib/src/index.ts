@@ -68,8 +68,7 @@ export {
   SecurityRestrictions,
 } from './context/index.js';
 
-// LLM Integration
-export * from './llm/index.js';
+// LLM Integration - removed, use prompt module instead
 
 // Prompt Processing
 export * from './prompt/index.js';

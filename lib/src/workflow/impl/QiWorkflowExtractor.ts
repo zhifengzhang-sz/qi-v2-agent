@@ -4,7 +4,7 @@
  * LangChain structured output workflow extractor adapted for app layer
  */
 
-import { createOllamaStructuredWrapper, type OllamaStructuredWrapper } from '../../llm/index.js';
+// OllamaStructuredWrapper removed - workflow extractor needs reimplementation
 import type {
   IWorkflowExtractor,
   IWorkflowExtractorConfig,
@@ -60,7 +60,7 @@ const WorkflowSpecSchema = {
 };
 
 export class QiWorkflowExtractor implements IWorkflowExtractor {
-  private wrapper: OllamaStructuredWrapper;
+  // private wrapper: OllamaStructuredWrapper; // Removed - broken dependency
   private supportedModes: readonly WorkflowMode[];
   private patternMapping: Map<string, string>;
 
@@ -68,12 +68,8 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
     this.supportedModes = config.supportedModes;
     this.patternMapping = new Map(config.patternMapping);
 
-    // Use working OllamaStructuredWrapper instead of broken ChatOllama
-    this.wrapper = createOllamaStructuredWrapper({
-      model: config.modelId || 'qwen2.5-coder:7b',
-      baseURL: config.baseUrl || 'http://172.18.144.1:11434',
-      temperature: config.temperature || 0.2,
-    });
+    // TODO: Reimplement workflow extraction without OllamaStructuredWrapper
+    // Workflow extraction currently disabled - dependency removed
   }
 
   async extractWorkflow(
@@ -88,9 +84,9 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
       const mode = analysis.detectedMode;
       const pattern = this.getPatternForMode(mode);
 
-      // 2. Generate workflow using OllamaStructuredWrapper
-      const prompt = this.buildExtractionPrompt(input, mode, context);
-      const workflowSpec = await this.wrapper.generateStructured(prompt, WorkflowSpecSchema);
+      // 2. Generate workflow - OllamaStructuredWrapper removed, workflow disabled
+      // TODO: Reimplement workflow extraction without deleted dependencies
+      throw new Error('Workflow extraction disabled - OllamaStructuredWrapper dependency removed');
 
       // 3. Post-process and validate
       const processedSpec = this.postProcessWorkflowSpec(workflowSpec);
