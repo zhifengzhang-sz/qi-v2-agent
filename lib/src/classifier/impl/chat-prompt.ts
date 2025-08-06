@@ -142,7 +142,7 @@ export class ChatPromptLangChainClassificationMethod implements IClassificationM
       const llm = new ChatOpenAI({
         model: this.config.modelId || 'qwen2.5:7b',
         temperature: this.config.temperature || 0.1,
-        maxTokens: this.config.maxTokens || 1000,
+        // Removed maxTokens to avoid truncation - let model use defaults
         streaming: this.config.enableStreaming || false,
         configuration: {
           baseURL: composeOpenAIEndpoint(this.config.baseUrl || 'http://localhost:11434'),

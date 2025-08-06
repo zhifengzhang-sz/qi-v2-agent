@@ -1,0 +1,31 @@
+# LangChain Investigation Configuration
+# For testing and debugging LangChain withStructuredOutput methods
+# Use environment variables for larger datasets: DATASET=./data-ops/datasets/balanced-100x3.json
+
+models:
+  - llama3.2:3b  # Has function calling support
+  - qwen3:0.6b   # No function calling - will test fallbacks
+
+methods:
+  # 2025 LangChain methods to investigate (removed broken langchain-structured)
+  - langchain-json-schema        # JSON Schema method (recommended 2025)
+  - langchain-json-mode          # JSON mode without function calling
+  - langchain-function-calling   # Function calling (requires support)
+  - langchain-ollama-json-schema # ChatOllama with JSON schema
+
+dataPath: "./data-ops/datasets/balanced-10x3.json"
+
+llm:
+  baseUrl: "http://localhost:11434"
+  apiKey: "ollama"
+  temperature: 0.1
+  timeout: 30000  # 30 seconds timeout
+  # Note: maxTokens removed to avoid truncation issues
+
+schema:
+  name: "standard"
+  selectionCriteria:
+    use_case: "production"
+    prioritize_accuracy: true
+    prioritize_speed: false
+    min_accuracy_threshold: 0.85

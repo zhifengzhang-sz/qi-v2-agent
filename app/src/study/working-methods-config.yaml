@@ -1,0 +1,23 @@
+models:
+  - qwen3:0.6b
+  - llama3.2:3b
+
+methods:
+  - rule-based
+  - ollama-native
+  - instructor-ollama
+  - langchain-json-schema        # BROKEN: JSON Schema method  
+  - langchain-function-calling   # BROKEN: Function calling method
+  - langchain-ollama-json-schema # BROKEN: ChatOllama with JSON schema
+  - langchain-ollama-function-calling # ✅ WORKING: Only working LangChain method
+
+dataPath: "./data-ops/datasets/balanced-100x3.json"
+
+llm:
+  baseUrl: "http://localhost:11434"
+  apiKey: "ollama"
+  temperature: 0.1
+  timeout: 30000
+
+schema:
+  name: "standard"

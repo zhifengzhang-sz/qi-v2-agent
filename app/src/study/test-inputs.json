@@ -24,6 +24,31 @@
       "id": 5,
       "input": "Can you explain the difference between functional and object-oriented programming?",
       "expected": "prompt"
+    },
+    {
+      "id": 6,
+      "input": "Hello",
+      "expected": "prompt"
+    },
+    {
+      "id": 7,
+      "input": "Write a function that calculates fibonacci numbers",
+      "expected": "prompt"
+    },
+    {
+      "id": 8,
+      "input": "Analyze the codebase, fix any bugs you find, run all tests, and create a deployment plan",
+      "expected": "workflow"
+    },
+    {
+      "id": 9,
+      "input": "/help",
+      "expected": "command"
+    },
+    {
+      "id": 10,
+      "input": "How do I implement error handling in TypeScript?",
+      "expected": "prompt"
     }
   ]
 }

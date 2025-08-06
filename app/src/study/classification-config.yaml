@@ -1,16 +1,23 @@
 models:
-  - qwen3:8b
+  - qwen3:0.6b
+  - llama3.2:3b
 
 methods:
   - rule-based
+  - ollama-native
+  - instructor-ollama
+  - langchain-json-schema        # 2025: JSON Schema method (recommended)
+  - langchain-json-mode          # 2025: JSON mode without function calling  
+  - langchain-function-calling   # 2025: Function calling method
+  - langchain-ollama-json-schema # 2025: ChatOllama with JSON schema
 
-dataPath: "./datasets/balanced-10x3.json"
+dataPath: "./data-ops/datasets/balanced-10x3.json"
 
 llm:
-  baseUrl: "http://172.18.144.1:11434"
+  baseUrl: "http://localhost:11434"
   apiKey: "ollama"
   temperature: 0.1
   timeout: 30000
 
 schema:
-  name: "minimal"
+  name: "standard"
