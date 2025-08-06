@@ -38,7 +38,13 @@ export class ClassificationExecutor {
         schemaSelectionCriteria: this.config.schema?.selectionCriteria
       });
       
-      const result = await classifier.classify(input);
+      // Add timeout isolation - each method gets max 30s, no more
+      const result = await Promise.race([
+        classifier.classify(input),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Method timeout after 30s`)), 30000)
+        )
+      ]);
       const latency = Date.now() - startTime;
       
       testLogger?.debug('Classification completed successfully', {
@@ -83,17 +89,35 @@ export class ClassificationExecutor {
       methods: this.config.methods
     });
 
-    const results = await Promise.all(
-      this.config.models
-        .flatMap(model => this.config.methods.map(method => ({ model, method })))
-        .flatMap(({ model, method }) => 
-          testInputs.map((input: string) => ({ model, method, input })))
-        .map(testParams => this.executeTest(testParams))
-    );
+    // SEQUENTIAL execution to avoid overwhelming Ollama with concurrent requests
+    const testParams = this.config.models
+      .flatMap(model => this.config.methods.map(method => ({ model, method })))
+      .flatMap(({ model, method }) => 
+        testInputs.map((input: string) => ({ model, method, input })));
+
+    const results: TestResult[] = [];
+    
+    executionLogger?.info('Executing tests sequentially to prevent Ollama overload', {
+      totalTests: testParams.length,
+      executionMode: 'sequential'
+    });
+
+    for (let i = 0; i < testParams.length; i++) {
+      const params = testParams[i];
+      executionLogger?.debug(`Executing test ${i + 1}/${testParams.length}`, {
+        model: params.model,
+        method: params.method,
+        progress: `${Math.round((i / testParams.length) * 100)}%`
+      });
+      
+      const result = await this.executeTest(params);
+      results.push(result);
+    }
     
     executionLogger?.info('Test execution completed', { 
       completedTests: results.length,
-      errorCount: results.filter(r => r.error).length 
+      errorCount: results.filter(r => r.error).length,
+      executionMode: 'sequential'
     });
     
     return results;

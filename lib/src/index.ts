@@ -22,7 +22,6 @@ export {
   createCompleteClassifier,
   createFastClassifier,
   createInputClassifier,
-  createLangChainClassifier,
   createRuleBasedClassifier,
   IClassificationMethod,
   IClassifier,
