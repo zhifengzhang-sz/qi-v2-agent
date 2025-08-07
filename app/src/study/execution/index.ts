@@ -3,6 +3,7 @@
  */
 
 import { createInputClassifier } from '@qi/agent/classifier';
+import { detectProviderFromModel } from '@qi/agent/classifier/shared/provider-map';
 import type { Logger } from '@qi/core';
 import type { StudyConfig, TestParams, TestResult } from '../types/index.js';
 
@@ -27,12 +28,40 @@ export class ClassificationExecutor {
       inputPreview: input.substring(0, 50) + (input.length > 50 ? '...' : '')
     });
     
+    // Auto-detect provider and use appropriate configuration
+    const providerInfo = detectProviderFromModel(model);
+    
+    let finalBaseUrl = this.config.llm.baseUrl;
+    let finalApiKey = this.config.llm.apiKey;
+    
+    // Override with provider-specific settings if detected
+    if (providerInfo) {
+      // Use provider's default baseUrl if not explicitly overridden in config
+      if (this.config.llm.baseUrl === 'http://localhost:11434') {
+        finalBaseUrl = providerInfo.baseUrl;
+      }
+      
+      // Use provider-specific API key from environment if available
+      const envApiKey = process.env[providerInfo.apiKeyEnv];
+      if (envApiKey) {
+        finalApiKey = envApiKey;
+      }
+      
+      testLogger?.debug('Provider detected for model', { 
+        model,
+        provider: providerInfo.providerName,
+        baseUrl: finalBaseUrl,
+        apiKeyEnv: providerInfo.apiKeyEnv,
+        hasApiKey: !!envApiKey
+      });
+    }
+    
     // Create classifier - configuration errors should crash immediately, not be caught
     const classifier = createInputClassifier({ 
       method: method as any, 
       modelId: model, 
-      baseUrl: this.config.llm.baseUrl,
-      apiKey: this.config.llm.apiKey,
+      baseUrl: finalBaseUrl,
+      apiKey: finalApiKey,
       temperature: this.config.llm.temperature,
       schemaName: this.config.schema?.name,
       schemaSelectionCriteria: this.config.schema?.selectionCriteria

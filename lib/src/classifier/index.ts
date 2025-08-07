@@ -22,6 +22,7 @@ import type { ClassificationConfig, ClassificationMethod } from './abstractions/
 import { InputClassifier } from './impl/input-classifier.js';
 import { OllamaNativeClassificationMethod } from './impl/ollama-native.js';
 import { ChatOllamaFunctionCallingClassificationMethod } from './impl/langchain-ollama-function-calling.js';
+import { LangChainFunctionCallingClassificationMethod } from './impl/langchain-function-calling.js';
 import { PythonLangChainMCPClassificationMethod } from './impl/python-langchain-mcp.js';
 import { RuleBasedClassificationMethod } from './impl/rule-based.js';
 
@@ -194,6 +195,7 @@ export function createInputClassifier(
       return new InputClassifier(ollamaNativeMethod);
 
     case 'langchain-ollama-function-calling':
+      // Original working ChatOllama implementation
       const ollamaFunctionCallingMethod = new ChatOllamaFunctionCallingClassificationMethod({
         baseUrl: config.baseUrl,
         modelId: config.modelId,
@@ -203,6 +205,19 @@ export function createInputClassifier(
         schemaSelectionCriteria: config.schemaSelectionCriteria,
       });
       return new InputClassifier(ollamaFunctionCallingMethod);
+      
+    case 'langchain-function-calling':
+      // New provider-agnostic function calling method
+      const functionCallingMethod = new LangChainFunctionCallingClassificationMethod({
+        baseUrl: config.baseUrl,
+        modelId: config.modelId,
+        apiKey: config.apiKey,
+        temperature: config.temperature,
+        timeout: config.timeout,
+        schemaName: config.schemaName,
+        schemaSelectionCriteria: config.schemaSelectionCriteria,
+      });
+      return new InputClassifier(functionCallingMethod);
 
     case 'python-langchain-mcp':
       const pythonMcpMethod = new PythonLangChainMCPClassificationMethod({
@@ -216,7 +231,7 @@ export function createInputClassifier(
       return new InputClassifier(pythonMcpMethod);
       
     default:
-      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, ollama-native, langchain-ollama-function-calling, python-langchain-mcp`);
+      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, ollama-native, langchain-ollama-function-calling, langchain-function-calling, python-langchain-mcp`);
   }
 }
 
@@ -259,7 +274,8 @@ export const createCompleteClassifier = createInputClassifier; // Now points to 
 export { 
   RuleBasedClassificationMethod, 
   OllamaNativeClassificationMethod,
-  ChatOllamaFunctionCallingClassificationMethod,
+  ChatOllamaFunctionCallingClassificationMethod, // Legacy - kept for backward compatibility
+  LangChainFunctionCallingClassificationMethod, // New provider-agnostic implementation
   PythonLangChainMCPClassificationMethod,
   InputClassifier 
 };

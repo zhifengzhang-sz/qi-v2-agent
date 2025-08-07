@@ -1,6 +1,11 @@
 models:
   - qwen3:0.6b
   - llama3.2:3b
+  - qwen/qwen3-8b        # OpenRouter: Qwen3 8B model  
+  - qwen/qwen3-8b:free   # OpenRouter: Free tier (no function calling)
+  - qwen/qwen3-14b       # OpenRouter: Qwen3 14B model
+  - openai/gpt-3.5-turbo # OpenRouter: GPT-3.5 (supports function calling)
+  - anthropic/claude-3-haiku # OpenRouter: Claude 3 Haiku (supports function calling)
 
 methods:
   - rule-based
@@ -8,18 +13,18 @@ methods:
   - instructor-ollama
   - langchain-json-schema        # 2025: JSON Schema method (recommended)
   - langchain-json-mode          # 2025: JSON mode without function calling  
-  - langchain-function-calling   # 2025: Function calling method
-  - langchain-ollama-function-calling # 2025: ChatOllama function calling (only working LangChain method)
+  - langchain-function-calling   # 2025: Provider-agnostic function calling (NEW - supports all providers)
+  - langchain-ollama-function-calling # 2025: Legacy ChatOllama function calling (Ollama only)
   - langchain-ollama-json-schema # 2025: ChatOllama with JSON schema
   - python-langchain-mcp         # 2025: Python LangChain via MCP (improved reliability)
 
 dataPath: "./data-ops/datasets/balanced-10x3-corrected.json"
 
 llm:
-  baseUrl: "http://localhost:11434"
-  apiKey: "ollama"
+  baseUrl: "https://openrouter.ai/api/v1"
+  apiKey: "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"
   temperature: 0.1
-  timeout: 30000
+  timeout: 60000
 
 schema:
-  name: "context-aware"
+  name: "context_aware"
