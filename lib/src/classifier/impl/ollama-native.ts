@@ -11,8 +11,6 @@ import { createClassificationError, type BaseClassificationErrorContext } from '
 import { JsonOutputParser } from '@langchain/core/output_parsers';
 import { 
   globalSchemaRegistry, 
-  selectOptimalClassificationSchema,
-  type SchemaSelectionCriteria,
   type SchemaEntry 
 } from '../schema-registry.js';
 import { detectCommand } from './command-detection-utils.js';
@@ -158,11 +156,16 @@ Respond with valid JSON matching the required schema.`;
       const duration = Date.now() - startTime;
       this.totalLatencyMs += duration;
       this.successfulClassifications++;
+      
+      // Performance tracking removed to prevent global state contamination
+      
       return classificationResult.value;
 
     } catch (error) {
       const duration = Date.now() - startTime;
       this.totalLatencyMs += duration;
+      
+      // Performance tracking removed to prevent global state contamination
       
       throw new Error(
         `Ollama native classification failed: ${error instanceof Error ? error.message : String(error)}`
@@ -231,15 +234,9 @@ Respond with valid JSON matching the required schema.`;
 
   private selectSchema(): Result<SchemaEntry, QiError> {
     try {
-      const criteria: SchemaSelectionCriteria = {
-        use_case: 'production',
-        prioritize_accuracy: true,
-        max_latency_ms: 10000,
-        min_accuracy_threshold: 0.85,
-        model_supports_function_calling: false, // Native Ollama doesn't use function calling
-      };
-
-      return selectOptimalClassificationSchema(criteria);
+      // 🔧 REAL FIX: Don't use adaptive schema selection at all!
+      // Just get the explicitly configured schema by name to ensure deterministic behavior
+      return globalSchemaRegistry.getSchema(this.config.schemaName || 'minimal');
     } catch (error) {
       return failure(createOllamaNativeClassificationError(
         'SCHEMA_SELECTION_FAILED',

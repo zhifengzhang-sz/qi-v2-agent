@@ -66,6 +66,16 @@ export interface StudyResults {
   expectedTypes: string[];
 }
 
+export interface CategoryMetrics {
+  category: string;
+  totalTests: number;
+  correct: number;
+  incorrect: number;
+  errors: number;
+  accuracyRate: number;
+  averageLatency: number;
+}
+
 export interface AccuracyMetrics {
   totalTests: number;
   correct: number;
@@ -73,4 +83,5 @@ export interface AccuracyMetrics {
   errors: number;
   accuracyRate: number;
   averageLatency: number;
+  categoryBreakdown?: CategoryMetrics[];
 }

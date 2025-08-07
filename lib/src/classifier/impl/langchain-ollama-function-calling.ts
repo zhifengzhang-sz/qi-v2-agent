@@ -16,8 +16,6 @@ import { failure, fromAsyncTryCatch, match, success, type ErrorCategory, type Qi
 import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
 import { 
   globalSchemaRegistry, 
-  selectOptimalClassificationSchema,
-  type SchemaSelectionCriteria,
   type SchemaEntry 
 } from '../schema-registry.js';
 import { detectCommand } from './command-detection-utils.js';
@@ -106,23 +104,9 @@ export class ChatOllamaFunctionCallingClassificationMethod implements IClassific
    * Select schema - explicit error propagation
    */
   private selectSchema(): Result<SchemaEntry, QiError> {
-    if (this.config.schemaName) {
-      return globalSchemaRegistry.getSchema(this.config.schemaName);
-    }
-
-    if (this.config.schemaSelectionCriteria) {
-      return selectOptimalClassificationSchema(this.config.schemaSelectionCriteria);
-    }
-
-    // Default to standard schema for function calling
-    const defaultCriteria: SchemaSelectionCriteria = {
-      use_case: 'production',
-      model_supports_function_calling: true, // Function calling requires tool support
-      prioritize_accuracy: true,
-      prioritize_speed: false
-    };
-
-    return selectOptimalClassificationSchema(defaultCriteria);
+    // 🔧 FIX: Always use explicit schema name, no adaptive selection
+    const schemaName = this.config.schemaName || 'standard'; // Default for function calling method
+    return globalSchemaRegistry.getSchema(schemaName);
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {

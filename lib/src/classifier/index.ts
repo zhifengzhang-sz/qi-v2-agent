@@ -21,19 +21,7 @@ export type {
 import type { ClassificationConfig, ClassificationMethod } from './abstractions/index.js';
 import { InputClassifier } from './impl/input-classifier.js';
 import { OllamaNativeClassificationMethod } from './impl/ollama-native.js';
-import { InstructorOllamaClassificationMethod } from './impl/instructor-ollama.js';
-import { LangChainJsonSchemaClassificationMethod } from './impl/langchain-json-schema.js';
-import { LangChainFunctionCallingClassificationMethod } from './impl/langchain-function-calling.js';
-import { LangChainJsonModeClassificationMethod } from './impl/langchain-json-mode.js';
-import { LangChainOllamaJsonSchemaClassificationMethod } from './impl/langchain-ollama-json-schema.js';
 import { ChatOllamaFunctionCallingClassificationMethod } from './impl/langchain-ollama-function-calling.js';
-// Import types only to avoid runtime issues
-import type { Mode } from '@instructor-ai/instructor';
-import { FewShotLangChainClassificationMethod } from './impl/fewshot.js';
-import { OutputParserLangChainClassificationMethod } from './impl/output-parser.js';
-import { ChatPromptLangChainClassificationMethod } from './impl/chat-prompt.js';
-import { OutputFixingLangChainClassificationMethod } from './impl/output-fixing.js';
-import { LLMClassificationMethod } from './impl/llm-direct.js';
 import { RuleBasedClassificationMethod } from './impl/rule-based.js';
 
 /**
@@ -126,297 +114,27 @@ export function createOllamaNativeClassifier(
   return new OllamaNativeClassificationMethod(defaultConfig);
 }
 
-/**
- * Create Instructor-based Ollama classifier with Zod validation (ENHANCED VALIDATION)
- * 
- * Uses Instructor JavaScript library with Zod schemas for structured output.
- * Provides Pydantic-like validation and automatic retries for TypeScript.
- * Alternative approach with enhanced schema validation and error handling.
- * Expected: 92%+ accuracy, automatic retries, structured validation.
- * 
- * Usage:
- * ```typescript
- * const method = createInstructorOllamaClassifier({
- *   baseUrl: 'http://localhost:11434/v1',
- *   modelId: 'llama3.2:3b'
- * })
- * const classifier = new InputClassifier(method)
- * const result = await classifier.classify('hello world')
- * ```
- */
-export function createInstructorOllamaClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxRetries: number;
-    timeout: number;
-    mode: Mode;
-  }> = {}
-): InstructorOllamaClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1', // OpenAI-compatible Ollama endpoint
-    modelId: 'llama3.2:3b',
-    temperature: 0.1,
-    maxRetries: 2,
-    timeout: 30.0,
-    mode: 'JSON' as Mode,
-    ...config,
-  };
-  return new InstructorOllamaClassificationMethod(defaultConfig);
-}
-
-
-/**
- * Create FewShot LangChain classifier (example-driven learning)
- */
-export function createFewShotLangChainClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-  }> = {},
-  customExamples?: import('./impl/fewshot.js').ClassificationExample[]
-): FewShotLangChainClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'qwen2.5:7b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new FewShotLangChainClassificationMethod(defaultConfig, customExamples);
-}
-
-/**
- * Create OutputParser LangChain classifier (legacy model support)
- */
-export function createOutputParserLangChainClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-    maxRetries: number;
-    temperatureIncrement: number;
-  }> = {}
-): OutputParserLangChainClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'qwen2.5:7b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new OutputParserLangChainClassificationMethod(defaultConfig);
-}
-
-/**
- * Create ChatPrompt LangChain classifier (conversational context)
- */
-export function createChatPromptLangChainClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-    systemPrompt: string;
-    userExperienceLevel: 'beginner' | 'intermediate' | 'expert';
-    enableStreaming: boolean;
-  }> = {}
-): ChatPromptLangChainClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'qwen2.5:7b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new ChatPromptLangChainClassificationMethod(defaultConfig);
-}
-
-/**
- * Create OutputFixing LangChain classifier (auto-correction)
- */
-export function createOutputFixingLangChainClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-    maxRetries: number;
-    temperatureIncrement: number;
-    maxFixingAttempts: number;
-    enableComparison: boolean;
-  }> = {}
-): OutputFixingLangChainClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'qwen2.5:7b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new OutputFixingLangChainClassificationMethod(defaultConfig);
-}
-
-/**
- * Create LangChain JSON Schema classifier (RECOMMENDED 2025 METHOD)
- * 
- * Uses ChatOpenAI with explicit JSON Schema method via withStructuredOutput.
- * Best reliability with Ollama according to 2025 LangChain updates.
- * NO fallbacks - explicit errors only.
- */
-export function createLangChainJsonSchemaClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-  }> = {}
-): LangChainJsonSchemaClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'llama3.2:3b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new LangChainJsonSchemaClassificationMethod(defaultConfig);
-}
-
-/**
- * Create LangChain Function Calling classifier
- * 
- * Uses ChatOpenAI with explicit Function Calling method via withStructuredOutput.
- * Requires models with function calling support.
- * NO fallbacks - explicit errors only.
- */
-export function createLangChainFunctionCallingClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-  }> = {}
-): LangChainFunctionCallingClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'llama3.2:3b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new LangChainFunctionCallingClassificationMethod(defaultConfig);
-}
-
-/**
- * Create LangChain JSON Mode classifier
- * 
- * Uses ChatOpenAI with explicit JSON Mode via withStructuredOutput.
- * Forces model to output valid JSON without function calling.
- * NO fallbacks - explicit errors only.
- */
-export function createLangChainJsonModeClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    apiKey: string;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-  }> = {}
-): LangChainJsonModeClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434/v1',
-    modelId: 'llama3.2:3b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    apiKey: 'ollama',
-    ...config,
-  };
-  return new LangChainJsonModeClassificationMethod(defaultConfig);
-}
-
-/**
- * Create LangChain ChatOllama JSON Schema classifier
- * 
- * Uses @langchain/ollama ChatOllama with explicit JSON Schema method.
- * Leverages 2025 improvements in @langchain/ollama@0.2.0.
- * DISTINCT from ollama-native (which uses direct Ollama API calls).
- * NO fallbacks - explicit errors only.
- */
-export function createLangChainOllamaJsonSchemaClassifier(
-  config: Partial<{
-    baseUrl: string;
-    modelId: string;
-    temperature: number;
-    maxTokens: number;
-    schemaName: string;
-    schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
-  }> = {}
-): LangChainOllamaJsonSchemaClassificationMethod {
-  const defaultConfig = {
-    baseUrl: 'http://localhost:11434',
-    modelId: 'llama3.2:3b',
-    temperature: 0.1,
-    maxTokens: 1000,
-    ...config,
-  };
-  return new LangChainOllamaJsonSchemaClassificationMethod(defaultConfig);
-}
+// All broken LangChain methods removed - keeping only working implementations
 
 /**
  * Create an input classifier with configurable method (RECOMMENDED)
  * 
- * Follows the same pattern as prompt module's createPromptHandler().
- * Provides simple API that hides qicore and LangChain complexity.
+ * Only includes methods that actually work - no broken implementations.
+ * Provides simple API that hides qicore complexity.
  * 
  * Usage:
  * ```typescript
- * // Default (LangChain-based - best accuracy)
+ * // Default (ollama-native - best reliability)
  * const classifier = createInputClassifier()
  * 
  * // Specify method explicitly
- * const classifier = createInputClassifier({ method: 'rule-based' })
- * const classifier = createInputClassifier({ method: 'llm-based' })
- * const classifier = createInputClassifier({ method: 'langchain-json-schema' })
- * 
- * // New 2025 LangChain withStructuredOutput methods
- * const classifier = createInputClassifier({ method: 'langchain-json-schema' }) // Recommended
- * const classifier = createInputClassifier({ method: 'langchain-function-calling' })
- * const classifier = createInputClassifier({ method: 'langchain-json-mode' })
- * const classifier = createInputClassifier({ method: 'langchain-ollama-json-schema' })
+ * const classifier = createInputClassifier({ method: 'rule-based' }) // Fast, no LLM needed
+ * const classifier = createInputClassifier({ method: 'ollama-native' }) // Direct API, reliable
+ * const classifier = createInputClassifier({ method: 'langchain-ollama-function-calling' }) // Only working LangChain method
  * 
  * // With method-specific config
  * const classifier = createInputClassifier({
- *   method: 'langchain-json-schema',
+ *   method: 'ollama-native',
  *   baseUrl: 'http://localhost:11434',
  *   modelId: 'llama3.2:3b'
  * })
@@ -448,7 +166,7 @@ export function createInputClassifier(
     fallbackMethod: ClassificationMethod;
   }> = {}
 ): InputClassifier {
-  const method = config.method || 'langchain-json-schema'; // Default to 2025 recommended method
+  const method = config.method || 'ollama-native'; // Default to reliable native method
   
   switch (method) {
     case 'rule-based':
@@ -463,7 +181,6 @@ export function createInputClassifier(
         ]),
       });
       return new InputClassifier(ruleMethod);
-      
 
     case 'ollama-native':
       const ollamaNativeMethod = createOllamaNativeClassifier({
@@ -473,86 +190,6 @@ export function createInputClassifier(
         schemaName: config.schemaName,
       });
       return new InputClassifier(ollamaNativeMethod);
-
-    case 'instructor-ollama':
-      const instructorMethod = createInstructorOllamaClassifier({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-      });
-      return new InputClassifier(instructorMethod);
-      
-    case 'llm-based':
-      const llmMethod = new LLMClassificationMethod({
-        baseUrl: config.baseUrl || 'http://localhost:11434',
-        modelId: config.modelId,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-      });
-      return new InputClassifier(llmMethod);
-      
-    case 'fewshot-langchain':
-      const fewshotMethod = createFewShotLangChainClassifier(config);
-      return new InputClassifier(fewshotMethod);
-      
-    case 'chatprompt-langchain':
-      const chatpromptMethod = createChatPromptLangChainClassifier(config);
-      return new InputClassifier(chatpromptMethod);
-      
-    case 'outputparser-langchain':
-      const outputparserMethod = createOutputParserLangChainClassifier(config);
-      return new InputClassifier(outputparserMethod);
-      
-    case 'outputfixing-langchain':
-      const outputfixingMethod = createOutputFixingLangChainClassifier(config);
-      return new InputClassifier(outputfixingMethod);
-
-    case 'langchain-json-schema':
-      const jsonSchemaMethod = new LangChainJsonSchemaClassificationMethod({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        apiKey: config.apiKey,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(jsonSchemaMethod);
-
-    case 'langchain-function-calling':
-      const functionCallingMethod = new LangChainFunctionCallingClassificationMethod({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        apiKey: config.apiKey,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(functionCallingMethod);
-
-    case 'langchain-json-mode':
-      const jsonModeMethod = new LangChainJsonModeClassificationMethod({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        apiKey: config.apiKey,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(jsonModeMethod);
-
-    case 'langchain-ollama-json-schema':
-      const ollamaJsonSchemaMethod = new LangChainOllamaJsonSchemaClassificationMethod({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(ollamaJsonSchemaMethod);
 
     case 'langchain-ollama-function-calling':
       const ollamaFunctionCallingMethod = new ChatOllamaFunctionCallingClassificationMethod({
@@ -566,7 +203,7 @@ export function createInputClassifier(
       return new InputClassifier(ollamaFunctionCallingMethod);
       
     default:
-      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, llm-based, ollama-native, instructor-ollama, fewshot-langchain, chatprompt-langchain, outputparser-langchain, outputfixing-langchain, langchain-json-schema, langchain-function-calling, langchain-json-mode, langchain-ollama-json-schema, langchain-ollama-function-calling`);
+      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, ollama-native, langchain-ollama-function-calling`);
   }
 }
 
@@ -594,11 +231,10 @@ export function createAccurateClassifier(
     baseUrl: string;
     modelId: string;
     temperature: number;
-    maxTokens: number;
-    apiKey: string;
+    schemaName: string;
   }> = {}
 ): InputClassifier {
-  return createInputClassifier({ method: 'langchain-json-schema', ...config });
+  return createInputClassifier({ method: 'ollama-native', ...config });
 }
 
 
@@ -606,20 +242,11 @@ export function createAccurateClassifier(
 export const createBasicClassifier = createRuleBasedClassifier;
 export const createCompleteClassifier = createInputClassifier; // Now points to main factory
 
-// Export implementation classes for demos and testing  
+// Export only working implementation classes
 export { 
   RuleBasedClassificationMethod, 
   OllamaNativeClassificationMethod,
-  InstructorOllamaClassificationMethod,
-  LangChainJsonSchemaClassificationMethod,
-  LangChainFunctionCallingClassificationMethod,
-  LangChainJsonModeClassificationMethod,
-  LangChainOllamaJsonSchemaClassificationMethod,
-  FewShotLangChainClassificationMethod,
-  OutputParserLangChainClassificationMethod,
-  ChatPromptLangChainClassificationMethod,
-  OutputFixingLangChainClassificationMethod,
-  LLMClassificationMethod, 
+  ChatOllamaFunctionCallingClassificationMethod,
   InputClassifier 
 };
 
