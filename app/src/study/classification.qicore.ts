@@ -6,6 +6,7 @@
 
 import { ConfigBuilder, createLogger, type ValidatedConfig } from '@qi/core';
 import { flatMap, match, success, type Result, type QiError } from '@qi/base';
+import { globalSchemaRegistry } from '@qi/agent/classifier';
 import { reportResults, runStudy, type StudyConfig } from './classification.js';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,6 +72,25 @@ const __dirname = dirname(__filename);
           // If SCHEMA_NAME was set, use it as schema name
           if (config.schema_name) {
             config.schema = { name: config.schema_name };
+          }
+          
+          // Validate schema name exists BEFORE running any tests
+          if (config.schema?.name) {
+            const schemaValidation = globalSchemaRegistry.getSchema(config.schema.name);
+            
+            match(
+              (schema) => {
+                studyLogger.info(`✅ Schema '${config.schema.name}' validated successfully`);
+              },
+              (error) => {
+                studyLogger.error(`❌ INVALID SCHEMA NAME: '${config.schema.name}'`);
+                studyLogger.error(`Available schemas: ${globalSchemaRegistry.listSchemas().map(s => s.metadata.name).join(', ')}`);
+                studyLogger.error(`❌ Error: ${error.message}`);
+                studyLogger.error('❌ CONFIGURATION ERROR - EXITING');
+                process.exit(1);
+              },
+              schemaValidation
+            );
           }
           
           studyLogger.info('Configuration loaded and validated successfully', {

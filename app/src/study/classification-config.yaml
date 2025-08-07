@@ -11,7 +11,7 @@ methods:
   - langchain-function-calling   # 2025: Function calling method
   - langchain-ollama-json-schema # 2025: ChatOllama with JSON schema
 
-dataPath: "./data-ops/datasets/balanced-10x3.json"
+dataPath: "./data-ops/datasets/balanced-10x3-corrected.json"
 
 llm:
   baseUrl: "http://localhost:11434"
@@ -20,4 +20,4 @@ llm:
   timeout: 30000
 
 schema:
-  name: "standard"
+  name: "context-aware"

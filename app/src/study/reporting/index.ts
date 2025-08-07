@@ -79,8 +79,30 @@ export class ResultsReporter {
   reportResults(results: TestResult[], expectedTypes: string[], config?: StudyConfig): void {
     const metrics = MetricsCalculator.calculate(results, expectedTypes);
     
-    console.log('\n📊 CLASSIFICATION RESULTS');
-    console.log('========================');
+    // Executive Summary
+    console.log('\n🎯 EXECUTIVE SUMMARY');
+    console.log('==================');
+    console.log(`✅ Overall Accuracy: ${metrics.accuracyRate.toFixed(1)}% (${metrics.correct}/${metrics.totalTests})`);
+    console.log(`❌ Error Rate: ${(metrics.errors/metrics.totalTests*100).toFixed(1)}% (${metrics.errors} errors)`);
+    console.log(`⚡ Average Response: ${metrics.averageLatency}ms`);
+    if (config?.schema?.name) {
+      console.log(`📋 Schema: ${config.schema.name}`);
+    }
+    if (config?.models && config?.methods) {
+      console.log(`🔧 Setup: ${config.models.join(', ')} + ${config.methods.join(', ')}`);
+    }
+    
+    // Category Performance Summary
+    if (metrics.categoryBreakdown && metrics.categoryBreakdown.length > 0) {
+      console.log('\n📊 CATEGORY PERFORMANCE');
+      console.log('=====================');
+      metrics.categoryBreakdown.forEach(cat => {
+        console.log(`${cat.category.toUpperCase()}: ${cat.accuracyRate.toFixed(1)}% accuracy (${cat.correct}/${cat.totalTests} total: ${cat.correct} correct, ${cat.incorrect} wrong, ${cat.errors} errors)`);
+      });
+    }
+    
+    console.log('\n📊 DETAILED RESULTS');
+    console.log('==================');
     
     if (config) {
       console.log(`📁 Dataset: ${config.dataPath}`);
@@ -99,6 +121,22 @@ export class ResultsReporter {
     console.log(`Incorrect: ${metrics.incorrect} (${(metrics.incorrect/metrics.totalTests*100).toFixed(1)}%)`);
     console.log(`Errors: ${metrics.errors} (${(metrics.errors/metrics.totalTests*100).toFixed(1)}%)`);
     
+    // Show error summary if there are errors
+    if (metrics.errors > 0) {
+      const errorTypes: Record<string, number> = {};
+      results.filter(r => r.error).forEach(r => {
+        const errorType = r.error || 'Unknown error';
+        errorTypes[errorType] = (errorTypes[errorType] || 0) + 1;
+      });
+      
+      console.log('\n❌ ERROR BREAKDOWN:');
+      Object.entries(errorTypes)
+        .sort(([,a], [,b]) => b - a) // Sort by frequency
+        .forEach(([error, count]) => {
+          console.log(`   ${count}x: ${error}`);
+        });
+    }
+    
     // Display per-category breakdown
     if (metrics.categoryBreakdown && metrics.categoryBreakdown.length > 0) {
       console.log('\n📋 PER-CATEGORY BREAKDOWN');
@@ -110,19 +148,17 @@ export class ResultsReporter {
     
     console.log('\nDetailed Results:');
     results.forEach((r, i) => {
-      const confidence = (r.result.confidence * 100).toFixed(1);
       const expectedType = expectedTypes[i];
-      const isCorrect = !r.error && r.result.type === expectedType;
-      const status = r.error ? 'ERROR' : isCorrect ? 'CORRECT' : 'WRONG';
-      const schemaUsed = r.result.metadata?.get('schema_used') || 'unknown';
-      // Debug metadata
-      if (i === 1) { // Only log for second result to avoid spam
-        console.log('DEBUG - Metadata type:', typeof r.result.metadata);
-        console.log('DEBUG - Metadata is Map:', r.result.metadata instanceof Map);
-        console.log('DEBUG - Metadata keys:', r.result.metadata ? Array.from(r.result.metadata.keys()) : 'no metadata');
-        console.log('DEBUG - Full metadata:', r.result.metadata);
+      
+      if (r.error) {
+        console.log(`${i+1}. "${r.input.substring(0, 30)}..." → [ERROR: ${r.error}] (expected: ${expectedType})`);
+      } else {
+        const confidence = (r.result.confidence * 100).toFixed(1);
+        const isCorrect = r.result.type === expectedType;
+        const status = isCorrect ? 'CORRECT' : 'WRONG';
+        const schemaUsed = r.result.metadata?.get('schema_used') || 'unknown';
+        console.log(`${i+1}. "${r.input.substring(0, 30)}..." → ${r.result.type} (${confidence}%) [${status}] (expected: ${expectedType}) [schema: ${schemaUsed}]`);
       }
-      console.log(`${i+1}. "${r.input.substring(0, 30)}..." → ${r.result.type} (${confidence}%) [${status}] (expected: ${expectedType}) [schema: ${schemaUsed}]`);
     });
     
     console.log(`\nAverage latency: ${metrics.averageLatency}ms`);

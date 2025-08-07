@@ -285,6 +285,52 @@ export class ClassificationSchemaRegistry {
         last_updated: currentTimestamp
       }
     });
+
+    // Context-Aware Schema - addresses workflow detection issues with conversation context analysis
+    const contextAwareSchema = z.object({
+      type: z.enum(['prompt', 'workflow'])
+        .describe('prompt: direct question/request, workflow: requires multiple coordinated steps'),
+      confidence: z.number()
+        .min(0)
+        .max(1)
+        .describe('Confidence score from 0.0 to 1.0'),
+      reasoning: z.string()
+        .max(150)
+        .describe('Brief explanation of classification decision'),
+      conversation_context: z.enum(['greeting', 'question', 'follow_up', 'task_request', 'multi_step'])
+        .describe('Context type: greeting/question/follow_up always prompt, task_request/multi_step may be workflow'),
+      step_count: z.number()
+        .min(1)
+        .describe('Estimated number of steps needed (1=prompt, 2+=workflow)'),
+      requires_coordination: z.boolean()
+        .describe('Does this require coordinating multiple tools/services?')
+    });
+
+    this.schemas.set('context_aware', {
+      schema: contextAwareSchema,
+      metadata: {
+        name: 'context_aware',
+        complexity: 'detailed',
+        description: 'Context-aware schema focusing on conversation context and task complexity analysis',
+        version: '1.0.0',
+        recommended_for: ['workflow-detection-improvement', 'research', 'conversational-ai'],
+        performance_profile: {
+          // No measured performance yet - will be populated through real usage
+          total_uses: 0,
+          successful_classifications: 0,
+          total_latency_ms: 0,
+          successful_parsing_attempts: 0,
+          total_parsing_attempts: 0,
+          
+          // Estimated performance based on research findings
+          baseline_accuracy_estimate: 0.75, // Target: improve workflow detection from 30% to 60%+
+          baseline_latency_estimate_ms: 450, // Slightly higher due to additional context analysis
+          baseline_parsing_reliability_estimate: 0.92 // Good structure but more complex fields
+        },
+        created_at: currentTimestamp,
+        last_updated: currentTimestamp
+      }
+    });
   }
 
   /**
