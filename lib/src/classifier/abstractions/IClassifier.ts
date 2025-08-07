@@ -8,7 +8,7 @@
 /**
  * Classification method types
  */
-export type ClassificationMethod = 'rule-based' | 'llm-based' | 'ollama-native' | 'instructor-ollama' | 'fewshot-langchain' | 'chatprompt-langchain' | 'outputparser-langchain' | 'outputfixing-langchain' | 'langchain-json-schema' | 'langchain-function-calling' | 'langchain-json-mode' | 'langchain-ollama-json-schema' | 'hybrid' | 'ensemble';
+export type ClassificationMethod = 'rule-based' | 'llm-based' | 'ollama-native' | 'instructor-ollama' | 'fewshot-langchain' | 'chatprompt-langchain' | 'outputparser-langchain' | 'outputfixing-langchain' | 'langchain-json-schema' | 'langchain-function-calling' | 'langchain-ollama-function-calling' | 'langchain-json-mode' | 'langchain-ollama-json-schema' | 'python-langchain-mcp' | 'hybrid' | 'ensemble';
 
 /**
  * Three input types for classification

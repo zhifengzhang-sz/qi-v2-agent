@@ -9,7 +9,9 @@ methods:
   - langchain-json-schema        # 2025: JSON Schema method (recommended)
   - langchain-json-mode          # 2025: JSON mode without function calling  
   - langchain-function-calling   # 2025: Function calling method
+  - langchain-ollama-function-calling # 2025: ChatOllama function calling (only working LangChain method)
   - langchain-ollama-json-schema # 2025: ChatOllama with JSON schema
+  - python-langchain-mcp         # 2025: Python LangChain via MCP (improved reliability)
 
 dataPath: "./data-ops/datasets/balanced-10x3-corrected.json"
 
