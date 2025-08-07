@@ -215,7 +215,11 @@ Respond with valid JSON matching the required schema.`;
         const prompt = promptResult.value;
 
         // Create JSON schema for Ollama format parameter
-        const jsonSchema = this.createOllamaJsonSchema();
+        const jsonSchemaResult = this.createOllamaJsonSchema();
+        if (jsonSchemaResult.tag === 'failure') {
+          throw new Error(`Schema creation failed: ${jsonSchemaResult.error.message}`);
+        }
+        const jsonSchema = jsonSchemaResult.value;
 
         // Call Ollama native API
         const ollamaResponse = await this.callOllamaNativeAPI(prompt, jsonSchema);
@@ -267,34 +271,19 @@ Respond with valid JSON matching the required schema.`;
     }
   }
 
-  private createOllamaJsonSchema(): object {
+  private createOllamaJsonSchema(): Result<object, QiError> {
     if (!this.selectedSchema) {
-      // Fallback to minimal schema
-      return {
-        type: 'object',
-        properties: {
-          type: {
-            type: 'string',
-            enum: ['prompt', 'workflow'],
-            description: 'Classification: prompt (single-step) or workflow (multi-step)'
-          },
-          confidence: {
-            type: 'number',
-            minimum: 0,
-            maximum: 1,
-            description: 'Confidence score from 0.0 to 1.0'
-          }
-        },
-        required: ['type', 'confidence']
-      };
+      return failure(createOllamaNativeClassificationError(
+        'NO_SCHEMA_SELECTED',
+        'Schema must be explicitly selected - no default schema available',
+        'SYSTEM'
+      ));
     }
 
-    // Convert Zod schema to JSON Schema for Ollama
-    // This is a simplified conversion - for production, use zod-to-json-schema
     const schemaName = this.selectedSchema.metadata.name;
     
     if (schemaName === 'minimal') {
-      return {
+      return success({
         type: 'object',
         properties: {
           type: {
@@ -310,10 +299,9 @@ Respond with valid JSON matching the required schema.`;
           }
         },
         required: ['type', 'confidence']
-      };
-    } else {
-      // Standard schema includes reasoning
-      return {
+      });
+    } else if (schemaName === 'standard') {
+      return success({
         type: 'object',
         properties: {
           type: {
@@ -333,7 +321,53 @@ Respond with valid JSON matching the required schema.`;
           }
         },
         required: ['type', 'confidence', 'reasoning']
-      };
+      });
+    } else if (schemaName === 'context_aware') {
+      return success({
+        type: 'object',
+        properties: {
+          type: {
+            type: 'string',
+            enum: ['prompt', 'workflow'],
+            description: 'prompt: direct question/request, workflow: requires multiple coordinated steps'
+          },
+          confidence: {
+            type: 'number',
+            minimum: 0,
+            maximum: 1,
+            description: 'Confidence score from 0.0 to 1.0'
+          },
+          reasoning: {
+            type: 'string',
+            description: 'Brief explanation of classification decision'
+          },
+          conversation_context: {
+            type: 'string',
+            enum: ['greeting', 'question', 'follow_up', 'task_request', 'multi_step'],
+            description: 'Context type: greeting/question/follow_up always prompt, task_request/multi_step may be workflow'
+          },
+          step_count: {
+            type: 'integer',
+            minimum: 1,
+            description: 'Estimated number of steps needed (1=prompt, 2+=workflow)'
+          },
+          requires_coordination: {
+            type: 'boolean',
+            description: 'Does this require coordinating multiple tools/services?'
+          }
+        },
+        required: ['type', 'confidence', 'reasoning', 'conversation_context', 'step_count', 'requires_coordination']
+      });
+    } else {
+      return failure(createOllamaNativeClassificationError(
+        'UNSUPPORTED_SCHEMA',
+        `Schema '${schemaName}' is not supported by ollama-native method. Supported schemas: minimal, standard, context_aware`,
+        'SYSTEM',
+        { 
+          requested_schema: schemaName,
+          supported_schemas: ['minimal', 'standard', 'context_aware']
+        }
+      ));
     }
   }
 

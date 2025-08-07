@@ -101,12 +101,18 @@ export class ChatOllamaFunctionCallingClassificationMethod implements IClassific
   }
 
   /**
-   * Select schema - explicit error propagation
+   * Select schema - explicit error propagation, NO FALLBACKS
    */
   private selectSchema(): Result<SchemaEntry, QiError> {
-    // 🔧 FIX: Always use explicit schema name, no adaptive selection
-    const schemaName = this.config.schemaName || 'standard'; // Default for function calling method
-    return globalSchemaRegistry.getSchema(schemaName);
+    if (!this.config.schemaName) {
+      return failure(createChatOllamaFunctionCallingError(
+        'NO_SCHEMA_SPECIFIED',
+        'Schema name must be explicitly provided - no default schema allowed',
+        'VALIDATION',
+        { operation: 'selectSchema' }
+      ));
+    }
+    return globalSchemaRegistry.getSchema(this.config.schemaName);
   }
 
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {

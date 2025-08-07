@@ -21,22 +21,24 @@ export class ClassificationExecutor {
       test: { model, method, inputLength: input.length }
     });
     
+    testLogger?.debug('Starting classification test', { 
+      model, 
+      method, 
+      inputPreview: input.substring(0, 50) + (input.length > 50 ? '...' : '')
+    });
+    
+    // Create classifier - configuration errors should crash immediately, not be caught
+    const classifier = createInputClassifier({ 
+      method: method as any, 
+      modelId: model, 
+      baseUrl: this.config.llm.baseUrl,
+      apiKey: this.config.llm.apiKey,
+      temperature: this.config.llm.temperature,
+      schemaName: this.config.schema?.name,
+      schemaSelectionCriteria: this.config.schema?.selectionCriteria
+    });
+    
     try {
-      testLogger?.debug('Starting classification test', { 
-        model, 
-        method, 
-        inputPreview: input.substring(0, 50) + (input.length > 50 ? '...' : '')
-      });
-      
-      const classifier = createInputClassifier({ 
-        method: method as any, 
-        modelId: model, 
-        baseUrl: this.config.llm.baseUrl,
-        apiKey: this.config.llm.apiKey,
-        temperature: this.config.llm.temperature,
-        schemaName: this.config.schema?.name,
-        schemaSelectionCriteria: this.config.schema?.selectionCriteria
-      });
       
       // Add timeout isolation - each method gets max 30s, no more
       const result = await Promise.race([
