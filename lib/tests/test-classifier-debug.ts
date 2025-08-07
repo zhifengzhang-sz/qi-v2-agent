@@ -5,7 +5,7 @@
  */
 
 import { createStateManager } from '@qi/agent/state/index.js';
-import { MultiMethodInputClassifier } from '@qi/agent/classifier/impl/multi-method-input-classifier.js';
+import { createInputClassifier } from '@qi/lib/classifier/index.js';
 
 async function testClassifier() {
   console.log('🧪 Testing classifier with debug output...\n');
@@ -27,9 +27,8 @@ async function testClassifier() {
 
     // Create classifier with role-specific config
     console.log('🔍 Creating classifier...');
-    const classifier = new MultiMethodInputClassifier({
-      defaultMethod: 'hybrid',
-      fallbackMethod: 'rule-based',
+    const classifier = createInputClassifier({
+      method: 'rule-based',
       confidenceThreshold: 0.8,
       commandPrefix: '/',
       promptIndicators: [
@@ -39,19 +38,7 @@ async function testClassifier() {
       workflowIndicators: [
         'fix', 'refactor', 'implement', 'debug', 'analyze', 
         'build', 'design', 'test', 'deploy'
-      ],
-      complexityThresholds: new Map([
-        ['command', 1.0],
-        ['prompt', 0.8],
-        ['workflow', 0.7]
-      ]),
-      llmConfig: {
-        provider: classifierConfig.provider,
-        model: classifierConfig.model,
-        baseURL: 'http://172.18.144.1:11434',
-        temperature: classifierConfig.temperature || 0.1,
-        maxTokens: classifierConfig.maxTokens || 200
-      }
+      ]
     });
 
     // Test input that should trigger LLM classification

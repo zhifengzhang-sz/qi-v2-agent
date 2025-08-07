@@ -11,7 +11,7 @@ async function testClassifierMethods() {
 
   try {
     // Test rule-based
-    const { RuleBasedClassificationMethod } = await import('./src/classifier/impl/rule-based-classification-method.js');
+    const { RuleBasedClassificationMethod } = await import('@qi/lib/classifier/impl/rule-based.js');
     const ruleClassifier = new RuleBasedClassificationMethod({
       commandPrefix: '/',
       promptIndicators: ['hi', 'hello', 'what', 'write'],
@@ -29,17 +29,17 @@ async function testClassifierMethods() {
     const ruleResult = await ruleClassifier.classify(testInput);
     console.log(`Rule-based: ${ruleResult.type} (${ruleResult.confidence})`);
 
-    // Test LLM-based  
-    const { LLMClassificationMethod } = await import('./src/classifier/impl/llm-classification-method.js');
-    const llmClassifier = new LLMClassificationMethod({
+    // Test LangChain function calling method  
+    const { LangChainFunctionCallingClassificationMethod } = await import('@qi/lib/classifier/impl/langchain-function-calling.js');
+    const llmClassifier = new LangChainFunctionCallingClassificationMethod({
       baseUrl: 'http://172.18.144.1:11434',
       modelId: 'qwen3:14b',
       temperature: 0.1,
-      maxTokens: 200
+      schemaName: 'minimal'
     });
 
     const llmResult = await llmClassifier.classify(testInput);
-    console.log(`LLM-based: ${llmResult.type} (${llmResult.confidence})`);
+    console.log(`LangChain function calling: ${llmResult.type} (${llmResult.confidence})`);
 
     // Simulate hybrid
     const useRule = ruleResult.confidence >= 0.8;

@@ -21,9 +21,7 @@ export type {
 import type { ClassificationConfig, ClassificationMethod } from './abstractions/index.js';
 import { InputClassifier } from './impl/input-classifier.js';
 import { OllamaNativeClassificationMethod } from './impl/ollama-native.js';
-import { ChatOllamaFunctionCallingClassificationMethod } from './impl/langchain-ollama-function-calling.js';
 import { LangChainFunctionCallingClassificationMethod } from './impl/langchain-function-calling.js';
-import { PythonLangChainMCPClassificationMethod } from './impl/python-langchain-mcp.js';
 import { RuleBasedClassificationMethod } from './impl/rule-based.js';
 
 /**
@@ -132,7 +130,7 @@ export function createOllamaNativeClassifier(
  * // Specify method explicitly
  * const classifier = createInputClassifier({ method: 'rule-based' }) // Fast, no LLM needed
  * const classifier = createInputClassifier({ method: 'ollama-native' }) // Direct API, reliable
- * const classifier = createInputClassifier({ method: 'langchain-ollama-function-calling' }) // Only working LangChain method
+ * const classifier = createInputClassifier({ method: 'langchain-function-calling' }) // Provider-agnostic LangChain method
  * 
  * // With method-specific config
  * const classifier = createInputClassifier({
@@ -158,6 +156,9 @@ export function createInputClassifier(
     // Schema selection options (for LangChain methods)
     schemaName: string;
     schemaSelectionCriteria: import('./schema-registry.js').SchemaSelectionCriteria;
+    
+    // LangChain specific config
+    enableProviderDebug: boolean;
     
     // Rule-based specific config  
     commandPrefix: string;
@@ -194,20 +195,8 @@ export function createInputClassifier(
       });
       return new InputClassifier(ollamaNativeMethod);
 
-    case 'langchain-ollama-function-calling':
-      // Original working ChatOllama implementation
-      const ollamaFunctionCallingMethod = new ChatOllamaFunctionCallingClassificationMethod({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        timeout: config.timeout,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(ollamaFunctionCallingMethod);
-      
     case 'langchain-function-calling':
-      // New provider-agnostic function calling method
+      // Provider-agnostic function calling method (supports Ollama, OpenRouter, OpenAI, etc.)
       const functionCallingMethod = new LangChainFunctionCallingClassificationMethod({
         baseUrl: config.baseUrl,
         modelId: config.modelId,
@@ -216,22 +205,12 @@ export function createInputClassifier(
         timeout: config.timeout,
         schemaName: config.schemaName,
         schemaSelectionCriteria: config.schemaSelectionCriteria,
+        enableProviderDebug: config.enableProviderDebug,
       });
       return new InputClassifier(functionCallingMethod);
-
-    case 'python-langchain-mcp':
-      const pythonMcpMethod = new PythonLangChainMCPClassificationMethod({
-        baseUrl: config.baseUrl,
-        modelId: config.modelId,
-        temperature: config.temperature,
-        timeout: config.timeout,
-        schemaName: config.schemaName,
-        schemaSelectionCriteria: config.schemaSelectionCriteria,
-      });
-      return new InputClassifier(pythonMcpMethod);
       
     default:
-      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, ollama-native, langchain-ollama-function-calling, langchain-function-calling, python-langchain-mcp`);
+      throw new Error(`Invalid classification method: "${method}". Valid methods are: rule-based, ollama-native, langchain-function-calling`);
   }
 }
 
@@ -274,9 +253,7 @@ export const createCompleteClassifier = createInputClassifier; // Now points to 
 export { 
   RuleBasedClassificationMethod, 
   OllamaNativeClassificationMethod,
-  ChatOllamaFunctionCallingClassificationMethod, // Legacy - kept for backward compatibility
-  LangChainFunctionCallingClassificationMethod, // New provider-agnostic implementation
-  PythonLangChainMCPClassificationMethod,
+  LangChainFunctionCallingClassificationMethod, // Provider-agnostic implementation
   InputClassifier 
 };
 

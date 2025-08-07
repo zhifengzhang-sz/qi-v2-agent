@@ -192,8 +192,8 @@ Respond with valid JSON matching the required schema.`;
       const response = await fetch(`${this.config.baseUrl}/api/tags`);
       if (!response.ok) return false;
       
-      const data = await response.json();
-      return data.models?.some((model: any) => model.name === this.config.modelId) || false;
+      const data = await response.json() as { models?: Array<{ name: string }> };
+      return data.models?.some((model) => model.name === this.config.modelId) || false;
     } catch {
       return false;
     }
@@ -409,7 +409,7 @@ Respond with valid JSON matching the required schema.`;
           throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        const result = await response.json();
+        const result = await response.json() as OllamaGenerateResponse;
         
         // Validate response structure
         if (!result || typeof result.response !== 'string') {

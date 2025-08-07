@@ -205,7 +205,7 @@ export async function testFunctionCallingSupport(
       signal: AbortSignal.timeout(5000),
     });
     
-    const result = await response.json();
+    const result = await response.json() as { error?: { message?: string } };
     
     // Check for explicit "does not support tools" error
     const supportsTools = !(

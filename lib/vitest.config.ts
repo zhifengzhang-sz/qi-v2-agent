@@ -37,6 +37,7 @@ export default defineConfig({
       { find: '@qi/agent/impl', replacement: resolve(__dirname, './src/impl') },
       { find: '@qi/agent/core', replacement: resolve(__dirname, './src/core') },
       { find: '@qi/agent', replacement: resolve(__dirname, './src/index.ts') },
+      { find: '@qi/lib', replacement: resolve(__dirname, './src') },
       { find: '@', replacement: resolve(__dirname, './src') },
     ],
   },

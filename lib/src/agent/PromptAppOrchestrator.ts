@@ -6,8 +6,12 @@
  * - Prompts (everything else) → route to prompt handler
  * 
  * No classifier, no workflow - just command vs prompt routing.
+ * 
+ * Now includes EventEmitter for responsive UI with progress tracking and cancellation.
  */
 
+import { EventEmitter } from 'node:events';
+import { create, fromAsyncTryCatch, match, success, failure, type ErrorCategory, type QiError, type Result } from '@qi/base';
 import type { IContextManager } from '@qi/agent/context';
 import { createContextAwarePromptHandler } from '@qi/agent/context/utils/ContextAwarePrompting';
 import type { IPromptHandler, PromptOptions } from '@qi/agent/prompt';
@@ -20,7 +24,29 @@ import type {
   AgentStatus,
   AgentStreamChunk,
   IAgent,
-} from '@qi/agent/abstractions';
+} from './abstractions/index.js';
+
+/**
+ * Event types emitted by PromptAppOrchestrator for responsive UI
+ */
+export interface AgentEvents {
+  progress: { phase: string; progress: number; details?: string };
+  message: { content: string; type: 'status' | 'streaming' | 'complete' | 'error' };
+  stateChange: { state: AgentStatus };
+  error: { error: QiError; context?: string };
+  complete: { result: AgentResponse };
+  cancelled: { reason: string };
+}
+
+/**
+ * Agent error factory using QiCore patterns
+ */
+const createAgentError = (
+  code: string,
+  message: string,
+  category: ErrorCategory,
+  context: Record<string, unknown> = {}
+): QiError => create(code, message, category, context);
 
 /**
  * Simple Input Parser for PromptApp
@@ -59,8 +85,9 @@ export function parseInput(input: string): ParsedInput {
 
 /**
  * Prompt App Orchestrator - Same interface as QiCodeAgent but simplified routing
+ * Now extends EventEmitter for responsive UI
  */
-export class PromptAppOrchestrator implements IAgent {
+export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   private stateManager: IStateManager;
   private contextManager: IContextManager;
   private commandHandler?: ICommandHandler;
@@ -69,6 +96,10 @@ export class PromptAppOrchestrator implements IAgent {
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
+
+  // Cancellation support
+  private abortController?: AbortController;
+  private isProcessing = false;
 
   private config: AgentConfig;
   private isInitialized = false;
@@ -86,6 +117,7 @@ export class PromptAppOrchestrator implements IAgent {
       promptHandler?: IPromptHandler;
     } = {}
   ) {
+    super(); // Initialize EventEmitter
     this.stateManager = stateManager;
     this.contextManager = contextManager;
     this.config = config;
@@ -122,28 +154,52 @@ export class PromptAppOrchestrator implements IAgent {
     const startTime = Date.now();
     this.requestCount++;
     this.lastActivity = new Date();
+    this.isProcessing = true;
+
+    // Create new abort controller for this request
+    this.abortController = new AbortController();
 
     try {
+      // Emit start event
+      this.emit('progress', { phase: 'parsing', progress: 0.1, details: 'Analyzing input...' });
+      this.emit('message', { content: 'Processing request...', type: 'status' });
+
       // Parse input: command vs prompt (2-category, no workflow)
       const parsed = parseInput(request.input);
+
+      // Check for cancellation
+      if (this.abortController.signal.aborted) {
+        throw new Error('Request was cancelled');
+      }
+
+      this.emit('progress', { phase: 'routing', progress: 0.2, details: `Routing to ${parsed.type} handler...` });
 
       let response: AgentResponse;
 
       switch (parsed.type) {
         case 'command':
+          this.emit('progress', { phase: 'command_processing', progress: 0.3, details: 'Executing command...' });
           response = await this.handleCommand(request, parsed.content);
           break;
         case 'prompt':
+          this.emit('progress', { phase: 'llm_processing', progress: 0.3, details: 'Sending to LLM...' });
           response = await this.handlePrompt(request, parsed.content);
           break;
         default:
           throw new Error(`Unknown input type: ${parsed.type}`);
       }
 
+      // Check for cancellation after processing
+      if (this.abortController.signal.aborted) {
+        throw new Error('Request was cancelled during processing');
+      }
+
+      this.emit('progress', { phase: 'completing', progress: 0.9, details: 'Finalizing response...' });
+
       const executionTime = Date.now() - startTime;
       this.totalResponseTime += executionTime;
 
-      return {
+      const finalResponse = {
         ...response,
         executionTime,
         metadata: new Map([
@@ -153,26 +209,70 @@ export class PromptAppOrchestrator implements IAgent {
           ['orchestrator', 'PromptApp']
         ]),
       };
+
+      // Emit completion events
+      this.emit('progress', { phase: 'complete', progress: 1.0, details: 'Request completed' });
+      this.emit('complete', { result: finalResponse });
+      this.emit('message', { content: 'Request completed successfully', type: 'complete' });
+
+      return finalResponse;
     } catch (error) {
       const executionTime = Date.now() - startTime;
       this.totalResponseTime += executionTime;
 
+      // Check if it was a cancellation
+      const wasCancelled = error instanceof Error && error.message.includes('cancelled');
+      
+      if (wasCancelled) {
+        this.emit('cancelled', { reason: 'user_requested' });
+        this.emit('message', { content: 'Request was cancelled', type: 'error' });
+      } else {
+        // Emit error events
+        const qiError = error instanceof Error 
+          ? createAgentError('PROCESSING_FAILED', error.message, 'SYSTEM')
+          : createAgentError('UNKNOWN_ERROR', String(error), 'SYSTEM');
+        
+        this.emit('error', { error: qiError, context: 'process' });
+        this.emit('message', { content: `Error: ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
+      }
+
       return {
         content: `Processing failed: ${error instanceof Error ? error.message : String(error)}`,
-        type: 'error',
+        type: 'prompt' as const,
         confidence: 0,
         executionTime,
         metadata: new Map([
           ['error', error instanceof Error ? error.message : String(error)],
+          ['cancelled', wasCancelled.toString()],
           ['orchestrator', 'PromptApp']
         ]),
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      this.isProcessing = false;
+      this.abortController = undefined;
     }
   }
 
-  async *processStream(request: AgentRequest): AsyncGenerator<AgentStreamChunk> {
+  /**
+   * Cancel the current request if one is in progress
+   */
+  cancel(): void {
+    if (this.isProcessing && this.abortController) {
+      this.abortController.abort();
+      this.emit('cancelled', { reason: 'user_requested' });
+    }
+  }
+
+  /**
+   * Check if a request is currently being processed
+   */
+  isCurrentlyProcessing(): boolean {
+    return this.isProcessing;
+  }
+
+  async *stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk> {
     // Parse and yield classification
     const parsed = parseInput(request.input);
     
