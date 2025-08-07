@@ -25,6 +25,7 @@ import type { IWorkflowEngine, IWorkflowExtractor } from '../workflow/index.js';
 import type { AgentConfig } from './abstractions/index.js';
 // Export factory functions (not implementation classes)
 import { QiCodeAgent } from './impl/QiCodeAgent.js';
+import { PromptAppOrchestrator, parseInput } from './PromptAppOrchestrator.js';
 
 /**
  * Agent factory configuration following prompt module pattern
@@ -63,3 +64,33 @@ export function createAgent(
 
   return new QiCodeAgent(stateManager, contextManager, agentConfig, dependencies);
 }
+
+/**
+ * Create a simplified PromptApp orchestrator (no classifier, no workflows)
+ */
+export function createPromptApp(
+  stateManager: IStateManager,
+  contextManager: IContextManager,
+  config: Partial<AgentConfig> & {
+    commandHandler?: ICommandHandler;
+    promptHandler?: IPromptHandler;
+  }
+): PromptAppOrchestrator {
+  const agentConfig: AgentConfig = {
+    domain: config.domain || 'prompt-app',
+    enableCommands: config.enableCommands ?? true,
+    enablePrompts: config.enablePrompts ?? true,
+    enableWorkflows: false, // PromptApp doesn't use workflows
+    sessionPersistence: config.sessionPersistence ?? false,
+  };
+
+  const dependencies = {
+    commandHandler: config.commandHandler,
+    promptHandler: config.promptHandler,
+  };
+
+  return new PromptAppOrchestrator(stateManager, contextManager, agentConfig, dependencies);
+}
+
+// Export parsing utilities
+export { parseInput } from './PromptAppOrchestrator.js';

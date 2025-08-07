@@ -68,14 +68,21 @@ const __dirname = dirname(__filename);
             config.methods = [config.method];
           }
           
+          // If SCHEMA_NAME was set, use it as schema name
+          if (config.schema_name) {
+            config.schema = { name: config.schema_name };
+          }
+          
           studyLogger.info('Configuration loaded and validated successfully', {
             models: config.models,
             methods: config.methods,
             dataPath: config.dataPath,
+            schema: config.schema,
             envOverrides: {
               model_id: config.model_id,
               method: config.method,
-              dataset: config.dataset
+              dataset: config.dataset,
+              schema_name: config.schema_name
             },
             allConfigKeys: Object.keys(config)
           });

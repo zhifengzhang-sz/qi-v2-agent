@@ -22,14 +22,14 @@ llm:
   # LLM configuration for input classification
   classifier:
     provider: "ollama"
-    model: "qwen2.5:7b"  # Use available model for classification
+    model: "llama3.2:3b"  # Use available model for classification
     temperature: 0.1     # Low temperature for consistent classification
     maxTokens: 1000      # Increased for structured output with reasoning
 
   # LLM configuration for user prompts (user-changeable)
   prompt:
-    currentModel: "qwen2.5:7b"  # Currently selected model
-    availableModels: ["qwen2.5:7b", "llama3.2:3b", "deepseek-coder:6.7b"]  # User can switch between these
+    currentModel: "qwen3:0.6b"  # Currently selected model
+    availableModels: ["llama3.2:3b", "qwen3:0.6b"]  # User can switch between these
     defaultProvider: "ollama"
 
   # Provider configurations
@@ -39,7 +39,7 @@ llm:
       name: "Ollama"
       type: "local"
       enabled: true
-      baseURL: "http://172.18.144.1:11434"
+      baseURL: "http://localhost:11434"
       # No API key required for local Ollama
       models:
         - name: "llama3.2:3b"
@@ -51,21 +51,13 @@ llm:
             temperature: 0.7
             top_p: 0.9
             top_k: 40
-        - name: "qwen2.5:7b" 
-          displayName: "Qwen 2.5 7B"
+        - name: "qwen3:0.6b" 
+          displayName: "Qwen 3 0.6B"
           maxTokens: 8192
           contextWindow: 32768
           capabilities: ["completion", "chat", "reasoning"]
           defaultParameters:
             temperature: 0.8
-            top_p: 0.95
-        - name: "deepseek-coder:6.7b"
-          displayName: "DeepSeek Coder 6.7B"
-          maxTokens: 4096
-          contextWindow: 16384
-          capabilities: ["completion", "chat", "code"]
-          defaultParameters:
-            temperature: 0.1
             top_p: 0.95
       healthCheck:
         enabled: true

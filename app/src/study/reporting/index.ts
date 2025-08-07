@@ -3,7 +3,7 @@
  */
 
 import type { Logger } from '@qi/core';
-import type { TestResult, AccuracyMetrics, StudyConfig } from '../types/index.js';
+import type { TestResult, AccuracyMetrics, StudyConfig, CategoryMetrics } from '../types/index.js';
 
 export class MetricsCalculator {
   static calculate(results: TestResult[], expectedTypes: string[]): AccuracyMetrics {
@@ -12,13 +12,39 @@ export class MetricsCalculator {
     const errors = results.filter(r => r.error);
     const avgLatency = results.reduce((sum, r) => sum + r.latency, 0) / results.length;
 
+    // Calculate per-category breakdown
+    const categories = [...new Set(expectedTypes)];
+    const categoryBreakdown: CategoryMetrics[] = categories.map(category => {
+      const categoryIndices = expectedTypes
+        .map((type, i) => ({ type, i }))
+        .filter(item => item.type === category)
+        .map(item => item.i);
+      
+      const categoryResults = categoryIndices.map(i => results[i]);
+      const categoryCorrect = categoryResults.filter(r => !r.error && r.result.type === category);
+      const categoryIncorrect = categoryResults.filter(r => !r.error && r.result.type !== category);
+      const categoryErrors = categoryResults.filter(r => r.error);
+      const categoryLatency = categoryResults.reduce((sum, r) => sum + r.latency, 0) / categoryResults.length;
+
+      return {
+        category,
+        totalTests: categoryResults.length,
+        correct: categoryCorrect.length,
+        incorrect: categoryIncorrect.length,
+        errors: categoryErrors.length,
+        accuracyRate: categoryResults.length > 0 ? (categoryCorrect.length / categoryResults.length) * 100 : 0,
+        averageLatency: Math.round(categoryLatency)
+      };
+    });
+
     return {
       totalTests: results.length,
       correct: correct.length,
       incorrect: incorrect.length,
       errors: errors.length,
       accuracyRate: (correct.length / results.length) * 100,
-      averageLatency: Math.round(avgLatency)
+      averageLatency: Math.round(avgLatency),
+      categoryBreakdown
     };
   }
 }
@@ -72,6 +98,15 @@ export class ResultsReporter {
     console.log(`Correct: ${metrics.correct} (${metrics.accuracyRate.toFixed(1)}%)`);
     console.log(`Incorrect: ${metrics.incorrect} (${(metrics.incorrect/metrics.totalTests*100).toFixed(1)}%)`);
     console.log(`Errors: ${metrics.errors} (${(metrics.errors/metrics.totalTests*100).toFixed(1)}%)`);
+    
+    // Display per-category breakdown
+    if (metrics.categoryBreakdown && metrics.categoryBreakdown.length > 0) {
+      console.log('\n📋 PER-CATEGORY BREAKDOWN');
+      console.log('=========================');
+      metrics.categoryBreakdown.forEach(cat => {
+        console.log(`${cat.category.toUpperCase()}: ${cat.correct}/${cat.totalTests} correct (${cat.accuracyRate.toFixed(1)}%), ${cat.errors} errors, ${cat.incorrect} wrong, ${cat.averageLatency}ms avg`);
+      });
+    }
     
     console.log('\nDetailed Results:');
     results.forEach((r, i) => {

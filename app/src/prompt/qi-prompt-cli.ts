@@ -15,13 +15,13 @@ import { createStateManager } from '@qi/agent/state';
 import { createPromptHandler } from '@qi/agent/prompt';
 import { createCommandHandler } from '@qi/agent/command';
 import type { AgentRequest } from '@qi/agent/abstractions';
-import { PromptAppOrchestrator } from './PromptAppOrchestrator.js';
+import { createPromptApp } from '@qi/agent';
 
 /**
  * CLI for Prompt App - communicates with orchestrator using same interface as agent
  */
 class QiPromptCLI {
-  private orchestrator: PromptAppOrchestrator;
+  private orchestrator: any;
   private stateManager: any;
   private rl: readline.Interface;
   private isRunning = false;
@@ -69,18 +69,15 @@ class QiPromptCLI {
       }
       console.log('✅ Prompt handler initialized');
 
-      // Create orchestrator with initialized components
-      this.orchestrator = new PromptAppOrchestrator(
+      // Create orchestrator with initialized components using factory
+      this.orchestrator = createPromptApp(
         this.stateManager,
         this.contextManager,
         {
           domain: 'prompt-app',
           enableCommands: true,
           enablePrompts: true,
-          enableWorkflows: false, // PromptApp doesn't handle workflows
           sessionPersistence: false,
-        },
-        {
           commandHandler: this.commandHandler,
           promptHandler: this.promptHandler,
         }
