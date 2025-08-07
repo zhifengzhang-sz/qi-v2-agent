@@ -14,7 +14,8 @@ import { failure, fromAsyncTryCatch, match, success, type ErrorCategory, type Qi
 import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
 import { 
   globalSchemaRegistry, 
-  type SchemaEntry 
+  type SchemaEntry,
+  type SchemaSelectionCriteria 
 } from '../schema-registry.js';
 import { 
   detectProviderFromModel, 
@@ -527,8 +528,8 @@ ${contextStr}
         
         if (!response.ok) return false;
         
-        const data = await response.json();
-        return data.models?.some((model: any) => model.name === this.config.modelId) || false;
+        const data = await response.json() as { models?: Array<{ name: string }> };
+        return data.models?.some((model) => model.name === this.config.modelId) || false;
       }
       
       // For other providers, just check if API key is available

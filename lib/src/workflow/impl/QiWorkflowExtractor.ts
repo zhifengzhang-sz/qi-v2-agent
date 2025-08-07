@@ -4,6 +4,8 @@
  * LangChain structured output workflow extractor adapted for app layer
  */
 
+import { create, fromAsyncTryCatch, match, success, failure, type ErrorCategory, type QiError, type Result } from '@qi/base';
+
 // OllamaStructuredWrapper removed - workflow extractor needs reimplementation
 import type {
   IWorkflowExtractor,
@@ -13,6 +15,16 @@ import type {
   WorkflowMode,
   WorkflowSpec,
 } from '../interfaces/index.js';
+
+/**
+ * Workflow extractor error factory using QiCore patterns
+ */
+const createWorkflowExtractorError = (
+  code: string,
+  message: string,
+  category: ErrorCategory,
+  context: Record<string, unknown> = {}
+): QiError => create(code, message, category, context);
 
 // JSON Schema for workflow specification (replacing broken Zod schemas)
 const WorkflowSpecSchema = {
@@ -86,58 +98,71 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
 
       // 2. Generate workflow - OllamaStructuredWrapper removed, workflow disabled
       // TODO: Reimplement workflow extraction without deleted dependencies
-      throw new Error('Workflow extraction disabled - OllamaStructuredWrapper dependency removed');
-
-      // 3. Post-process and validate
-      const processedSpec = this.postProcessWorkflowSpec(workflowSpec);
-      const isValid = await this.validateWorkflowSpec(processedSpec);
-
-      if (!isValid) {
-        console.log('DEBUG: Validation failed for spec:', JSON.stringify(workflowSpec, null, 2));
-        console.log(
-          'DEBUG: Processed spec:',
-          JSON.stringify(
-            {
-              id: processedSpec.id,
-              name: processedSpec.name,
-              nodeCount: processedSpec.nodes.length,
-              edgeCount: processedSpec.edges.length,
-            },
-            null,
-            2
-          )
-        );
-        return {
-          success: false,
-          mode,
-          pattern,
-          confidence: 0.1,
-          extractionMethod: 'llm-based',
-          error: 'Generated workflow specification failed validation',
-          metadata: new Map([
-            ['extractionTime', Date.now() - startTime],
-            ['validationFailed', true],
-            ['rawSpec', workflowSpec],
-          ]),
-        };
-      }
-
       return {
-        success: true,
-        mode,
-        pattern,
-        workflowSpec: processedSpec,
-        confidence: 0.9,
-        extractionMethod: 'llm-based',
+        success: false,
+        mode: 'error',
+        pattern: 'error',
+        confidence: 0,
+        extractionMethod: 'template-based',
+        error: 'Workflow extraction disabled - OllamaStructuredWrapper dependency removed',
         metadata: new Map([
-          ['extractionTime', (Date.now() - startTime).toString()],
-          ['nodeCount', processedSpec.nodes.length.toString()],
-          ['edgeCount', processedSpec.edges.length.toString()],
-          ['complexity', analysis.level],
-          ['model', 'ollama-structured-wrapper'],
-          ['schemaValidated', 'true'],
-        ]),
+          ['errorCode', 'WORKFLOW_EXTRACTION_DISABLED'],
+          ['dependency', 'OllamaStructuredWrapper'],
+          ['extractionTime', (Date.now() - startTime).toString()]
+        ])
       };
+
+      // NOTE: The following code is unreachable due to the early return above
+      // 3. Post-process and validate  
+      // const processedSpec = this.postProcessWorkflowSpec(workflowSpec);
+      // const isValid = await this.validateWorkflowSpec(processedSpec);
+
+      // if (!isValid) {
+      //   console.log('DEBUG: Validation failed for spec:', JSON.stringify(workflowSpec, null, 2));
+      //   console.log(
+      //     'DEBUG: Processed spec:',
+      //     JSON.stringify(
+      //       {
+      //         id: processedSpec.id,
+      //         name: processedSpec.name,
+      //         nodeCount: processedSpec.nodes.length,
+      //         edgeCount: processedSpec.edges.length,
+      //       },
+      //       null,
+      //       2
+      //     )
+      //   );
+      //   return {
+      //     success: false,
+      //     mode,
+      //     pattern,
+      //     confidence: 0.1,
+      //     extractionMethod: 'llm-based',
+      //     error: 'Generated workflow specification failed validation',
+      //     metadata: new Map([
+      //       ['extractionTime', Date.now() - startTime],
+      //       ['validationFailed', true],
+      //       ['rawSpec', workflowSpec],
+      //     ]),
+      //   };
+      // }
+
+      // return {
+      //   success: true,
+      //   mode,
+      //   pattern,
+      //   workflowSpec: processedSpec,
+      //   confidence: 0.9,
+      //   extractionMethod: 'llm-based',
+      //   metadata: new Map([
+      //     ['extractionTime', (Date.now() - startTime).toString()],
+      //     ['nodeCount', processedSpec.nodes.length.toString()],
+      //     ['edgeCount', processedSpec.edges.length.toString()],
+      //     ['complexity', analysis.level],
+      //     ['model', 'ollama-structured-wrapper'],
+      //     ['schemaValidated', 'true'],
+      //   ]),
+      // };
     } catch (error) {
       return {
         success: false,

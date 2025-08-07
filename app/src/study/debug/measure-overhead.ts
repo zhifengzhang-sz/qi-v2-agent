@@ -2,7 +2,7 @@
  * Measure actual overhead with multiple samples
  */
 
-import { createOllamaNativeClassificationMethod } from './lib/src/classifier/impl/ollama-native.js';
+import { createOllamaNativeClassifier } from '@qi/agent/classifier';
 
 async function measureDirectAPI(runs: number) {
   console.log(`🔍 Direct API - ${runs} runs`);
@@ -48,7 +48,7 @@ async function measureOurMethod(runs: number) {
   console.log(`\n🔍 Our Method - ${runs} runs`);
   const times: number[] = [];
   
-  const method = createOllamaNativeClassificationMethod({
+  const method = createOllamaNativeClassifier({
     baseUrl: 'http://localhost:11434',
     modelId: 'llama3.2:3b',
     temperature: 0.1,

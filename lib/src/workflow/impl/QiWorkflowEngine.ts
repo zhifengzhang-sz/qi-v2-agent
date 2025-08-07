@@ -4,6 +4,7 @@
  * Simplified workflow engine adapted for app layer without LangGraph dependency
  */
 
+import { fromAsyncTryCatch, match } from '@qi/base';
 import type {
   ExecutableWorkflow,
   IWorkflowEngine,
@@ -118,9 +119,23 @@ export class QiWorkflowEngine implements IWorkflowEngine {
         },
       };
     } catch (error) {
-      throw new Error(
-        `Workflow execution failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      // Convert error to proper WorkflowResult failure format
+      const failureTime = Date.now() - startTime;
+      const failureResult: WorkflowResult = {
+        finalState: {
+          ...currentState,
+          output: `Workflow execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          reasoningOutput: 'Execution failed due to error',
+        },
+        executionPath,
+        performance: {
+          totalTime: failureTime,
+          nodeExecutionTimes: nodeExecutionTimes,
+          toolExecutionTime: 0,
+          reasoningTime: 0,
+        },
+      };
+      return failureResult;
     }
   }
 

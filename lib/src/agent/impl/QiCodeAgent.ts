@@ -5,6 +5,7 @@
  * Internal to agent module - other modules cannot access this directly.
  */
 
+import { create, fromAsyncTryCatch, match, success, failure, type ErrorCategory, type QiError, type Result } from '@qi/base';
 import type { ClassificationResult, IClassifier } from '../../classifier/index.js';
 import type { CommandRequest, ICommandHandler } from '../../command/index.js';
 import type { IContextManager } from '../../context/index.js';
@@ -21,6 +22,16 @@ import type {
   AgentStreamChunk,
   IAgent,
 } from '../abstractions/index.js';
+
+/**
+ * QiCode Agent error factory using QiCore patterns
+ */
+const createQiCodeAgentError = (
+  code: string,
+  message: string,
+  category: ErrorCategory,
+  context: Record<string, unknown> = {}
+): QiError => create(code, message, category, context);
 
 /**
  * QiCode Agent - Main orchestrator with StateManager integration
@@ -161,7 +172,7 @@ export class QiCodeAgent implements IAgent {
 
       return {
         content: `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`,
-        type: 'command', // Default type for errors
+        type: 'command' as const, // Default type for errors
         confidence: 0,
         executionTime,
         metadata: new Map([
@@ -176,7 +187,16 @@ export class QiCodeAgent implements IAgent {
 
   async *stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk> {
     if (!this.isInitialized) {
-      throw new Error('Agent not initialized. Call initialize() first.');
+      yield {
+        type: 'error',
+        content: 'Agent not initialized. Call initialize() first.',
+        isComplete: true,
+        metadata: new Map([
+          ['errorCode', 'AGENT_NOT_INITIALIZED'],
+          ['errorType', 'validation'],
+        ]),
+      };
+      return;
     }
 
     try {
@@ -188,7 +208,16 @@ export class QiCodeAgent implements IAgent {
       };
 
       if (!this.classifier) {
-        throw new Error('Classifier not available');
+        yield {
+          type: 'error',
+          content: 'Classifier not available',
+          isComplete: true,
+          metadata: new Map([
+            ['errorCode', 'CLASSIFIER_NOT_AVAILABLE'],
+            ['errorType', 'system'],
+          ]),
+        };
+        return;
       }
 
       const classification = await this.classifier.classify(request.input);
@@ -404,7 +433,8 @@ export class QiCodeAgent implements IAgent {
     // 4. Context and state management across workflow steps
     // 5. Error handling and recovery strategy for workflow execution
     // 6. Progress tracking and streaming for long-running workflows
-    throw new Error(
+    return this.createErrorResponse(
+      'workflow',
       'Workflow processing not implemented - design incomplete. See TODO above for required design decisions.'
     );
   }
