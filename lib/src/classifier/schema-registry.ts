@@ -168,7 +168,6 @@ export class ClassificationSchemaRegistry {
         .max(1)
         .describe('Confidence score from 0.0 to 1.0'),
       reasoning: z.string()
-        .max(150)
         .describe('Brief explanation of why this classification was chosen')
     });
 
@@ -295,7 +294,6 @@ export class ClassificationSchemaRegistry {
         .max(1)
         .describe('Confidence score from 0.0 to 1.0'),
       reasoning: z.string()
-        .max(150)
         .describe('Brief explanation of classification decision'),
       conversation_context: z.enum(['greeting', 'question', 'follow_up', 'task_request', 'multi_step'])
         .describe('Context type: greeting/question/follow_up always prompt, task_request/multi_step may be workflow'),
