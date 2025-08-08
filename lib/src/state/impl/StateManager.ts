@@ -252,6 +252,10 @@ export class StateManager implements IStateManager {
     const oldConfig = { ...this.promptConfig };
     this.promptConfig = { ...this.promptConfig, model };
 
+    // Also update the current model to keep it in sync
+    const oldCurrentModel = this.currentModel;
+    this.currentModel = model;
+
     // Update the underlying config
     if (this.llmConfig?.llm?.prompt) {
       this.llmConfig.llm.prompt.currentModel = model;

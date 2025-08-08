@@ -38,7 +38,6 @@ import {
   QiCoreCommandRouter,
   QiCoreAgentConnector,
 } from '../services/index.js';
-import { CommandHandlerBridge } from '../services/CommandHandlerBridge.js';
 import type { ICommandHandler } from '../../command/abstractions/index.js';
 
 // Will be implemented when we refactor EventDrivenCLI
@@ -106,8 +105,8 @@ export function createReadlineCLI(
       
       return match(
         () => {
-          // Create CLI instance
-          return createCLIInstance(container, fullConfig);
+          // Create CLI instance with commandHandler option
+          return createCLIInstance(container, fullConfig, options.commandHandler);
         },
         (error) => Err(error),
         registrationResult
@@ -226,14 +225,10 @@ function registerServices(
     return eventManagerResult;
   }
   
-  // Decide which command router to use based on options
-  const commandRouter = options?.commandHandler 
-    ? new CommandHandlerBridge(options.commandHandler)
-    : new QiCoreCommandRouter();
-    
+  // Use QiCoreCommandRouter - if commandHandler provided, it will be used directly by CLI
   const commandRouterResult = container.register(
     'commandRouter',
-    () => commandRouter,
+    () => new QiCoreCommandRouter(),
     { singleton: true }
   );
   
@@ -257,7 +252,7 @@ function registerServices(
 /**
  * Create the CLI instance with resolved dependencies
  */
-function createCLIInstance(container: CLIContainer, config: CLIConfig): Result<ICLIFramework, QiError> {
+function createCLIInstance(container: CLIContainer, config: CLIConfig, commandHandler?: ICommandHandler): Result<ICLIFramework, QiError> {
   try {
     // Resolve all dependencies with explicit types
     const terminal = container.resolve<ITerminal>('terminal');
@@ -292,7 +287,8 @@ function createCLIInstance(container: CLIContainer, config: CLIConfig): Result<I
       (eventManager as any).value,
       (commandRouter as any).value,
       (agentConnector as any).value,
-      config
+      config,
+      commandHandler // Pass the commandHandler directly
     );
     
     return Ok(cli);

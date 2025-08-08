@@ -82,6 +82,16 @@ export class ReadlineInputManager implements IInputManager {
       this.config = { ...this.config, ...config };
     }
 
+    // Enable keypress events on stdin (required for Shift+Tab, Escape, etc.)
+    if (process.stdin.isTTY) {
+      // Enable keypress events
+      const emitKeypressEvents = require('readline').emitKeypressEvents;
+      emitKeypressEvents(process.stdin);
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(true);
+      }
+    }
+
     // Create readline interface
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -391,6 +401,11 @@ export class ReadlineInputManager implements IInputManager {
           console.error('Error in input callback:', error);
         }
       });
+    });
+
+    // Keypress handler for special keys (Shift+Tab, Escape, etc.)
+    process.stdin.on('keypress', (str: string, key: any) => {
+      this.handleKeypress(str, key);
     });
 
     // Close handler
