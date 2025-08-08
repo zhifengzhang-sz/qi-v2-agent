@@ -46,6 +46,9 @@ export interface CLIConfig {
   // Performance
   streamingThrottle: number; // ms between characters
   maxBufferSize: number;
+  
+  // Debugging
+  debug: boolean;
 }
 
 export interface CLIState {

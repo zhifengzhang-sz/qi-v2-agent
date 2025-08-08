@@ -115,15 +115,15 @@ export class ModeIndicator {
   /**
    * Set the current mode
    */
-  setMode(mode: CLIMode): void {
+  setMode(mode: CLIMode, silent: boolean = false): void {
     const previousMode = this.currentMode;
     this.currentMode = mode;
     
     if (this.isVisible) {
       this.render();
       
-      // Show brief transition message
-      if (previousMode !== mode) {
+      // Show brief transition message only if not silent
+      if (previousMode !== mode && !silent) {
         this.showTransition(previousMode, mode);
       }
     }
@@ -139,13 +139,13 @@ export class ModeIndicator {
   /**
    * Cycle to the next mode
    */
-  cycleMode(): CLIMode {
+  cycleMode(silent: boolean = false): CLIMode {
     const modes: CLIMode[] = ['interactive', 'command', 'streaming'];
     const currentIndex = modes.indexOf(this.currentMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextMode = modes[nextIndex];
     
-    this.setMode(nextMode);
+    this.setMode(nextMode, silent);
     return nextMode;
   }
 
@@ -300,6 +300,13 @@ export class ModeIndicator {
     }
     
     return prefix;
+  }
+
+  /**
+   * Get current configuration
+   */
+  getConfig(): ModeConfig {
+    return { ...this.config };
   }
 
   /**

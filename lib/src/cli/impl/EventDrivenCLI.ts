@@ -10,6 +10,8 @@
 
 import { EventEmitter } from 'node:events';
 import * as readline from 'node:readline';
+import { createFromEnv, type Logger } from '@qi/core';
+import { isSuccess } from '@qi/base';
 import type {
   ICLIFramework,
   IAgentCLIBridge,
@@ -34,6 +36,7 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
   private rl: readline.Interface | null = null;
   private isInitialized = false;
   private isStarted = false;
+  private logger: Logger;
 
   // UI Components
   private hotkeyManager: HotkeyManager;
@@ -43,6 +46,7 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
 
   // Agent integration
   private connectedAgent: any = null;
+  private currentModel: string = 'unknown';
 
   constructor(config: Partial<CLIConfig> = {}) {
     super();
@@ -59,8 +63,25 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
       autoComplete: false,
       streamingThrottle: 0,
       maxBufferSize: 10000,
+      debug: false, // Default to false - quiet mode
       ...config,
     };
+
+    // Initialize logger
+    const loggerResult = createFromEnv();
+    if (isSuccess(loggerResult)) {
+      this.logger = loggerResult.value.child({ component: 'EventDrivenCLI' });
+      // Set log level based on debug flag
+      this.logger.setLevel(this.config.debug ? 'debug' : 'warn');
+    } else {
+      // Fallback to console
+      this.logger = {
+        debug: this.config.debug ? console.debug : () => {},
+        info: this.config.debug ? console.info : () => {},
+        warn: console.warn,
+        error: console.error,
+      } as any;
+    }
 
     this.state = {
       mode: 'interactive',
@@ -140,7 +161,6 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
 
     console.log('🚀 Event-Driven CLI Ready');
     console.log('=========================');
-    this.showModeHelp();
     console.log('💡 Press Shift+Tab to cycle modes, Esc to cancel operations');
     console.log('');
 
@@ -287,8 +307,8 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
 
       case '/status':
       case '/s':
-        this.showStatus();
-        return true;
+        // Let the agent handle status instead of CLI
+        return false;
 
       default:
         return false;
@@ -341,14 +361,24 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
    */
   private cycleMode(): void {
     const previousMode = this.state.mode;
-    const newMode = this.modeIndicator.cycleMode();
     
+    // Cycle mode manually to avoid any ModeIndicator messages
+    const modes: CLIMode[] = ['interactive', 'command', 'streaming'];
+    const currentIndex = modes.indexOf(this.state.mode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    const newMode = modes[nextIndex];
+    
+    // Update state directly
     this.state.mode = newMode;
+    this.modeIndicator.setMode(newMode, true); // Silent update
     this.emit('modeChanged', { previousMode, newMode });
     
-    // Update readline prompt
+    // Update readline prompt - this will show the new mode icon in the prompt
     if (this.rl) {
       this.rl.setPrompt(this.getFormattedPrompt());
+      // Clear current line and show new prompt
+      process.stdout.write('\x1b[2K\x1b[G'); // Clear line and move to start
+      this.rl.prompt();
     }
   }
 
@@ -381,11 +411,20 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
   }
 
   /**
-   * Get formatted prompt with mode indicator
+   * Get formatted prompt: [provider] [model] [mode icon] >
    */
   private getFormattedPrompt(): string {
-    const prefix = this.config.enableModeIndicator ? this.modeIndicator.getPromptPrefix() : '';
-    return prefix + this.config.prompt;
+    const provider = this.getProviderName();
+    const model = this.currentModel !== 'unknown' ? this.currentModel : 'model';
+    const modeIcon = this.modeIndicator.getConfig().colors[this.state.mode].icon;
+    
+    return `${provider} ${model} ${modeIcon} ${this.config.prompt}`;
+  }
+
+  private getProviderName(): string {
+    // For now, we know we're using ollama as the provider
+    // In the future, this could be made configurable or detected from agent
+    return 'ollama';
   }
 
   /**
@@ -512,6 +551,14 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
   connectAgent(agent: any): void {
     this.connectedAgent = agent;
     
+    // Try to get current model information
+    this.updateCurrentModel();
+    
+    // Update the prompt now that we have the agent info
+    if (this.rl) {
+      this.rl.setPrompt(this.getFormattedPrompt());
+    }
+    
     // Setup agent event listeners
     if (agent.on) {
       agent.on('progress', this.onAgentProgress.bind(this));
@@ -519,6 +566,51 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
       agent.on('complete', this.onAgentComplete.bind(this));
       agent.on('error', this.onAgentError.bind(this));
       agent.on('cancelled', this.onAgentCancelled.bind(this));
+    }
+    
+    // Listen for state manager changes to update model display
+    if (agent.stateManager && agent.stateManager.subscribe) {
+      agent.stateManager.subscribe((change: any) => {
+        if (change.field === 'promptModel' || change.field === 'currentModel') {
+          this.updateCurrentModel();
+          if (this.rl) {
+            this.rl.setPrompt(this.getFormattedPrompt());
+            // Refresh the prompt display
+            if (!this.state.isProcessing) {
+              process.stdout.write('\x1b[2K\x1b[G'); // Clear line and move to start
+              this.rl.prompt();
+            }
+          }
+        }
+      });
+    }
+  }
+
+  private updateCurrentModel(): void {
+    if (!this.connectedAgent) {
+      this.currentModel = 'unknown';
+      return;
+    }
+    
+    // Try to get the actual model name from prompt config first
+    if (this.connectedAgent.stateManager?.getPromptConfig) {
+      const promptConfig = this.connectedAgent.stateManager.getPromptConfig();
+      if (promptConfig?.model) {
+        this.currentModel = promptConfig.model;
+        return;
+      }
+    }
+    
+    // Try different ways to get model info from agent
+    if (this.connectedAgent.getCurrentModel) {
+      this.currentModel = this.connectedAgent.getCurrentModel();
+    } else if (this.connectedAgent.stateManager?.getCurrentModel) {
+      this.currentModel = this.connectedAgent.stateManager.getCurrentModel();
+    } else if (this.connectedAgent.config?.model) {
+      this.currentModel = this.connectedAgent.config.model;
+    } else {
+      // Fallback: use a reasonable default
+      this.currentModel = 'qwen2.5:7b'; // Updated default based on StateManager
     }
   }
 
@@ -538,19 +630,50 @@ export class EventDrivenCLI extends EventEmitter implements ICLIFramework, IAgen
       }
       this.addStreamingChunk(message.content);
     } else {
-      this.displayMessage(message.content, message.type as MessageType);
+      // Skip status messages during processing to avoid interfering with progress display
+      if (message.type !== 'status' || !this.state.isProcessing) {
+        this.displayMessage(message.content, message.type as MessageType);
+      }
     }
   }
 
   onAgentComplete(result: any): void {
     this.state.isProcessing = false;
-    this.progressDisplay.hide();
     
     if (this.state.isStreamingActive) {
       this.completeStreaming('Response completed');
     }
     
-    this.displayMessage('Request completed', 'complete');
+    // Extract response content from result structure
+    let content = '';
+    if (result && typeof result === 'object') {
+      // Handle nested result structure like { result: { content: "..." } }
+      if (result.result && result.result.content) {
+        content = result.result.content;
+      } else if (result.content) {
+        content = result.content;
+      } else if (result.response) {
+        content = result.response;
+      } else if (result.message) {
+        content = result.message;
+      } else if (result.text) {
+        content = result.text;
+      }
+    } else if (result) {
+      content = String(result);
+    }
+    
+    // Clear progress and replace with result immediately
+    this.progressDisplay.hideAndReplace();
+    
+    // Write result directly over where the progress bar was
+    if (content) {
+      process.stdout.write(content + '\n\n');
+    } else {
+      process.stdout.write('(No response content available)\n\n');
+    }
+    
+    // Show prompt with status
     this.showPrompt();
   }
 

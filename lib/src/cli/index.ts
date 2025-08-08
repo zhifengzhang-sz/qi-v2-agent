@@ -80,6 +80,7 @@ export const DefaultCLIConfig: import('./abstractions/ICLIFramework.js').CLIConf
   autoComplete: false,
   streamingThrottle: 0,
   maxBufferSize: 10000,
+  debug: false,
 };
 
 /**
@@ -89,10 +90,12 @@ export function setupQuickCLI(options: {
   agent?: any;
   enableHotkeys?: boolean;
   enableStreaming?: boolean;
+  debug?: boolean;
 } = {}) {
   const cli = internalCreateCLI({
     enableHotkeys: options.enableHotkeys ?? true,
     enableStreaming: options.enableStreaming ?? true,
+    debug: options.debug ?? false,
   });
 
   if (options.agent) {

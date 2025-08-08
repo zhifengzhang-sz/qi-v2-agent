@@ -129,9 +129,33 @@ export class ProgressDisplay {
     
     this.stopAnimation();
     
-    // Clear the current line
+    // Clear the current line completely and position cursor at start
     Terminal.clearLine();
     Terminal.cursorToStart();
+    process.stdout.write('\r'); // Ensure carriage return
+    
+    this.isVisible = false;
+    this.currentState = null;
+  }
+
+  /**
+   * Hide and prepare for content replacement
+   * This aggressively clears the screen area and positions for clean replacement
+   */
+  hideAndReplace(): void {
+    if (!this.isVisible) return;
+    
+    this.stopAnimation();
+    
+    // Clear current line and move up to clear any interfering content
+    Terminal.clearLine();
+    Terminal.cursorToStart();
+    
+    // Try to clear the previous few lines to remove debug output
+    for (let i = 0; i < 3; i++) {
+      process.stdout.write('\x1b[1A'); // Move up 1 line
+      Terminal.clearLine();
+    }
     
     this.isVisible = false;
     this.currentState = null;

@@ -266,6 +266,37 @@ export class StateManager implements IStateManager {
     });
   }
 
+  updatePromptMaxTokens(maxTokens: number): void {
+    if (!this.promptConfig) {
+      throw new Error('Prompt configuration not loaded');
+    }
+
+    if (maxTokens < 1 || maxTokens > 32768) {
+      throw new Error('Max tokens must be between 1 and 32768');
+    }
+
+    const oldConfig = { ...this.promptConfig };
+    this.promptConfig = { ...this.promptConfig, maxTokens };
+
+    // Update the underlying config if possible
+    if (this.llmConfig?.llm?.providers?.[this.promptConfig.provider]?.models) {
+      // Find the current model in the provider's models and update its maxTokens
+      const models = this.llmConfig.llm.providers[this.promptConfig.provider].models;
+      const currentModel = models.find((m: any) => m.name === this.promptConfig?.model);
+      if (currentModel?.defaultParameters) {
+        currentModel.defaultParameters.max_tokens = maxTokens;
+      }
+    }
+
+    this.notifyChange({
+      type: 'config',
+      field: 'promptMaxTokens',
+      oldValue: oldConfig,
+      newValue: this.promptConfig,
+      timestamp: new Date(),
+    });
+  }
+
   getAvailablePromptModels(): readonly string[] {
     if (!this.llmConfig?.llm?.prompt?.availableModels) {
       return [];
