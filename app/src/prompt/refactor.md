@@ -294,10 +294,10 @@ interface IInputManager {
 }
 ```
 
-**Implementations:**
-- `ReadlineTerminal` & `ReadlineInputManager` - current readline-based implementation
-- `InkTerminal` & `InkInputManager` - future Ink.js support
-- `BlessedTerminal` & `BlessedInputManager` - future neo-blessed support
+**Three Framework Options:**
+- `ReadlineTerminal` & `ReadlineInputManager` - lightweight custom framework (no dependencies)
+- `InkTerminal` & `InkInputManager` - React-based rich UI framework (`bun add ink @inkjs/ui`)
+- `BlessedTerminal` & `BlessedInputManager` - traditional TUI widgets framework (`bun add neo-blessed`)
 
 ### Phase 2: UI Component Layer
 
@@ -431,18 +431,18 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 }
 ```
 
-### Factory Functions for Different Configurations
+### Three Framework Factories - Equal Options
 
 ```typescript
-// Default readline-based CLI
+// 1. Custom Readline Framework - Lightweight, no dependencies
 export function createReadlineCLI(config: CLIConfig): ICLIFramework {
   const container = new CLIContainer();
   
   container.register('terminal', () => new ReadlineTerminal());
   container.register('inputManager', () => new ReadlineInputManager());
-  container.register('progressRenderer', () => new ProgressRenderer(container.resolve('terminal')));
-  container.register('modeRenderer', () => new ModeRenderer(container.resolve('terminal')));
-  container.register('streamRenderer', () => new StreamRenderer(container.resolve('terminal')));
+  container.register('progressRenderer', () => new ReadlineProgressRenderer());
+  container.register('modeRenderer', () => new ReadlineModeRenderer());
+  container.register('streamRenderer', () => new ReadlineStreamRenderer());
   container.register('eventManager', () => new EventManager());
   container.register('commandRouter', () => new CommandRouter());
   container.register('agentConnector', () => new AgentConnector());
@@ -450,15 +450,48 @@ export function createReadlineCLI(config: CLIConfig): ICLIFramework {
   return container.createCLI(config);
 }
 
-// Future: Ink.js-based CLI  
+// 2. Ink Framework - React-based rich UI (bun add ink @inkjs/ui)
 export function createInkCLI(config: CLIConfig): ICLIFramework {
   const container = new CLIContainer();
   
   container.register('terminal', () => new InkTerminal());
   container.register('inputManager', () => new InkInputManager());
-  // ... Ink-specific implementations
+  container.register('progressRenderer', () => new InkProgressRenderer()); // Uses ink-progress-bar
+  container.register('modeRenderer', () => new InkModeRenderer());         // Uses @inkjs/ui Badge
+  container.register('streamRenderer', () => new InkStreamRenderer());     // Uses ink components
+  // Same services across all frameworks
+  container.register('eventManager', () => new EventManager());
+  container.register('commandRouter', () => new CommandRouter());
+  container.register('agentConnector', () => new AgentConnector());
   
   return container.createCLI(config);
+}
+
+// 3. neo-blessed Framework - Traditional TUI widgets (bun add neo-blessed)
+export function createBlessedCLI(config: CLIConfig): ICLIFramework {
+  const container = new CLIContainer();
+  
+  container.register('terminal', () => new BlessedTerminal());
+  container.register('inputManager', () => new BlessedInputManager());
+  container.register('progressRenderer', () => new BlessedProgressRenderer()); // Uses blessed progress widget
+  container.register('modeRenderer', () => new BlessedModeRenderer());         // Uses blessed box widgets
+  container.register('streamRenderer', () => new BlessedStreamRenderer());     // Uses blessed log widget
+  // Same services across all frameworks  
+  container.register('eventManager', () => new EventManager());
+  container.register('commandRouter', () => new CommandRouter());
+  container.register('agentConnector', () => new AgentConnector());
+  
+  return container.createCLI(config);
+}
+
+// Framework-agnostic factory with choice
+export function createCLI(config: CLIConfig & { framework?: 'readline' | 'ink' | 'blessed' }): ICLIFramework {
+  switch (config.framework) {
+    case 'ink': return createInkCLI(config);
+    case 'blessed': return createBlessedCLI(config);
+    case 'readline':
+    default: return createReadlineCLI(config); // Default to our custom framework
+  }
 }
 
 // Backward compatibility
@@ -467,7 +500,30 @@ export function createEventDrivenCLI(config?: Partial<CLIConfig>): ICLIFramework
 }
 ```
 
-## Benefits of New Architecture
+## Benefits of Three-Framework Architecture
+
+### **Framework Choice Based on Use Case**
+
+**1. Custom Readline Framework** - Best for:
+- Simple CLIs with minimal UI needs
+- Environments where dependency size matters  
+- Direct terminal control requirements
+- Educational/learning purposes
+- Zero external dependencies
+
+**2. Ink Framework** - Best for:
+- Rich interactive applications
+- Modern development experience (React, hot reload)
+- Complex layouts and animations
+- Teams familiar with React
+- Rapid prototyping with pre-built components
+
+**3. neo-blessed Framework** - Best for:
+- Traditional terminal user interfaces
+- Complex forms and data entry
+- Apps requiring multiple windows/panes
+- Legacy TUI application aesthetics
+- Robust widget ecosystem
 
 ### **Testability**
 Each component can be unit tested in isolation with mock dependencies:
@@ -485,33 +541,37 @@ describe('EventDrivenCLI', () => {
 });
 ```
 
-### **Extensibility**
-Easy to add new UI frameworks without changing core logic:
+### **Framework Flexibility**
+Easy to switch frameworks without changing business logic:
 
 ```typescript
-// Add blessed support without touching EventDrivenCLI
-export function createBlessedCLI(config: CLIConfig): ICLIFramework {
-  const container = new CLIContainer();
-  container.register('terminal', () => new BlessedTerminal());
-  // ... blessed implementations
-  return container.createCLI(config);
-}
+// Same agent, different UI frameworks
+const agent = new PromptAppOrchestrator(/* ... */);
+
+// Choose your framework:
+const readlineCLI = createReadlineCLI({ agent }); // Lightweight
+const inkCLI = createInkCLI({ agent });           // Rich React UI
+const blessedCLI = createBlessedCLI({ agent });   // Traditional TUI
+
+// All provide identical functionality, different experiences
 ```
 
-### **Maintainability**
-Clear separation of concerns - each class has a single responsibility:
+### **Code Reuse & Maintainability** 
+Core business logic is framework-agnostic:
 
-- `EventDrivenCLI` - orchestration only
-- `ReadlineTerminal` - terminal operations only  
-- `ProgressRenderer` - progress display only
-- `ModeRenderer` - mode indication only
+- `EventDrivenCLI` - orchestration only (same across all frameworks)
+- `EventManager` - event handling (shared service)
+- `CommandRouter` - command parsing (shared service)  
+- `AgentConnector` - agent communication (shared service)
+
+Only UI rendering differs between frameworks.
 
 ### **SOLID Compliance**
 - **S**RP: Each class has one reason to change
-- **O**CP: Open for extension via new implementations, closed for modification
-- **L**SP: All implementations honor their interface contracts  
-- **I**SP: Interfaces are focused and cohesive
-- **D**IP: Depend on abstractions, not concretions
+- **O**CP: Open for extension via new framework implementations, closed for modification
+- **L**SP: All framework implementations honor the same interface contracts  
+- **I**SP: Interfaces are focused and framework-agnostic
+- **D**IP: Depend on abstractions, not specific framework implementations
 
 ## Implementation Strategy
 
@@ -528,33 +588,95 @@ Clear separation of concerns - each class has a single responsibility:
 5. **Phase 5**: Update factory functions to use new architecture
 6. **Phase 6**: Testing and validation - ensure all functionality works
 
-### File Structure
+### File Structure - Three Framework Support
 ```
 lib/src/cli/
 ├── abstractions/
-│   ├── ITerminal.ts
-│   ├── IUIComponent.ts
-│   └── ICLIServices.ts
-├── terminal/
-│   ├── ReadlineTerminal.ts
-│   ├── InkTerminal.ts (future)
-│   └── BlessedTerminal.ts (future)
-├── renderers/
-│   ├── ProgressRenderer.ts
-│   ├── ModeRenderer.ts
-│   └── StreamRenderer.ts
-├── services/
+│   ├── ITerminal.ts          # Terminal abstraction
+│   ├── IUIComponent.ts       # UI component interfaces
+│   └── ICLIServices.ts       # Service interfaces
+├── frameworks/
+│   ├── readline/             # Custom Framework (no deps)
+│   │   ├── ReadlineTerminal.ts
+│   │   ├── ReadlineInputManager.ts
+│   │   ├── ReadlineProgressRenderer.ts
+│   │   ├── ReadlineModeRenderer.ts
+│   │   └── ReadlineStreamRenderer.ts
+│   ├── ink/                  # Ink Framework (bun add ink @inkjs/ui)
+│   │   ├── InkTerminal.tsx
+│   │   ├── InkInputManager.tsx
+│   │   ├── InkProgressRenderer.tsx
+│   │   ├── InkModeRenderer.tsx
+│   │   └── InkStreamRenderer.tsx
+│   └── blessed/              # neo-blessed Framework (bun add neo-blessed)
+│       ├── BlessedTerminal.ts
+│       ├── BlessedInputManager.ts
+│       ├── BlessedProgressRenderer.ts
+│       ├── BlessedModeRenderer.ts
+│       └── BlessedStreamRenderer.ts
+├── services/                 # Shared across all frameworks
 │   ├── EventManager.ts
 │   ├── CommandRouter.ts
 │   └── AgentConnector.ts
 ├── container/
-│   └── CLIContainer.ts
+│   └── CLIContainer.ts       # Dependency injection
 ├── factories/
-│   ├── createReadlineCLI.ts
-│   ├── createInkCLI.ts
-│   └── createBlessedCLI.ts
+│   ├── createReadlineCLI.ts  # Custom framework factory
+│   ├── createInkCLI.ts       # Ink framework factory  
+│   ├── createBlessedCLI.ts   # blessed framework factory
+│   └── createCLI.ts          # Framework-agnostic factory
 └── impl/
-    └── EventDrivenCLI.ts (refactored)
+    └── EventDrivenCLI.ts     # Framework-agnostic orchestrator
 ```
 
-This architecture refactoring will transform the CLI from a monolithic implementation into a modular, testable, and extensible framework that can support multiple terminal backends while maintaining clean separation of concerns.
+## Framework Comparison & Selection Guide
+
+### Dependencies & Package Size
+```bash
+# 1. Custom Readline Framework - Zero dependencies
+# Uses only Node.js built-ins: readline, process, events
+# Bundle impact: ~0 KB
+
+# 2. Ink Framework - Modern React-based
+bun add ink @inkjs/ui ink-progress-bar ink-spinner
+# Bundle impact: ~500KB (React + Ink ecosystem)
+
+# 3. neo-blessed Framework - Traditional TUI
+bun add neo-blessed @types/blessed  
+# Bundle impact: ~200KB (blessed widgets)
+```
+
+### Code Complexity Comparison
+
+**Custom Readline** (Current approach, ~1,600 lines):
+- Manual ANSI escape sequences
+- Direct terminal control
+- Custom progress/mode implementations
+- Full control but more code
+
+**Ink Framework** (~200-300 lines):
+- Declarative React components
+- Rich ecosystem of pre-built components  
+- Automatic rendering and layout
+- Less code, more functionality
+
+**neo-blessed** (~400-600 lines):
+- Widget-based approach
+- Traditional TUI patterns
+- Robust but more verbose than Ink
+- Good balance of control and convenience
+
+### Performance Characteristics
+- **Custom Readline**: Fastest startup, lowest memory
+- **Ink**: Moderate startup (React), rich interactions
+- **neo-blessed**: Fast startup, efficient widgets
+
+## Conclusion
+
+This three-framework architecture provides the best of all worlds:
+
+1. **Custom Framework** remains as a lightweight, dependency-free option
+2. **Ink Framework** enables rich, modern React-based UIs
+3. **neo-blessed Framework** supports traditional TUI applications
+
+The abstraction layer ensures all frameworks provide identical functionality while allowing developers to choose the best tool for their specific use case. The architecture transforms the CLI from a monolithic implementation into a modular, testable, and extensible framework that supports multiple terminal backends while maintaining clean separation of concerns.
