@@ -6,12 +6,14 @@
 
 import React from 'react'
 import { Box, Text, Newline } from 'ink'
+import Spinner from 'ink-spinner'
 
 interface OutputMessage {
   id: string
   content: string
-  type: 'info' | 'success' | 'error' | 'warning' | 'command' | 'response'
+  type: 'info' | 'success' | 'error' | 'warning' | 'command' | 'response' | 'streaming' | 'complete' | 'status'
   timestamp: Date
+  isProcessing?: boolean
 }
 
 interface OutputDisplayProps {
@@ -25,7 +27,10 @@ const MESSAGE_COLORS = {
   error: 'red',
   warning: 'yellow',
   command: 'cyan',
-  response: 'white'
+  response: 'white',
+  streaming: 'magenta',
+  complete: 'green',
+  status: 'gray'
 } as const
 
 const MESSAGE_PREFIXES = {
@@ -34,7 +39,10 @@ const MESSAGE_PREFIXES = {
   error: '❌',
   warning: '⚠️',
   command: '▶️',
-  response: '💬'
+  response: '💬',
+  streaming: '🌊',
+  complete: '✅',
+  status: 'ℹ️'
 } as const
 
 export function OutputDisplay({ messages, maxMessages = 50 }: OutputDisplayProps) {
@@ -54,7 +62,7 @@ export function OutputDisplay({ messages, maxMessages = 50 }: OutputDisplayProps
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
       {displayMessages.map((message, index) => (
-        <MessageItem key={message.id} message={message} />
+        <MessageItem key={`${message.id}-${index}`} message={message} />
       ))}
     </Box>
   )
@@ -78,9 +86,16 @@ function MessageItem({ message }: { message: OutputMessage }) {
         <Text color="dim" dimColor>
           [{timeStr}] 
         </Text>
-        <Text color={color}>
-          {prefix} 
-        </Text>
+        {message.isProcessing ? (
+          <Text color="cyan">
+            <Spinner type="dots" />
+            {' '}
+          </Text>
+        ) : (
+          <Text color={color}>
+            {prefix} 
+          </Text>
+        )}
         <Text color={color}>
           {message.content}
         </Text>
@@ -89,16 +104,22 @@ function MessageItem({ message }: { message: OutputMessage }) {
   )
 }
 
+// Counter to ensure unique message IDs
+let messageCounter = 0;
+
 // Helper function to create output messages
 export function createOutputMessage(
   content: string, 
-  type: OutputMessage['type'] = 'info'
+  type: OutputMessage['type'] = 'info',
+  isProcessing: boolean = false
 ): OutputMessage {
+  messageCounter++;
   return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `msg-${Date.now()}-${messageCounter}-${Math.random().toString(36).substr(2, 9)}`,
     content,
     type,
-    timestamp: new Date()
+    timestamp: new Date(),
+    isProcessing
   }
 }
 

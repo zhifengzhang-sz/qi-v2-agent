@@ -4,9 +4,9 @@
  * Handles user input with proper parsing and command detection
  */
 
-import React, { useState, useTransition } from 'react'
-import { Box, Text, useInput } from 'ink'
-import { TextInput } from '@inkjs/ui'
+import React, { useState, useTransition, useRef, useEffect } from 'react'
+import { Box, Text, useInput, useApp } from 'ink'
+import TextInput, { UncontrolledTextInput } from 'ink-text-input'
 import type { AppState, AppSubState } from '../../../abstractions/index.js'
 
 interface InputBoxProps {
@@ -14,7 +14,11 @@ interface InputBoxProps {
   subState?: AppSubState
   onSubmit: (input: string) => void
   onStateChange?: () => void
+  onCommand?: (command: string, args: string[]) => void
+  onCancel?: () => void
+  onClear?: () => void
   placeholder?: string
+  framework?: any // Framework instance for listening to events
 }
 
 export function InputBox({ 
@@ -22,28 +26,52 @@ export function InputBox({
   subState, 
   onSubmit, 
   onStateChange,
-  placeholder = 'Enter command or prompt...'
+  onCommand,
+  onCancel,
+  onClear,
+  placeholder = 'Enter command or prompt...',
+  framework
 }: InputBoxProps) {
   const [input, setInput] = useState('')
   const [isPending, startTransition] = useTransition()
+  const { exit } = useApp()
   
-  useInput((input, key) => {
-    // Handle Shift+Tab for state cycling
-    if (key.shift && key.tab && state === 'ready' && onStateChange) {
-      onStateChange()
-      return
-    }
+  const isDisabled = state === 'busy' || isPending
+  
+  // Listen to global framework events for input clearing (avoids useInput conflict)
+  useEffect(() => {
+    if (!framework) return;
     
-    // Handle Ctrl+C for exit
-    if (key.ctrl && input === 'c') {
-      process.exit(0)
-    }
-  })
+    const handleClearInput = () => {
+      setInput('');
+      if (onClear) {
+        onClear();
+      }
+    };
+
+    // Listen to the clearInput event from the global handler
+    framework.on('clearInput', handleClearInput);
+    
+    return () => {
+      framework.off('clearInput', handleClearInput);
+    };
+  }, [framework, onClear]);
   
   const handleSubmit = (value: string) => {
     if (value.trim()) {
       startTransition(() => {
-        onSubmit(value.trim())
+        const trimmedValue = value.trim()
+        
+        // Check if it's a command
+        if (trimmedValue.startsWith('/') && onCommand) {
+          const parts = trimmedValue.slice(1).split(' ')
+          const command = parts[0]
+          const args = parts.slice(1)
+          onCommand(command, args)
+        } else {
+          onSubmit(trimmedValue)
+        }
+        
         setInput('')
       })
     }
@@ -63,18 +91,23 @@ export function InputBox({
     return prefixes[subState || 'generic']
   }
   
-  const isDisabled = state === 'busy' || isPending
-  
   return (
     <Box flexDirection="column">
       <Box>
         <Text color="cyan">{getPromptPrefix()} </Text>
-        <TextInput
-          onChange={setInput}
-          onSubmit={handleSubmit}
-          placeholder={isDisabled ? 'Please wait...' : placeholder}
-          isDisabled={isDisabled}
-        />
+        {!isDisabled ? (
+          <TextInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            placeholder={placeholder}
+            focus={true}
+          />
+        ) : (
+          <Text color="gray" dimColor>
+            Please wait...
+          </Text>
+        )}
       </Box>
       
       {isDisabled && (

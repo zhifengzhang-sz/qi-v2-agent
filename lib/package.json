@@ -18,6 +18,7 @@
     "check": "bun run type-check && bun run lint && bun run test"
   },
   "dependencies": {
+    "@inkjs/ui": "^2.0.0",
     "@instructor-ai/instructor": "^1.7.0",
     "@langchain/anthropic": "^0.3.15",
     "@langchain/cohere": "^0.3.3",
@@ -29,6 +30,7 @@
     "@langchain/openai": "^0.3.15",
     "@modelcontextprotocol/sdk": "^1.16.0",
     "@qi": "file:../../qi-v2-qicore/typescript",
+    "ink": "^6.1.0",
     "js-yaml": "^4.1.0",
     "ollama": "^0.5.16",
     "openai": "^5.12.0",

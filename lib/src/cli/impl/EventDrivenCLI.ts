@@ -139,6 +139,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     this.terminal.writeLine('🚀 Event-Driven CLI Ready');
     this.terminal.writeLine('=========================');
     this.terminal.writeLine('💡 Press Shift+Tab to cycle modes, Esc to cancel operations');
+    this.terminal.writeLine('⌨️  Ctrl+C to clear prompt • Ctrl+D to exit');
     this.terminal.writeLine('');
 
     // Update prompt with current model/mode info
@@ -452,6 +453,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     });
 
     this.inputManager.onCtrlC(() => {
+      this.handleClearPrompt();
+    });
+
+    this.inputManager.onCtrlD(() => {
       this.handleGracefulExit();
     });
   }
@@ -543,6 +548,12 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
     this.eventManager.emit('cancelRequested', { reason: 'user_escape' });
     this.showPrompt();
+  }
+
+  private handleClearPrompt(): void {
+    // Clear current input line
+    this.inputManager.clearInput();
+    this.displayMessage('Prompt cleared', 'info');
   }
 
   private handleGracefulExit(): void {
