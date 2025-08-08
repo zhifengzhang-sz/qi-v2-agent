@@ -47,6 +47,9 @@ class QiPromptCLI {
     this.commandHandler = createCommandHandler({
       enableBuiltInCommands: true,
     });
+    
+    // Register app-specific commands
+    this.registerAppCommands();
   }
 
   async initialize(): Promise<void> {
@@ -94,6 +97,7 @@ class QiPromptCLI {
         enableHotkeys: true,
         enableStreaming: true,
         debug: this.debugMode,
+        commandHandler: this.commandHandler, // Connect app's CommandHandler to CLI
       });
 
       console.log('✅ Event-driven CLI initialized');
@@ -132,6 +136,79 @@ class QiPromptCLI {
     } catch (error) {
       console.error('Error during shutdown:', error);
     }
+  }
+
+  /**
+   * Register application-specific commands
+   */
+  private registerAppCommands(): void {
+    // Status command - show app status
+    this.commandHandler.registerCommand(
+      {
+        name: 'status',
+        description: 'Show current application status',
+        usage: '/status',
+        category: 'system',
+        parameters: [],
+      },
+      async (request) => {
+        const uptime = Math.floor(process.uptime());
+        const commands = this.commandHandler.getAvailableCommands().length;
+        
+        const content = `📊 System Status:\n\n` +
+          `  Mode: interactive\n` +
+          `  Provider: ollama\n` +
+          `  Model: qwen3:8b\n` +
+          `  Uptime: ${uptime}s\n` +
+          `  Commands: ${commands}`;
+
+        return {
+          status: 'success' as const,
+          success: true,
+          content,
+          output: content,
+          commandName: 'status',
+          metadata: new Map()
+        };
+      }
+    );
+
+    // Model command - show/change model
+    this.commandHandler.registerCommand(
+      {
+        name: 'model',
+        description: 'Show or change the current LLM model',
+        usage: '/model [model_name]',
+        category: 'system',
+        parameters: [
+          {
+            name: 'model_name',
+            type: 'string',
+            required: false,
+            description: 'Model to switch to'
+          }
+        ],
+      },
+      async (request) => {
+        const modelName = request.parameters.get('model_name') as string;
+        
+        let content: string;
+        if (!modelName) {
+          content = 'Current model: qwen3:8b\nAvailable models: qwen3:8b, llama3.2:3b';
+        } else {
+          content = `Model would be changed to: ${modelName} (not implemented yet)`;
+        }
+
+        return {
+          status: 'success' as const,
+          success: true,
+          content,
+          output: content,
+          commandName: 'model',
+          metadata: new Map()
+        };
+      }
+    );
   }
 }
 
