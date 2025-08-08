@@ -22,6 +22,19 @@ import { createCommandHandler } from '@qi/agent/command';
 import { createPromptApp } from '@qi/agent';
 import { setupQuickCLI } from '@qi/agent/cli';
 
+// Import app-specific event types
+import type {
+  ModelChangeRequestedEvent,
+  ModeChangeRequestedEvent,
+  ModelChangedEvent,
+  ModeChangedEvent,
+  StatusResponseEvent
+} from './events/PromptAppEvents.js';
+
+// Import app-specific commands
+import { createModelCommand } from './commands/ModelCommand.js';
+import { createStatusCommand } from './commands/StatusCommand.js';
+
 /**
  * Modern Event-Driven Prompt CLI
  * 
@@ -48,7 +61,7 @@ class QiPromptCLI {
       enableBuiltInCommands: true,
     });
     
-    // Register app-specific commands
+    // Register app-specific commands that integrate with StateManager
     this.registerAppCommands();
   }
 
@@ -100,7 +113,16 @@ class QiPromptCLI {
         commandHandler: this.commandHandler, // Connect app's CommandHandler to CLI
       });
 
+      console.log('✅ Event-driven CLI created');
+
+      // Explicitly initialize the CLI to ensure hotkeys work
+      await this.cli.initialize();
       console.log('✅ Event-driven CLI initialized');
+
+      // Setup bidirectional event communication (Phase 5: App Assembly)
+      this.setupEventCommunication();
+      console.log('✅ Event-driven communication wired');
+      
       console.log('🎉 Initialization complete!\n');
     } catch (error) {
       console.error('❌ Initialization failed:', error);
@@ -139,76 +161,91 @@ class QiPromptCLI {
   }
 
   /**
-   * Register application-specific commands
+   * Setup bidirectional event communication between CLI and Agent
+   * This is Phase 5: App Assembly - where the app layer wires CLI and Agent with app-specific events
+   */
+  private setupEventCommunication(): void {
+    // ===========================================
+    // CLI Events → Agent (CLI emits, Agent handles)
+    // ===========================================
+    
+    // Wire CLI model change requests to Agent
+    // When CLI detects /model command, emit modelChangeRequested event to Agent
+    this.cli.on('modelChangeRequest', (modelName: string) => {
+      const event: ModelChangeRequestedEvent = {
+        type: 'modelChangeRequested',
+        modelName,
+        timestamp: new Date()
+      };
+      this.orchestrator.emit('modelChangeRequested', event);
+    });
+    
+    // Wire CLI mode change requests to Agent  
+    // TODO: Define proper CLI mode vs App mode separation
+    // Reason: CLI modes (interactive/command/streaming) are UI behavior modes,
+    // while App modes (ready/planning/editing/executing/error) are workflow states.
+    // Need to decide if CLI modes should affect app workflow or remain independent.
+    this.cli.on('modeChangeRequest', (mode: 'interactive' | 'command' | 'streaming') => {
+      const event: ModeChangeRequestedEvent = {
+        type: 'modeChangeRequested', 
+        mode,
+        timestamp: new Date()
+      };
+      this.orchestrator.emit('modeChangeRequested', event);
+    });
+    
+    // ===========================================
+    // Agent Events → CLI (Agent emits, CLI handles) 
+    // ===========================================
+    
+    // Wire Agent model change confirmations back to CLI
+    this.orchestrator.on('modelChanged', (event: ModelChangedEvent) => {
+      if (event.success) {
+        this.cli.displayMessage(`✅ Model changed: ${event.oldModel} → ${event.newModel}`);
+        // Update CLI prompt display to show new model
+        this.cli.updatePrompt(`${event.newModel} [💬] > `);
+      } else {
+        this.cli.displayMessage(`❌ Model change failed: ${event.error}`);
+      }
+    });
+    
+    // Wire Agent mode change confirmations back to CLI
+    // TODO: Implement proper mode change feedback to CLI
+    // Reason: Currently CLI and Agent have different mode systems that need reconciliation
+    this.orchestrator.on('modeChanged', (event: ModeChangedEvent) => {
+      if (event.success) {
+        this.cli.displayMessage(`✅ Mode changed: ${event.oldMode} → ${event.newMode}`);
+        // TODO: Update CLI mode indicator properly
+        // Reason: CLI modes and Agent modes are different - need proper mapping
+      } else {
+        this.cli.displayMessage(`❌ Mode change failed`);
+      }
+    });
+    
+    // Wire Agent status responses back to CLI
+    this.orchestrator.on('statusResponse', (event: StatusResponseEvent) => {
+      const { model, mode, uptime, provider, memoryUsage } = event.status;
+      const content = `📊 System Status:\n\n` +
+        `  Mode: ${mode}\n` +
+        `  Provider: ${provider}\n` +
+        `  Model: ${model}\n` +
+        `  Uptime: ${uptime}s\n` +
+        `  Memory: ${memoryUsage}MB`;
+      this.cli.displayMessage(content);
+    });
+  }
+
+  /**
+   * Register application-specific commands that use StateManager properly
    */
   private registerAppCommands(): void {
-    // Status command - show app status
-    this.commandHandler.registerCommand(
-      {
-        name: 'status',
-        description: 'Show current application status',
-        usage: '/status',
-        category: 'system',
-        parameters: [],
-      },
-      async (request) => {
-        const uptime = Math.floor(process.uptime());
-        const commands = this.commandHandler.getAvailableCommands().length;
-        
-        const content = `📊 System Status:\n\n` +
-          `  Mode: interactive\n` +
-          `  Provider: ollama\n` +
-          `  Model: qwen3:8b\n` +
-          `  Uptime: ${uptime}s\n` +
-          `  Commands: ${commands}`;
+    // Register model command with real StateManager integration
+    const modelCommand = createModelCommand(this.stateManager);
+    this.commandHandler.registerCommand(modelCommand.definition, modelCommand.handler);
 
-        return {
-          status: 'success' as const,
-          success: true,
-          content,
-          output: content,
-          commandName: 'status',
-          metadata: new Map()
-        };
-      }
-    );
-
-    // Model command - show/change model
-    this.commandHandler.registerCommand(
-      {
-        name: 'model',
-        description: 'Show or change the current LLM model',
-        usage: '/model [model_name]',
-        category: 'system',
-        parameters: [
-          {
-            name: 'model_name',
-            type: 'string',
-            required: false,
-            description: 'Model to switch to'
-          }
-        ],
-      },
-      async (request) => {
-        const modelName = request.parameters.get('model_name') as string;
-        
-        let content: string;
-        if (!modelName) {
-          content = 'Current model: qwen3:8b\nAvailable models: qwen3:8b, llama3.2:3b';
-        } else {
-          content = `Model would be changed to: ${modelName} (not implemented yet)`;
-        }
-
-        return {
-          status: 'success' as const,
-          success: true,
-          content,
-          output: content,
-          commandName: 'model',
-          metadata: new Map()
-        };
-      }
-    );
+    // Register status command with real StateManager integration  
+    const statusCommand = createStatusCommand(this.stateManager);
+    this.commandHandler.registerCommand(statusCommand.definition, statusCommand.handler);
   }
 }
 

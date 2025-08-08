@@ -25,6 +25,8 @@ import type {
   AgentStreamChunk,
   IAgent,
 } from './abstractions/index.js';
+// Event types will be provided by the app layer when instantiating
+// This follows the generic framework pattern where app provides the content types
 
 /**
  * Event types emitted by PromptAppOrchestrator for responsive UI
@@ -123,6 +125,29 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     this.config = config;
     this.commandHandler = dependencies.commandHandler;
     this.promptHandler = dependencies.promptHandler;
+    
+    // Set up CLI event handlers
+    this.setupCLIEventHandlers();
+  }
+
+  /**
+   * Set up handlers for CLI events (app-specific event-driven communication)
+   */
+  private setupCLIEventHandlers(): void {
+    // Handle model change requests from CLI
+    this.on('modelChangeRequested', this.handleModelChangeRequest.bind(this));
+    
+    // Handle mode change requests from CLI
+    this.on('modeChangeRequested', this.handleModeChangeRequest.bind(this));
+    
+    // Handle prompt requests from CLI
+    this.on('promptRequested', this.handlePromptRequest.bind(this));
+    
+    // Handle status requests from CLI
+    this.on('statusRequested', this.handleStatusRequest.bind(this));
+    
+    // Handle cancel requests from CLI
+    this.on('cancelRequested', this.handleCancelRequest.bind(this));
   }
 
   async initialize(): Promise<void> {
@@ -712,5 +737,166 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  // ===========================================
+  // CLI Event Handlers (Event-Driven Communication)  
+  // ===========================================
+
+  /**
+   * Handle model change requests from CLI
+   */
+  private async handleModelChangeRequest(event: any): Promise<void> {
+    const { modelName } = event;
+    const currentModel = this.stateManager.getCurrentModel();
+    
+    try {
+      // Validate model is available
+      const availableModels = this.stateManager.getAvailablePromptModels();
+      if (availableModels.length > 0 && !availableModels.includes(modelName)) {
+        this.emit('modelChanged', {
+          type: 'modelChanged',
+          oldModel: currentModel,
+          newModel: modelName,
+          success: false,
+          error: `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`,
+          timestamp: new Date()
+        });
+        return;
+      }
+      
+      // Update model via StateManager
+      this.stateManager.updatePromptModel(modelName);
+      
+      // Emit success event back to CLI
+      this.emit('modelChanged', {
+        type: 'modelChanged',
+        oldModel: currentModel,
+        newModel: modelName,
+        success: true,
+        timestamp: new Date()
+      });
+      
+    } catch (error) {
+      this.emit('modelChanged', {
+        type: 'modelChanged',
+        oldModel: currentModel,
+        newModel: modelName,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date()
+      });
+    }
+  }
+
+  /**
+   * Handle mode change requests from CLI
+   * TODO: Implement proper CLI mode to App mode mapping
+   * Reason: CLI modes (interactive/command/streaming) are UI behavior states,
+   * while App modes (ready/planning/editing/executing/error) are workflow states.
+   * Currently just acknowledging the request without proper state management.
+   */
+  private async handleModeChangeRequest(event: any): Promise<void> {
+    const { mode } = event;
+    // TODO: Implement proper mode handling logic
+    // For now, just acknowledge the mode change request
+    
+    try {
+      // TODO: Determine if CLI modes should map to App workflow modes
+      // Current approach: acknowledge but don't change App mode
+      
+      // Emit success event back to CLI
+      this.emit('modeChanged', {
+        type: 'modeChanged',
+        oldMode: mode, // TODO: Get actual previous CLI mode
+        newMode: mode,
+        success: true,
+        timestamp: new Date()
+      });
+      
+    } catch (error) {
+      this.emit('modeChanged', {
+        type: 'modeChanged',
+        oldMode: mode,
+        newMode: mode,
+        success: false,
+        timestamp: new Date()
+      });
+    }
+  }
+
+  /**
+   * Handle prompt requests from CLI
+   */
+  private async handlePromptRequest(event: any): Promise<void> {
+    const { prompt, context } = event;
+    
+    try {
+      // Create traditional AgentRequest and process it
+      const agentRequest: AgentRequest = {
+        input: prompt,
+        context: {
+          sessionId: context?.sessionId || 'cli-session',
+          timestamp: new Date(),
+          source: 'cli'
+        }
+      };
+      
+      // Process through traditional flow (will emit progress, complete events)
+      await this.process(agentRequest);
+      
+    } catch (error) {
+      this.emit('error', {
+        type: 'error',
+        error: {
+          code: 'PROMPT_PROCESSING_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        },
+        timestamp: new Date()
+      });
+    }
+  }
+
+  /**
+   * Handle status requests from CLI
+   */
+  private async handleStatusRequest(event: any): Promise<void> {
+    try {
+      const currentModel = this.stateManager.getCurrentModel();
+      const currentMode = this.stateManager.getCurrentMode();
+      const promptConfig = this.stateManager.getPromptConfig();
+      const uptime = Math.floor(process.uptime());
+      const availableModels = this.stateManager.getAvailablePromptModels();
+      
+      this.emit('statusResponse', {
+        type: 'statusResponse',
+        status: {
+          model: currentModel,
+          mode: currentMode,
+          uptime,
+          provider: promptConfig?.provider || 'ollama',
+          availableCommands: this.commandHandler?.getAvailableCommands().length || 0,
+          memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+        },
+        timestamp: new Date()
+      });
+      
+    } catch (error) {
+      this.emit('error', {
+        type: 'error',
+        error: {
+          code: 'STATUS_REQUEST_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        },
+        timestamp: new Date()
+      });
+    }
+  }
+
+  /**
+   * Handle cancel requests from CLI
+   */
+  private async handleCancelRequest(event: any): Promise<void> {
+    this.cancel();
   }
 }

@@ -35,6 +35,7 @@ import type {
   ICommandRouter,
   IAgentConnector,
 } from '../abstractions/ICLIServices.js';
+import type { ICommandHandler } from '../../command/abstractions/index.js';
 
 /**
  * Refactored EventDrivenCLI - Pure orchestration with dependency injection
@@ -64,7 +65,8 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     private eventManager: IEventManager,
     private commandRouter: ICommandRouter,
     private agentConnector: IAgentConnector,
-    config: Partial<CLIConfig> = {}
+    config: Partial<CLIConfig> = {},
+    private commandHandler?: ICommandHandler
   ) {
     // Default configuration
     this.config = {
@@ -463,12 +465,53 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   private async handleCommand(command: string, args: string[], flags: Record<string, string | boolean>): Promise<void> {
-    const result = await this.commandRouter.handleCommand(command, args, flags);
-    
-    if (result.tag === 'success') {
-      this.displayMessage(result.value, 'info');
+    // Use commandHandler directly if available (preferred approach)
+    if (this.commandHandler) {
+      const parameters = new Map<string, unknown>();
+      
+      // Map args to parameters
+      args.forEach((arg, index) => {
+        parameters.set(`arg${index}`, arg);
+      });
+      
+      // Add flags to parameters
+      Object.entries(flags).forEach(([key, value]) => {
+        parameters.set(key, value);
+      });
+      
+      const request = {
+        commandName: command,
+        parameters,
+        rawInput: `/${command} ${args.join(' ')}`.trim(),
+        context: new Map<string, unknown>()
+      };
+      
+      try {
+        const result = await this.commandHandler.executeCommand(request);
+        
+        if (result.success) {
+          this.displayMessage(result.content, 'info');
+          
+          // Check if this was a model command and update prompt  
+          if (command === 'model') {
+            this.updatePrompt(); // Refresh prompt to show current model
+          }
+        } else {
+          this.displayMessage(result.error || 'Command failed', 'error');
+        }
+      } catch (error) {
+        // CommandHandler should not throw, but handle gracefully if it does
+        this.displayMessage(`Command execution error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      }
     } else {
-      this.displayMessage(result.error.message, 'error');
+      // Fallback to commandRouter (existing behavior)
+      const result = await this.commandRouter.handleCommand(command, args, flags);
+      
+      if (result.tag === 'success') {
+        this.displayMessage(result.value, 'info');
+      } else {
+        this.displayMessage(result.error.message, 'error');
+      }
     }
     
     this.showPrompt();
@@ -478,6 +521,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     const newMode = this.modeRenderer.cycleMode(true);
     this.state.mode = newMode;
     this.updatePrompt();
+    
+    // Force immediate visual refresh of the prompt to show mode change
+    this.showPrompt();
+    
     this.eventManager.emit('modeChanged', { 
       previousMode: this.state.mode, 
       newMode 
@@ -512,16 +559,36 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   private updatePrompt(): void {
-    const provider = 'ollama'; // TODO: Get from agent
+    const provider = this.getAgentProvider();
     const model = this.getAgentModel();
     const modePrefix = this.modeRenderer.getPromptPrefix();
     
-    const prompt = `${provider} ${model} ${modePrefix}${this.config.prompt}`;
+    // Show both provider and current model name in prompt
+    const prompt = `${provider}:${model} ${modePrefix}${this.config.prompt}`;
     this.inputManager.setPrompt(prompt);
   }
 
   private updatePromptWithAgentInfo(): void {
     this.updatePrompt();
+  }
+
+  private getAgentProvider(): string {
+    try {
+      const agent = (this.agentConnector as any).currentAgent;
+      
+      // Try to get provider from state manager's prompt config
+      if (agent?.stateManager?.getPromptConfig) {
+        const promptConfig = agent.stateManager.getPromptConfig();
+        if (promptConfig?.provider) {
+          return promptConfig.provider;
+        }
+      }
+      
+      // Fallback to default
+      return 'ollama';
+    } catch {
+      return 'ollama';
+    }
   }
 
   private getAgentModel(): string {
@@ -530,12 +597,20 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       const agentInfo = this.agentConnector.getAgentInfo();
       const agent = (this.agentConnector as any).currentAgent;
       
+      // Try to get current model from state manager's prompt config (most accurate)
+      if (agent?.stateManager?.getPromptConfig) {
+        const promptConfig = agent.stateManager.getPromptConfig();
+        if (promptConfig?.model) {
+          return promptConfig.model;
+        }
+      }
+      
       // Try to get model from agent's prompt handler
       if (agent?.promptHandler?.getCurrentModel) {
         return agent.promptHandler.getCurrentModel();
       }
       
-      // Try to get model from state manager
+      // Try to get model from state manager (general)
       if (agent?.stateManager?.getCurrentModel) {
         return agent.stateManager.getCurrentModel();
       }
@@ -545,10 +620,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
         return agent.promptHandler.config.defaultModel;
       }
       
-      // Fallback to a reasonable default
-      return 'qwen2.5:7b';
+      // Fallback to match what the status command shows
+      return 'qwen3:8b';
     } catch {
-      return 'qwen2.5:7b';
+      return 'qwen3:8b';
     }
   }
 

@@ -53,6 +53,14 @@ const BUILT_IN_COMMANDS: CommandDefinition[] = [
     category: 'ui',
     parameters: [],
   },
+  {
+    name: 'exit',
+    description: 'Exit the application',
+    usage: '/exit',
+    aliases: ['quit', 'q'],
+    category: 'system',
+    parameters: [],
+  },
 ];
 
 /**
@@ -233,13 +241,13 @@ export class CommandHandler implements ICommandHandler {
         }
 
         const commands = this.getAvailableCommands();
-        let output = 'Available commands:\\n\\n';
+        let output = 'Available commands:\n\n';
 
         for (const cmd of commands) {
-          output += `/${cmd.name} - ${cmd.description}\\n`;
+          output += `  /${cmd.name} - ${cmd.description}\n`;
         }
 
-        output += '\\nUse /help <command> for detailed usage information.';
+        output += '\nUse /help <command> for detailed usage information.';
 
         return {
           status: 'success',
@@ -283,6 +291,29 @@ export class CommandHandler implements ICommandHandler {
           content: 'Screen cleared',
           output: '',
           commandName: 'clear',
+          success: true,
+          metadata: new Map(),
+        };
+      }
+    );
+
+    // Exit command
+    this.registerCommand(
+      BUILT_IN_COMMANDS.find((c) => c.name === 'exit')!,
+      async (_request: CommandRequest) => {
+        // Initiate graceful shutdown
+        process.stdout.write('\\n👋 Goodbye!\\n');
+        
+        // Use setTimeout to allow the message to be displayed before exiting
+        setTimeout(() => {
+          process.exit(0);
+        }, 100);
+
+        return {
+          status: 'success',
+          content: 'Exiting application...',
+          output: 'Exiting application...',
+          commandName: 'exit',
           success: true,
           metadata: new Map(),
         };
