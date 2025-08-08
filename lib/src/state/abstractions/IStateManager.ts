@@ -113,6 +113,7 @@ export interface IStateManager {
   getClassifierConfig(): LLMRoleConfig | null;
   getPromptConfig(): LLMRoleConfig | null;
   updatePromptModel(model: string): void;
+  updatePromptMaxTokens(maxTokens: number): void;
   getAvailablePromptModels(): readonly string[];
   getLLMConfigForPromptModule(): any | null; // Returns LLMConfig structure that prompt module expects
 

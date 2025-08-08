@@ -211,9 +211,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       };
 
       // Emit completion events
-      this.emit('progress', { phase: 'complete', progress: 1.0, details: 'Request completed' });
       this.emit('complete', { result: finalResponse });
-      this.emit('message', { content: 'Request completed successfully', type: 'complete' });
 
       return finalResponse;
     } catch (error) {
@@ -365,6 +363,10 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     
     if (commandName === 'status' || commandName === 's') {
       return await this.handleStatusCommand();
+    }
+    
+    if (commandName === 'maxTokens' || commandName === 'maxtokens' || commandName === 'tokens') {
+      return await this.handleMaxTokensCommand(parts.slice(1));
     }
 
     // Fall back to standard command handler for basic CLI commands
@@ -523,20 +525,28 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   }
 
   private async handleModelCommand(args: string[]): Promise<AgentResponse> {
-    const currentModel = this.stateManager.getCurrentModel();
     const promptConfig = this.stateManager.getPromptConfig();
+    const currentModel = promptConfig?.model || this.stateManager.getCurrentModel();
     
     if (args.length === 0) {
-      // Show current model
+      // Show current model and available models
+      const availableModels = this.stateManager.getAvailablePromptModels();
+      let content = `Current model: ${currentModel || 'qwen3:0.6b'}\nProvider: ${promptConfig?.provider || 'ollama'}`;
+      
+      if (availableModels.length > 0) {
+        content += `\nAvailable models: ${availableModels.join(', ')}`;
+        content += `\n\nUse '/model <model_name>' to switch models.`;
+      }
+      
       return {
-        content: `Current model: ${currentModel || 'qwen3:8b'}\nProvider: ${promptConfig?.provider || 'ollama'}`,
+        content,
         type: 'command',
         confidence: 1.0,
         executionTime: 0,
         metadata: new Map([
           ['commandName', 'model'],
           ['action', 'view'],
-          ['currentModel', currentModel || 'qwen3:8b']
+          ['currentModel', currentModel || 'qwen3:0.6b']
         ]),
         success: true,
       };
@@ -546,8 +556,26 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     const previousModel = currentModel;
     
     try {
-      // Switch model using state manager
-      this.stateManager.setCurrentModel(newModel);
+      // Check if model is available for prompts
+      const availableModels = this.stateManager.getAvailablePromptModels();
+      if (availableModels.length > 0 && !availableModels.includes(newModel)) {
+        return {
+          content: `❌ Model '${newModel}' not available.\nAvailable models: ${availableModels.join(', ')}`,
+          type: 'command',
+          confidence: 0,
+          executionTime: 0,
+          metadata: new Map([
+            ['commandName', 'model'],
+            ['action', 'switch'],
+            ['error', 'model_not_available']
+          ]),
+          success: false,
+          error: 'Model not available',
+        };
+      }
+      
+      // Switch model using prompt config
+      this.stateManager.updatePromptModel(newModel);
       
       return {
         content: `✅ Switched to model: ${newModel}`,
@@ -558,7 +586,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
           ['commandName', 'model'],
           ['action', 'switch'],
           ['newModel', newModel],
-          ['previousModel', previousModel || 'qwen3:8b']
+          ['previousModel', previousModel || 'qwen3:0.6b']
         ]),
         success: true,
       };
@@ -580,29 +608,26 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   }
 
   private async handleStatusCommand(): Promise<AgentResponse> {
-    const orchestratorStatus = this.getStatus();
-    const currentModel = this.stateManager.getCurrentModel();
     const promptConfig = this.stateManager.getPromptConfig();
-    const currentMode = this.stateManager.getCurrentMode();
+    const currentModel = promptConfig?.model || this.stateManager.getCurrentModel();
+    const availableModels = this.stateManager.getAvailablePromptModels();
     
-    let statusContent = '📊 PromptApp Status:\n';
-    statusContent += `   Initialized: ${orchestratorStatus.isInitialized}\n`;
-    statusContent += `   Domain: ${orchestratorStatus.domain}\n`;
-    statusContent += `   Mode: ${currentMode}\n`;
-    statusContent += `   Uptime: ${Math.floor(orchestratorStatus.uptime / 1000)}s\n`;
-    statusContent += `   Requests Processed: ${orchestratorStatus.requestsProcessed}\n`;
-    statusContent += `   Average Response Time: ${Math.floor(orchestratorStatus.averageResponseTime)}ms\n`;
+    let statusContent = '📊 Status:\n';
+    statusContent += `Provider: ${promptConfig?.provider || 'ollama'}\n`;
+    statusContent += `Model: ${currentModel || 'qwen3:0.6b'}\n`;
+    statusContent += `Temperature: ${promptConfig?.temperature || 0.1}\n`;
+    statusContent += `Max Tokens: ${promptConfig?.maxTokens || 1000}\n`;
     
-    if (orchestratorStatus.lastActivity) {
-      statusContent += `   Last Activity: ${orchestratorStatus.lastActivity.toLocaleTimeString()}\n`;
+    if (availableModels.length > 0) {
+      statusContent += `\nAvailable Models: ${availableModels.join(', ')}`;
     }
     
-    statusContent += '\n🔧 Configuration:\n';
-    statusContent += `   Current Model: ${currentModel || 'qwen3:8b'}\n`;
-    statusContent += `   Provider: ${promptConfig?.provider || 'ollama'}\n`;
-    statusContent += `   Temperature: ${promptConfig?.temperature || 0.1}\n`;
-    statusContent += `   Context Aware: ${this.contextAwarePromptHandler ? 'enabled' : 'disabled'}\n`;
-    statusContent += `   Active Sessions: ${this.sessionContextMap.size}`;
+    const orchestratorStatus = this.getStatus();
+    statusContent += `\n\nSession: ${orchestratorStatus.requestsProcessed} requests processed`;
+    if (orchestratorStatus.lastActivity) {
+      const timeSince = Math.floor((Date.now() - orchestratorStatus.lastActivity.getTime()) / 1000);
+      statusContent += `, last active ${timeSince}s ago`;
+    }
     
     return {
       content: statusContent,
@@ -611,11 +636,81 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       executionTime: 0,
       metadata: new Map([
         ['commandName', 'status'],
-        ['uptime', orchestratorStatus.uptime.toString()],
-        ['requestsProcessed', orchestratorStatus.requestsProcessed.toString()],
-        ['currentModel', currentModel || 'qwen3:8b']
+        ['provider', promptConfig?.provider || 'ollama'],
+        ['currentModel', currentModel || 'qwen3:0.6b']
       ]),
       success: true,
     };
+  }
+
+  private async handleMaxTokensCommand(args: string[]): Promise<AgentResponse> {
+    const promptConfig = this.stateManager.getPromptConfig();
+    const currentMaxTokens = promptConfig?.maxTokens || 1000;
+    
+    if (args.length === 0) {
+      // Show current max tokens
+      return {
+        content: `Current max tokens: ${currentMaxTokens}\n\nUse '/tokens <number>' to change (1-32768)`,
+        type: 'command',
+        confidence: 1.0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'maxTokens'],
+          ['action', 'view'],
+          ['currentMaxTokens', currentMaxTokens.toString()]
+        ]),
+        success: true,
+      };
+    }
+
+    const newMaxTokens = parseInt(args[0], 10);
+    
+    if (isNaN(newMaxTokens)) {
+      return {
+        content: `❌ Invalid number: ${args[0]}\nUse a number between 1 and 32768`,
+        type: 'command',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'maxTokens'],
+          ['action', 'set'],
+          ['error', 'invalid_number']
+        ]),
+        success: false,
+        error: 'Invalid number',
+      };
+    }
+    
+    try {
+      this.stateManager.updatePromptMaxTokens(newMaxTokens);
+      
+      return {
+        content: `✅ Max tokens updated: ${newMaxTokens} (was ${currentMaxTokens})`,
+        type: 'command',
+        confidence: 1.0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'maxTokens'],
+          ['action', 'set'],
+          ['newMaxTokens', newMaxTokens.toString()],
+          ['previousMaxTokens', currentMaxTokens.toString()]
+        ]),
+        success: true,
+      };
+    } catch (error) {
+      return {
+        content: `❌ Failed to update max tokens: ${error instanceof Error ? error.message : String(error)}`,
+        type: 'command',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([
+          ['commandName', 'maxTokens'],
+          ['action', 'set'],
+          ['error', error instanceof Error ? error.message : String(error)]
+        ]),
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }

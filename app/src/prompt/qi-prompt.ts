@@ -34,8 +34,11 @@ class QiPromptCLI {
   private contextManager: any;
   private promptHandler: any;
   private commandHandler: any;
+  private debugMode: boolean;
 
-  constructor() {
+  constructor(options: { debug?: boolean } = {}) {
+    this.debugMode = options.debug ?? false;
+    
     // Create agent components (same as before)
     this.stateManager = createStateManager();
     const appContext = createDefaultAppContext();
@@ -90,6 +93,7 @@ class QiPromptCLI {
         agent: this.orchestrator,
         enableHotkeys: true,
         enableStreaming: true,
+        debug: this.debugMode,
       });
 
       console.log('✅ Event-driven CLI initialized');
@@ -131,9 +135,17 @@ class QiPromptCLI {
   }
 }
 
+// Parse command line arguments
+function parseArgs(): { debug: boolean } {
+  const args = process.argv.slice(2);
+  const debug = args.includes('--debug') || args.includes('-d');
+  return { debug };
+}
+
 // Main entry point
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const cli = new QiPromptCLI();
+  const options = parseArgs();
+  const cli = new QiPromptCLI(options);
   
   // Handle graceful shutdown - more aggressive
   const shutdown = (signal: string) => {
