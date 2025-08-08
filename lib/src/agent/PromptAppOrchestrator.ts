@@ -168,7 +168,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       const parsed = parseInput(request.input);
 
       // Check for cancellation
-      if (this.abortController.signal.aborted) {
+      if (this.abortController?.signal.aborted) {
         throw new Error('Request was cancelled');
       }
 
@@ -190,7 +190,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       }
 
       // Check for cancellation after processing
-      if (this.abortController.signal.aborted) {
+      if (this.abortController?.signal.aborted) {
         throw new Error('Request was cancelled during processing');
       }
 
