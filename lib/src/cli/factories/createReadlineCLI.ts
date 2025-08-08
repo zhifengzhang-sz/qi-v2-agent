@@ -38,6 +38,8 @@ import {
   QiCoreCommandRouter,
   QiCoreAgentConnector,
 } from '../services/index.js';
+import { CommandHandlerBridge } from '../services/CommandHandlerBridge.js';
+import type { ICommandHandler } from '../../command/abstractions/index.js';
 
 // Will be implemented when we refactor EventDrivenCLI
 import { EventDrivenCLI } from '../impl/EventDrivenCLI.js';
@@ -86,7 +88,12 @@ const DEFAULT_READLINE_CONFIG: CLIConfig = {
  * - QiCore services for robust error handling
  * - Proper dependency injection and lifecycle management
  */
-export function createReadlineCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
+export function createReadlineCLI(
+  config: Partial<CLIConfig> = {},
+  options: {
+    commandHandler?: ICommandHandler;
+  } = {}
+): Result<ICLIFramework, QiError> {
   const fullConfig: CLIConfig = { ...DEFAULT_READLINE_CONFIG, ...config };
   
   // Create container
@@ -95,7 +102,7 @@ export function createReadlineCLI(config: Partial<CLIConfig> = {}): Result<ICLIF
   return flatMap(
     (container: CLIContainer) => {
       // Register all services
-      const registrationResult = registerServices(container, fullConfig);
+      const registrationResult = registerServices(container, fullConfig, options);
       
       return match(
         () => {
@@ -134,7 +141,11 @@ function createContainer(): Result<CLIContainer, QiError> {
 /**
  * Register all necessary services in the container
  */
-function registerServices(container: CLIContainer, config: CLIConfig): Result<void, QiError> {
+function registerServices(
+  container: CLIContainer, 
+  config: CLIConfig, 
+  options: { commandHandler?: ICommandHandler } = {}
+): Result<void, QiError> {
   // Register terminal implementation
   const terminalResult = container.register(
     'terminal',
@@ -215,9 +226,14 @@ function registerServices(container: CLIContainer, config: CLIConfig): Result<vo
     return eventManagerResult;
   }
   
+  // Decide which command router to use based on options
+  const commandRouter = options?.commandHandler 
+    ? new CommandHandlerBridge(options.commandHandler)
+    : new QiCoreCommandRouter();
+    
   const commandRouterResult = container.register(
     'commandRouter',
-    () => new QiCoreCommandRouter(),
+    () => commandRouter,
     { singleton: true }
   );
   

@@ -97,11 +97,14 @@ export function setupQuickCLI(options: {
   enableHotkeys?: boolean;
   enableStreaming?: boolean;
   debug?: boolean;
+  commandHandler?: any; // ICommandHandler - using any for now to avoid circular imports
 } = {}) {
   const result = createReadlineCLI({
     enableHotkeys: options.enableHotkeys ?? true,
     enableStreaming: options.enableStreaming ?? true,
     debug: options.debug ?? false,
+  }, {
+    commandHandler: options.commandHandler,
   });
 
   if (result.tag === 'failure') {
