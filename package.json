@@ -30,6 +30,11 @@
   },
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
+    "ink-big-text": "^2.0.0",
+    "ink-gradient": "^3.0.0",
+    "ink-select-input": "^6.2.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
     "js-yaml": "^4.1.0",
     "multi-llm-ts": "^4.2.2",
     "react-devtools-core": "^6.1.5",

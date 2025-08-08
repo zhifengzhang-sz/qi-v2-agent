@@ -48,9 +48,23 @@ class QiPromptCLI {
   private promptHandler: any;
   private commandHandler: any;
   private debugMode: boolean;
+  private framework?: 'readline' | 'ink' | 'blessed';
+  private autoDetect: boolean;
 
-  constructor(options: { debug?: boolean } = {}) {
+  constructor(options: { 
+    debug?: boolean; 
+    framework?: 'readline' | 'ink' | 'blessed';
+    autoDetect?: boolean;
+  } = {}) {
     this.debugMode = options.debug ?? false;
+    this.framework = options.framework;
+    this.autoDetect = options.autoDetect ?? false;
+    
+    // Remove debug logging for cleaner output
+    // if (this.debugMode) {
+    //   console.log('🔧 QiPromptCLI constructor - framework:', this.framework);
+    //   console.log('🔧 QiPromptCLI constructor - options:', options);
+    // }
     
     // Create agent components (same as before)
     this.stateManager = createStateManager();
@@ -104,13 +118,16 @@ class QiPromptCLI {
       await this.orchestrator.initialize();
       console.log('✅ PromptApp orchestrator initialized');
 
-      // Create event-driven CLI with hotkey support
+      // Create event-driven CLI with framework selection and configuration support
       this.cli = setupQuickCLI({
+        framework: this.framework,
         agent: this.orchestrator,
         enableHotkeys: true,
         enableStreaming: true,
         debug: this.debugMode,
         commandHandler: this.commandHandler, // Connect app's CommandHandler to CLI
+        autoDetect: this.autoDetect,
+        args: process.argv.slice(2), // Pass CLI args for configuration loading
       });
 
       console.log('✅ Event-driven CLI created');
@@ -233,6 +250,21 @@ class QiPromptCLI {
         `  Memory: ${memoryUsage}MB`;
       this.cli.displayMessage(content);
     });
+    
+    // Wire Agent completion responses back to CLI - THIS WAS MISSING!
+    this.orchestrator.on('complete', (event: { result: any }) => {
+      let responseContent = 'Task completed successfully';
+      if (event.result) {
+        if (typeof event.result === 'string') {
+          responseContent = event.result;
+        } else if (event.result.content) {
+          responseContent = event.result.content;
+        } else if (event.result.data) {
+          responseContent = event.result.data;
+        }
+      }
+      this.cli.displayMessage(responseContent, 'complete');
+    });
   }
 
   /**
@@ -250,25 +282,120 @@ class QiPromptCLI {
 }
 
 // Parse command line arguments
-function parseArgs(): { debug: boolean } {
+function parseArgs(): { 
+  debug: boolean;
+  framework?: 'readline' | 'ink' | 'blessed';
+  autoDetect: boolean;
+  help: boolean;
+} {
   const args = process.argv.slice(2);
+  
   const debug = args.includes('--debug') || args.includes('-d');
-  return { debug };
+  const autoDetect = args.includes('--auto-detect') || args.includes('-a');
+  const help = args.includes('--help') || args.includes('-h');
+  
+  let framework: 'readline' | 'ink' | 'blessed' | undefined;
+  
+  // Look for framework argument (supports both --framework=value and --framework value formats)
+  for (const arg of args) {
+    if (arg.startsWith('--framework=')) {
+      const frameworkArg = arg.split('=')[1];
+      if (['readline', 'ink', 'blessed'].includes(frameworkArg)) {
+        framework = frameworkArg as 'readline' | 'ink' | 'blessed';
+      }
+      break;
+    } else if (arg === '-f' || arg === '--framework') {
+      const index = args.indexOf(arg);
+      if (index >= 0 && index + 1 < args.length) {
+        const frameworkArg = args[index + 1];
+        if (['readline', 'ink', 'blessed'].includes(frameworkArg)) {
+          framework = frameworkArg as 'readline' | 'ink' | 'blessed';
+        }
+      }
+      break;
+    }
+  }
+  
+  return { debug, framework, autoDetect, help };
+}
+
+// Display help function
+function displayHelp() {
+  // Import configuration utilities for dynamic help
+  const { getAvailableFrameworks, autoDetectFramework } = require('@qi/agent/cli');
+  
+  const available = getAvailableFrameworks();
+  const recommended = autoDetectFramework();
+  
+  console.log(`
+Qi Prompt CLI - AI Assistant with configurable UI frameworks
+
+Usage: bun run qi-prompt [options]
+
+Options:
+  --framework, -f <type>    UI framework (${available.join('|')})
+  --auto-detect, -a         Auto-detect best framework for environment
+  --debug, -d               Enable debug mode
+  --help, -h                Display this help message
+
+Environment Variables:
+  QI_CLI_FRAMEWORK         Set framework (${available.join('|')})
+  QI_CLI_DEBUG            Enable debug mode (true|false)
+  QI_CLI_ENABLE_HOTKEYS   Enable hotkeys (true|false)
+  QI_CLI_COLORS           Enable colors (true|false)
+
+Configuration Files:
+  config/cli.yaml         Global CLI configuration
+  .qi-cli.yaml           Local CLI configuration
+
+Framework Information:
+  Available: ${available.join(', ')}
+  Recommended for your environment: ${recommended}
+  
+  • readline  - Zero dependencies, always available, basic terminal UI
+  • ink       - Rich React-based UI with animations and colors ${available.includes('ink') ? '✓' : '✗ (run: bun add ink @inkjs/ui)'}
+  • blessed   - Traditional TUI with widget support ${available.includes('blessed') ? '✓' : '✗ (run: bun add neo-blessed)'}
+
+Examples:
+  bun run qi-prompt                    # Use default configuration
+  bun run qi-prompt --framework ink   # Use Ink framework (React-based UI)
+  bun run qi-prompt --auto-detect     # Use recommended framework (${recommended})
+  bun run qi-prompt --debug           # Enable debug mode
+  
+  QI_CLI_FRAMEWORK=ink bun run qi-prompt  # Use environment variable
+`);
 }
 
 // Main entry point
 if (import.meta.url === `file://${process.argv[1]}`) {
   const options = parseArgs();
+  
+  // Display help if requested
+  if (options.help) {
+    displayHelp();
+    process.exit(0);
+  }
+  
   const cli = new QiPromptCLI(options);
   
-  // Handle graceful shutdown - more aggressive
+  // Handle graceful shutdown - only for external SIGTERM, let CLI handle SIGINT (Ctrl+C) internally
+  let shutdownRequested = false;
   const shutdown = (signal: string) => {
-    console.log(`\n👋 Received ${signal}, shutting down...`);
-    // Don't wait for async cleanup, just exit
-    process.exit(0);
+    if (shutdownRequested) {
+      console.log(`\n⚡ Force ${signal}, exiting immediately...`);
+      process.exit(0);
+    }
+    
+    shutdownRequested = true;
+    console.log(`\n👋 Received ${signal}, shutting down gracefully... (press again to force exit)`);
+    
+    // Allow CLI to handle cancellation first
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
   };
 
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  // Only handle SIGTERM - let CLI handle SIGINT (Ctrl+C) internally for prompt clearing
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   
   // Also handle uncaught exceptions

@@ -4,12 +4,15 @@
  * Combines all UI components into a cohesive layout
  */
 
-import React from 'react'
+import React, { memo } from 'react'
 import { Box, Text } from 'ink'
+import Gradient from 'ink-gradient'
+import BigText from 'ink-big-text'
 import { StateIndicator } from './StateIndicator.js'
 import { InputBox } from './InputBox.js'
 import { OutputDisplay, type OutputMessage } from './OutputDisplay.js'
 import type { AppState, AppSubState } from '../../../abstractions/index.js'
+import { styles, defaultTheme, getInputBorderColor, textStyles, createProgressBar } from '../styles/theme.js'
 
 interface MainLayoutProps {
   state: AppState
@@ -18,61 +21,101 @@ interface MainLayoutProps {
   messages: OutputMessage[]
   onInput: (input: string) => void
   onStateChange?: () => void
+  onCommand?: (command: string, args: string[]) => void
+  onCancel?: () => void
+  onClear?: () => void
+  provider?: string
+  model?: string
+  mode?: string
+  isProcessing?: boolean
+  currentPhase?: string
+  progress?: number
+  framework?: any
 }
 
-export function MainLayout({
+export const MainLayout = memo(function MainLayout({
   state,
   subState,
   taskName,
   messages,
   onInput,
-  onStateChange
+  onStateChange,
+  onCommand,
+  onCancel,
+  onClear,
+  provider = 'ollama',
+  model = 'qwen3:0.6b',
+  mode = 'interactive',
+  isProcessing = false,
+  currentPhase = '',
+  progress = 0,
+  framework
 }: MainLayoutProps) {
   return (
     <Box flexDirection="column" height="100%" width="100%">
       {/* Header */}
-      <Box 
-        borderStyle="single" 
-        borderColor="cyan"
-        paddingLeft={1}
-        paddingRight={1}
-        justifyContent="space-between"
-      >
-        <Text color="cyan" bold>
-          🤖 Qi CLI v2
-        </Text>
-        <StateIndicator 
-          state={state} 
-          subState={subState} 
-          taskName={taskName} 
-        />
+      <Box {...styles.header}>
+        <Gradient name={defaultTheme.gradients.rainbow}>
+          <Text {...textStyles.header}>QI CLI</Text>
+        </Gradient>
       </Box>
       
       {/* Main Content Area */}
-      <Box flexGrow={1} flexDirection="column" paddingTop={1}>
+      <Box {...styles.content}>
         <OutputDisplay messages={messages} />
       </Box>
       
       {/* Input Area */}
       <Box 
-        borderStyle="single"
-        borderColor={state === 'busy' ? 'yellow' : 'green'}
-        padding={1}
+        {...styles.inputContainer}
+        borderColor={getInputBorderColor(state === 'busy' ? 'busy' : 'ready')}
       >
         <InputBox
           state={state}
           subState={subState}
           onSubmit={onInput}
           onStateChange={onStateChange}
+          onCommand={onCommand}
+          onCancel={onCancel}
+          onClear={onClear}
+          framework={framework}
         />
       </Box>
       
-      {/* Footer */}
-      <Box paddingLeft={1} paddingRight={1}>
-        <Text color="dim" dimColor>
-          Use /help for commands • Ctrl+C to exit • Shift+Tab to cycle modes
-        </Text>
+      {/* Progress Bar - Shows during processing */}
+      {isProcessing && progress > 0 && (
+        <Box paddingX={2} paddingY={0}>
+          <Text {...textStyles.progress}>
+            {createProgressBar(progress)} {currentPhase}
+          </Text>
+        </Box>
+      )}
+
+      {/* Status Line - Zero gap with input */}
+      <Box {...styles.statusLine}>
+        <Box {...styles.statusLeft}>
+          <Gradient colors={defaultTheme.gradients.provider}>
+            <Text {...textStyles.provider}>{provider}</Text>
+          </Gradient>
+          <Text {...textStyles.separator}> → </Text>
+          <Gradient colors={defaultTheme.gradients.model}>
+            <Text {...textStyles.model}>{model}</Text>
+          </Gradient>
+          <Text {...textStyles.separator}> | </Text>
+          <Text {...textStyles.mode}>{mode}</Text>
+        </Box>
+        {isProcessing ? (
+          <Box {...styles.statusRight}>
+            <Text {...textStyles.processing}>⚡ {currentPhase}</Text>
+            <Text {...textStyles.separator}> | </Text>
+            <Text {...textStyles.progress}>Esc to cancel</Text>
+          </Box>
+        ) : (
+          <Box {...styles.statusRight}>
+            <Text {...textStyles.separator}>Ctrl+C to clear • Ctrl+D to exit</Text>
+          </Box>
+        )}
       </Box>
     </Box>
   )
-}
+});

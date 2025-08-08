@@ -4,7 +4,7 @@
  * Shows current application state with visual indicators
  */
 
-import React from 'react'
+import React, { memo } from 'react'
 import { Box, Text } from 'ink'
 import type { AppState, AppSubState } from '../../../abstractions/index.js'
 
@@ -12,6 +12,12 @@ interface StateIndicatorProps {
   state: AppState
   subState?: AppSubState
   taskName?: string
+  provider?: string
+  model?: string
+  mode?: string
+  isProcessing?: boolean
+  currentPhase?: string
+  progress?: number
 }
 
 const STATE_COLORS = {
@@ -25,33 +31,55 @@ const SUB_STATE_LABELS = {
   generic: '💬 Generic'
 } as const
 
-export function StateIndicator({ state, subState, taskName }: StateIndicatorProps) {
-  const getStateDisplay = () => {
-    if (state === 'busy') {
-      return taskName ? `⏳ Busy: ${taskName}` : '⏳ Busy'
-    }
-    
-    if (state === 'ready' && subState) {
-      return SUB_STATE_LABELS[subState]
-    }
-    
-    return '🟢 Ready'
+const MODE_LABELS = {
+  interactive: '💬 Interactive',
+  command: '⚡ Command',
+  streaming: '🌊 Streaming'
+} as const
+
+export const StateIndicator = memo(function StateIndicator({ 
+  state, 
+  subState, 
+  taskName, 
+  provider = 'ollama', 
+  model = 'qwen3:0.6b', 
+  mode = 'interactive',
+  isProcessing = false,
+  currentPhase = '',
+  progress = 0
+}: StateIndicatorProps) {
+  
+  const getModeDisplay = () => {
+    return MODE_LABELS[mode as keyof typeof MODE_LABELS] || '💬 Interactive'
   }
   
-  const getStatusColor = () => {
-    return STATE_COLORS[state] || 'white'
+  const getProgressDisplay = () => {
+    if (isProcessing && currentPhase) {
+      const percentage = Math.round(progress * 100)
+      return `⏳ ${currentPhase} ${percentage}%`
+    }
+    return null
   }
   
   return (
-    <Box paddingLeft={1} paddingRight={1}>
-      <Text color={getStatusColor()}>
-        {getStateDisplay()}
-      </Text>
-      {state === 'ready' && (
-        <Text color="dim" dimColor>
-          {' '}(Shift+Tab to cycle)
-        </Text>
-      )}
+    <Box flexDirection="column" alignItems="flex-end">
+      {/* Provider and Model Info */}
+      <Box>
+        <Text color="cyan">{provider}:</Text>
+        <Text color="white" bold> {model}</Text>
+      </Box>
+      
+      {/* Mode and Status */}
+      <Box>
+        {getProgressDisplay() ? (
+          <Text color="yellow">{getProgressDisplay()}</Text>
+        ) : (
+          <>
+            <Text color="green">{getModeDisplay()}</Text>
+            <Text color="dim" dimColor> (Shift+Tab to cycle)</Text>
+          </>
+        )}
+      </Box>
     </Box>
   )
-}
+});

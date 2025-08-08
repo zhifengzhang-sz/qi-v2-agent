@@ -25,6 +25,9 @@ import {
   checkReadlineSupport,
 } from './createReadlineCLI.js';
 
+// Import Ink framework
+import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework.js';
+
 /**
  * Framework types supported by the CLI
  */
@@ -185,7 +188,7 @@ export function checkFrameworkSupport(framework: CLIFramework): Result<void, QiE
       if (!support.available) {
         return Err(cliFactoryError(
           'INK_NOT_SUPPORTED',
-          'Ink framework is not available. Run: bun add ink @inkjs/ui',
+          'Ink framework is not available. Run: bun add ink ink-text-input',
           { framework, supportCheck: support }
         ));
       }
@@ -249,30 +252,79 @@ export function recommendFramework(): {
   };
 }
 
-// Framework-specific factories (stubs for now)
+// Framework-specific factories
 
 function createInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  return Err(cliFactoryError(
-    'INK_NOT_IMPLEMENTED',
-    'Ink framework is not yet implemented. Use readline framework.',
-    { framework: 'ink', operation: 'createInkCLI' }
-  ));
+  try {
+    // Check if Ink is available
+    const support = checkInkSupport();
+    if (!support.available) {
+      return Err(cliFactoryError(
+        'INK_NOT_AVAILABLE',
+        `Ink framework not available: ${support.reason}. Install with: bun add ${support.packages?.join(' ')}`,
+        { framework: 'ink', operation: 'createInkCLI', supportCheck: support }
+      ));
+    }
+    
+    // Create actual Ink CLI implementation
+    const cli = new InkCLIFramework(config);
+    
+    return Ok(cli);
+  } catch (error: any) {
+    return Err(cliFactoryError(
+      'INK_CREATION_FAILED',
+      `Failed to create Ink CLI: ${error.message}`,
+      { framework: 'ink', operation: 'createInkCLI' }
+    ));
+  }
 }
 
 function createBlessedCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  return Err(cliFactoryError(
-    'BLESSED_NOT_IMPLEMENTED',
-    'neo-blessed framework is not yet implemented. Use readline framework.',
-    { framework: 'blessed', operation: 'createBlessedCLI' }
-  ));
+  try {
+    // Check if neo-blessed is available
+    const support = checkBlessedSupport();
+    if (!support.available) {
+      return Err(cliFactoryError(
+        'BLESSED_NOT_AVAILABLE',
+        `neo-blessed framework not available: ${support.reason}. Install with: bun add ${support.packages?.join(' ')}`,
+        { framework: 'blessed', operation: 'createBlessedCLI', supportCheck: support }
+      ));
+    }
+    
+    // Import Blessed CLI implementation
+    const { createBlessedCLIImpl } = require('../frameworks/blessed/index.js');
+    const cli = createBlessedCLIImpl(config);
+    
+    return Ok(cli);
+  } catch (error: any) {
+    return Err(cliFactoryError(
+      'BLESSED_CREATION_FAILED',
+      `Failed to create Blessed CLI: ${error.message}`,
+      { framework: 'blessed', operation: 'createBlessedCLI' }
+    ));
+  }
 }
 
 function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  return createInkCLI(config);
+  // Run validation first
+  const validationResult = checkFrameworkSupport('ink');
+  
+  return match(
+    () => createInkCLI(config),
+    (error) => Err(error),
+    validationResult
+  );
 }
 
 function createValidatedBlessedCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  return createBlessedCLI(config);
+  // Run validation first
+  const validationResult = checkFrameworkSupport('blessed');
+  
+  return match(
+    () => createBlessedCLI(config),
+    (error) => Err(error),
+    validationResult
+  );
 }
 
 async function createInkCLIAsync(config: Partial<CLIConfig> = {}): Promise<Result<ICLIFramework, QiError>> {
@@ -289,7 +341,7 @@ function checkInkSupport(): { available: boolean; reason: string; packages?: str
   try {
     // Try to require ink packages
     require('ink');
-    require('@inkjs/ui');
+    require('ink-text-input');
     
     return {
       available: true,
@@ -299,7 +351,7 @@ function checkInkSupport(): { available: boolean; reason: string; packages?: str
     return {
       available: false,
       reason: 'Ink packages not found',
-      packages: ['ink', '@inkjs/ui'],
+      packages: ['ink', 'ink-text-input'],
     };
   }
 }
@@ -349,3 +401,6 @@ export function getAvailableFrameworks(): CLIFramework[] {
   
   return frameworks;
 }
+
+// Export the framework-specific factories for direct use
+export { createInkCLI, createBlessedCLI };

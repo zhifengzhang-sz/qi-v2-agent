@@ -50,6 +50,7 @@ export class ReadlineInputManager implements IInputManager {
   private shiftTabCallbacks: SpecialKeyCallback[] = [];
   private escapeCallbacks: SpecialKeyCallback[] = [];
   private ctrlCCallbacks: SpecialKeyCallback[] = [];
+  private ctrlDCallbacks: SpecialKeyCallback[] = [];
 
   constructor() {
     this.config = {
@@ -100,6 +101,7 @@ export class ReadlineInputManager implements IInputManager {
       historySize: this.config.historySize,
       removeHistoryDuplicates: true,
       terminal: true,
+      crlfDelay: Infinity,
     });
 
     // Setup event handlers
@@ -158,6 +160,14 @@ export class ReadlineInputManager implements IInputManager {
     this.ctrlCCallbacks.push(callback);
   }
 
+  onCtrlD(callback: SpecialKeyCallback): void {
+    if (this.isDestroyed) {
+      return;
+    }
+    
+    this.ctrlDCallbacks.push(callback);
+  }
+
   /**
    * Set the prompt string
    */
@@ -201,20 +211,15 @@ export class ReadlineInputManager implements IInputManager {
   }
 
   /**
-   * Clear current input line
+   * Clear current input line using proper readline method
    */
   clearInput(): void {
     if (this.isDestroyed || !this.rl) {
       return;
     }
     
-    // Use type assertion to access mutable properties
-    (this.rl as any).line = '';
-    (this.rl as any).cursor = 0;
-    
-    // Clear the current line and show prompt
-    process.stdout.write('\r\x1b[K');
-    this.showPrompt();
+    // Use the proper readline method to simulate Ctrl+U which clears the input line
+    this.rl.write(null, { ctrl: true, name: 'u' });
   }
 
   /**
@@ -350,6 +355,7 @@ export class ReadlineInputManager implements IInputManager {
     this.shiftTabCallbacks = [];
     this.escapeCallbacks = [];
     this.ctrlCCallbacks = [];
+    this.ctrlDCallbacks = [];
     
     this.isDestroyed = true;
   }
@@ -413,7 +419,7 @@ export class ReadlineInputManager implements IInputManager {
       this.close();
     });
 
-    // SIGINT handler (Ctrl+C)
+    // SIGINT handler (Ctrl+C) - Keep as backup for some environments
     this.rl.on('SIGINT', () => {
       this.ctrlCCallbacks.forEach(callback => {
         try {
@@ -477,6 +483,11 @@ export class ReadlineInputManager implements IInputManager {
       return true;
     }
     
+    // Ctrl+D
+    if (key?.name === 'd' && key?.ctrl) {
+      return true;
+    }
+    
     return false;
   }
 
@@ -505,7 +516,29 @@ export class ReadlineInputManager implements IInputManager {
       return;
     }
     
-    // Ctrl+C is handled by readline SIGINT event
+    // Ctrl+D
+    if (key?.name === 'd' && key?.ctrl) {
+      this.ctrlDCallbacks.forEach(callback => {
+        try {
+          callback();
+        } catch (error) {
+          console.error('Error in Ctrl+D callback:', error);
+        }
+      });
+      return;
+    }
+    
+    // Ctrl+C
+    if (key?.name === 'c' && key?.ctrl) {
+      this.ctrlCCallbacks.forEach(callback => {
+        try {
+          callback();
+        } catch (error) {
+          console.error('Error in Ctrl+C callback:', error);
+        }
+      });
+      return;
+    }
   }
 
   private matchesSequence(chunk: Buffer, sequence: Buffer): boolean {

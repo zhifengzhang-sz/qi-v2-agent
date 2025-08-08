@@ -1,12 +1,14 @@
 /**
- * Ink CLI Framework - DEPRECATED
+ * Ink CLI Framework
  *
- * Main application file moved to InkCLI.tsx.deprecated due to design issues.
- * Components may still be useful for future proper CLI implementations.
+ * React-based CLI implementation using Ink framework
  */
 
+// Main Ink CLI Framework
+export { InkCLIFramework, createInkCLIImpl } from './InkCLIFramework.js';
+
+// React Components
 export { InputBox } from './components/InputBox.js';
-// export { InkCLIApplication, createInkCLI } from './InkCLI.js' // DEPRECATED
 export { MainLayout } from './components/MainLayout.js';
 export {
   createOutputMessage,
@@ -14,3 +16,6 @@ export {
   type OutputMessage,
 } from './components/OutputDisplay.js';
 export { StateIndicator } from './components/StateIndicator.js';
+
+// Legacy components (deprecated)
+// export { InkCLIApplication, createInkCLI } from './InkCLI.js' // DEPRECATED
