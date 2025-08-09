@@ -8,7 +8,6 @@ import React, { memo } from 'react'
 import { Box, Text } from 'ink'
 import Gradient from 'ink-gradient'
 import BigText from 'ink-big-text'
-import { StateIndicator } from './StateIndicator.js'
 import { InputBox } from './InputBox.js'
 import { OutputDisplay, type OutputMessage } from './OutputDisplay.js'
 import { LoadingIndicator } from './LoadingIndicator.js'
@@ -59,6 +58,11 @@ export const MainLayout = memo(function MainLayout({
   onPermissionDeny,
   onPermissionDismiss
 }: MainLayoutProps) {
+  const [suggestions, setSuggestions] = React.useState<Array<{command: string, description: string, selected?: boolean}>>([]);
+  
+  const handleSuggestions = React.useCallback((newSuggestions: Array<{command: string, description: string, selected?: boolean}>) => {
+    setSuggestions(newSuggestions);
+  }, []);
   return (
     <Box flexDirection="column" height="100%" width="100%">
       {/* Header - Claude Code style */}
@@ -100,41 +104,68 @@ export const MainLayout = memo(function MainLayout({
           onCancel={onCancel}
           onClear={onClear}
           framework={framework}
+          onSuggestions={handleSuggestions}
         />
       </Box>
       
-      {/* Processing Indicator - Simple and real */}
-      {isProcessing && currentPhase && (
-        <Box paddingX={2} paddingY={0}>
-          <Text color="#ff9800">
-            {currentPhase}...
-          </Text>
-        </Box>
-      )}
 
-      {/* Status Line - Claude Code style */}
+      {/* Status Line - Claude Code style with conditional command suggestions */}
       <Box {...styles.statusLine}>
-        <Box {...styles.statusLeft}>
-          <Text color="#ff6b35" bold>{provider}</Text>
-          <Text color="dim" dimColor> → </Text>
-          <Text color="#4caf50" bold>{model}</Text>
-          <Text color="dim" dimColor> • </Text>
-          <Text color="#007acc">{mode}</Text>
-        </Box>
-        {isProcessing ? (
-          <Box {...styles.statusRight}>
-            <LoadingIndicator 
-              message={currentPhase || 'Processing'} 
-              showAnimation={true}
-              color="#ff9800"
-            />
-            <Text color="dim" dimColor> • </Text>
-            <Text color="#2196f3">Esc to cancel</Text>
+        {suggestions.length > 0 && state !== 'busy' ? (
+          /* Show command suggestions instead of normal status when typing commands */
+          <Box flexDirection="column" width="100%">
+            {suggestions.map((suggestion, index) => (
+              <Box key={suggestion.command}>
+                <Text 
+                  color={suggestion.selected ? "#ffffff" : "#4caf50"}
+                  backgroundColor={suggestion.selected ? "#007acc" : undefined}
+                  bold={suggestion.selected}
+                >
+                  {suggestion.selected ? '► ' : '  '}{suggestion.command}
+                </Text>
+                <Text 
+                  color={suggestion.selected ? "#ffffff" : "dim"} 
+                  dimColor={!suggestion.selected}
+                  backgroundColor={suggestion.selected ? "#007acc" : undefined}
+                >
+                  {' '}– {suggestion.description}
+                </Text>
+              </Box>
+            ))}
+            {/* Add navigation help text */}
+            <Box marginTop={1}>
+              <Text color="dim" dimColor>
+                ↑↓ navigate • Tab/Enter select • Esc cancel
+              </Text>
+            </Box>
           </Box>
         ) : (
-          <Box {...styles.statusRight}>
-            <Text color="dim" dimColor>Ctrl+C clear • Ctrl+D exit</Text>
+          /* Normal status line */
+          <Box {...styles.statusLeft}>
+            <Text color="#ff6b35" bold>{provider}</Text>
+            <Text color="dim" dimColor> → </Text>
+            <Text color="#4caf50" bold>{model}</Text>
+            <Text color="dim" dimColor> • </Text>
+            <Text color="#007acc">{mode}</Text>
           </Box>
+        )}
+        {/* Only show right status when not showing command suggestions */}
+        {!(suggestions.length > 0 && state !== 'busy') && (
+          isProcessing ? (
+            <Box {...styles.statusRight}>
+              <LoadingIndicator 
+                message={currentPhase || 'Processing'} 
+                showAnimation={true}
+                color="#ff9800"
+              />
+              <Text color="dim" dimColor> • </Text>
+              <Text color="#2196f3">Esc to cancel</Text>
+            </Box>
+          ) : (
+            <Box {...styles.statusRight}>
+              <Text color="dim" dimColor>Shift+Tab mode • Ctrl+C clear • Ctrl+D exit</Text>
+            </Box>
+          )
         )}
       </Box>
     </Box>

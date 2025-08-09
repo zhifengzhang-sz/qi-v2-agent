@@ -381,11 +381,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       parameters.set(`arg${i}`, parts[i]);
     }
 
-    // Handle PromptApp-specific commands first
-    if (commandName === 'model' || commandName === 'm') {
-      return await this.handleModelCommand(parts.slice(1));
-    }
-    
+    // Handle PromptApp-specific commands first  
     if (commandName === 'status' || commandName === 's') {
       return await this.handleStatusCommand();
     }
@@ -549,88 +545,6 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     };
   }
 
-  private async handleModelCommand(args: string[]): Promise<AgentResponse> {
-    const promptConfig = this.stateManager.getPromptConfig();
-    const currentModel = promptConfig?.model || this.stateManager.getCurrentModel();
-    
-    if (args.length === 0) {
-      // Show current model and available models
-      const availableModels = this.stateManager.getAvailablePromptModels();
-      let content = `Current model: ${currentModel || 'qwen3:0.6b'}\nProvider: ${promptConfig?.provider || 'ollama'}`;
-      
-      if (availableModels.length > 0) {
-        content += `\nAvailable models: ${availableModels.join(', ')}`;
-        content += `\n\nUse '/model <model_name>' to switch models.`;
-      }
-      
-      return {
-        content,
-        type: 'command',
-        confidence: 1.0,
-        executionTime: 0,
-        metadata: new Map([
-          ['commandName', 'model'],
-          ['action', 'view'],
-          ['currentModel', currentModel || 'qwen3:0.6b']
-        ]),
-        success: true,
-      };
-    }
-
-    const newModel = args[0];
-    const previousModel = currentModel;
-    
-    try {
-      // Check if model is available for prompts
-      const availableModels = this.stateManager.getAvailablePromptModels();
-      if (availableModels.length > 0 && !availableModels.includes(newModel)) {
-        return {
-          content: `❌ Model '${newModel}' not available.\nAvailable models: ${availableModels.join(', ')}`,
-          type: 'command',
-          confidence: 0,
-          executionTime: 0,
-          metadata: new Map([
-            ['commandName', 'model'],
-            ['action', 'switch'],
-            ['error', 'model_not_available']
-          ]),
-          success: false,
-          error: 'Model not available',
-        };
-      }
-      
-      // Switch model using prompt config
-      this.stateManager.updatePromptModel(newModel);
-      
-      return {
-        content: `✅ Switched to model: ${newModel}`,
-        type: 'command',
-        confidence: 1.0,
-        executionTime: 0,
-        metadata: new Map([
-          ['commandName', 'model'],
-          ['action', 'switch'],
-          ['newModel', newModel],
-          ['previousModel', previousModel || 'qwen3:0.6b']
-        ]),
-        success: true,
-      };
-    } catch (error) {
-      return {
-        content: `❌ Failed to switch model: ${error instanceof Error ? error.message : String(error)}`,
-        type: 'command',
-        confidence: 0,
-        executionTime: 0,
-        metadata: new Map([
-          ['commandName', 'model'],
-          ['action', 'switch'],
-          ['error', error instanceof Error ? error.message : String(error)]
-        ]),
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
 
   private async handleStatusCommand(): Promise<AgentResponse> {
     const promptConfig = this.stateManager.getPromptConfig();

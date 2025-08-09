@@ -39,8 +39,8 @@ export interface CLITheme {
     xl: number;
   };
   layout: {
-    headerAlignment: 'left' | 'center' | 'right';
-    statusAlignment: 'left' | 'center' | 'right';
+    headerAlignment: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around' | 'space-evenly';
+    statusAlignment: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around' | 'space-evenly';
   };
   animation: {
     loadingFrames: string[];
@@ -84,8 +84,8 @@ export const defaultTheme: CLITheme = {
     xl: 16,
   },
   layout: {
-    headerAlignment: 'center',
-    statusAlignment: 'left',
+    headerAlignment: 'flex-start',
+    statusAlignment: 'flex-start',
   },
   animation: {
     loadingFrames: ['·', '✢', '✳', '∗', '✻', '✽'],

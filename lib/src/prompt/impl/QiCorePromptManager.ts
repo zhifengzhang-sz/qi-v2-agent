@@ -331,6 +331,7 @@ export class QiCorePromptManager implements IPromptManager {
   private mapProviderToEngine(providerId: string): string {
     const mapping: Record<string, string> = {
       ollama: 'ollama',
+      openrouter: 'openai',  // OpenRouter uses OpenAI-compatible API
       groq: 'groq',
       huggingface: 'huggingface',
       together: 'together',

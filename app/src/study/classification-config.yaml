@@ -22,7 +22,7 @@ dataPath: "./data-ops/datasets/balanced-10x3-corrected.json"
 
 llm:
   baseUrl: "https://openrouter.ai/api/v1"
-  apiKey: "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"
+  apiKey: "${OPENROUTER_API_KEY}"
   temperature: 0.1
   timeout: 60000
 

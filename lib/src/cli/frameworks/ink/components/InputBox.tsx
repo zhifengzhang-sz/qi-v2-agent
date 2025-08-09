@@ -4,7 +4,7 @@
  * Handles user input with proper parsing and command detection
  */
 
-import React, { useState, useTransition, useRef, useEffect } from 'react'
+import React, { useState, useTransition, useRef, useEffect, useMemo } from 'react'
 import { Box, Text, useInput, useApp } from 'ink'
 import TextInput, { UncontrolledTextInput } from 'ink-text-input'
 import { LoadingSpinner } from './LoadingIndicator.js'
@@ -20,6 +20,7 @@ interface InputBoxProps {
   onClear?: () => void
   placeholder?: string
   framework?: any // Framework instance for listening to events
+  onSuggestions?: (suggestions: Array<{command: string, description: string}>) => void
 }
 
 // Claude Code-style command suggestions
@@ -27,6 +28,7 @@ const COMMAND_SUGGESTIONS = [
   { command: '/help', description: 'Show available commands' },
   { command: '/clear', description: 'Clear conversation history' },
   { command: '/model', description: 'Switch AI model' },
+  { command: '/provider', description: 'Switch AI provider' },
   { command: '/status', description: 'Show system status' },
   { command: '/config', description: 'View configuration' },
   { command: '/permission', description: 'Demo permission dialog' },
@@ -41,9 +43,11 @@ export function InputBox({
   onCancel,
   onClear,
   placeholder = 'Enter command or prompt...',
-  framework
+  framework,
+  onSuggestions
 }: InputBoxProps) {
   const [input, setInput] = useState('')
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
   const [isPending, startTransition] = useTransition()
   const { exit } = useApp()
   
@@ -102,17 +106,77 @@ export function InputBox({
     return prefixes[subState || 'generic']
   }
 
-  // Check if input matches command suggestions
-  const getCommandSuggestions = () => {
-    if (!input.startsWith('/') || input.length < 2) return []
+  // Memoize suggestions calculation to prevent infinite loops
+  const suggestions = useMemo(() => {
+    if (!input.startsWith('/')) return []
     
+    // Show all commands when just typing '/'
+    if (input.length === 1) {
+      return COMMAND_SUGGESTIONS.slice(0, 6) // Show more commands initially
+    }
+    
+    // Filter commands when typing more characters
     const query = input.toLowerCase()
     return COMMAND_SUGGESTIONS.filter(suggestion => 
       suggestion.command.toLowerCase().startsWith(query)
-    ).slice(0, 3) // Show max 3 suggestions
-  }
-
-  const suggestions = getCommandSuggestions()
+    ).slice(0, 6) // Show up to 6 suggestions
+  }, [input])
+  
+  // Reset selection when suggestions change
+  useEffect(() => {
+    setSelectedSuggestionIndex(0)
+  }, [suggestions.length])
+  
+  // Handle keyboard navigation for command suggestions
+  useInput((input, key) => {
+    if (suggestions.length === 0) return;
+    
+    if (key.upArrow) {
+      setSelectedSuggestionIndex(prev => 
+        prev <= 0 ? suggestions.length - 1 : prev - 1
+      );
+      return;
+    }
+    
+    if (key.downArrow) {
+      setSelectedSuggestionIndex(prev => 
+        prev >= suggestions.length - 1 ? 0 : prev + 1
+      );
+      return;
+    }
+    
+    if (key.tab && suggestions.length > 0) {
+      // Tab to select current suggestion
+      const selectedCommand = suggestions[selectedSuggestionIndex];
+      if (selectedCommand) {
+        setInput(selectedCommand.command + ' ');
+        setSelectedSuggestionIndex(0);
+      }
+      return;
+    }
+    
+    if (key.return && suggestions.length > 0 && input.trim().startsWith('/')) {
+      // Enter with suggestions visible - auto-complete first suggestion if input is just '/'
+      if (input.trim() === '/') {
+        const selectedCommand = suggestions[selectedSuggestionIndex];
+        if (selectedCommand) {
+          setInput(selectedCommand.command + ' ');
+          setSelectedSuggestionIndex(0);
+          return;
+        }
+      }
+    }
+  }, { isActive: !isDisabled });
+  
+  // Notify parent about suggestions changes (include selected index)
+  useEffect(() => {
+    if (onSuggestions) {
+      onSuggestions(suggestions.map((suggestion, index) => ({
+        ...suggestion,
+        selected: index === selectedSuggestionIndex
+      })));
+    }
+  }, [suggestions, selectedSuggestionIndex, onSuggestions]);
   
   return (
     <Box flexDirection="column">
@@ -134,21 +198,6 @@ export function InputBox({
         )}
       </Box>
 
-      {/* Command Suggestions - Claude Code style */}
-      {suggestions.length > 0 && !isDisabled && (
-        <Box flexDirection="column" paddingLeft={3}>
-          {suggestions.map((suggestion, index) => (
-            <Box key={suggestion.command}>
-              <Text color="#4caf50">
-                {suggestion.command}
-              </Text>
-              <Text color="dim" dimColor>
-                {' '}- {suggestion.description}
-              </Text>
-            </Box>
-          ))}
-        </Box>
-      )}
       
     </Box>
   )

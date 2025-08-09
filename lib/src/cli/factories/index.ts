@@ -28,14 +28,6 @@ export {
   checkReadlineSupport,
 } from './createReadlineCLI.js';
 
-// Blessed framework factory
-export {
-  createBlessedCLI,
-  createValidatedBlessedCLI,
-  createBlessedCLIAsync,
-  checkBlessedFrameworkSupport,
-} from './createBlessedCLI.js';
-
 // Re-export core interfaces
 export type {
   ICLIFramework,

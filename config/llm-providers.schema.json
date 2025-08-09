@@ -12,14 +12,14 @@
         "defaultProvider": {
           "type": "string",
           "description": "Default LLM provider to use",
-          "enum": ["ollama", "groq", "huggingface", "together"]
+          "enum": ["ollama", "openrouter", "groq", "huggingface", "together"]
         },
         "fallbackChain": {
           "type": "array",
           "description": "Ordered list of providers to try if primary fails",
           "items": {
             "type": "string",
-            "enum": ["ollama", "groq", "huggingface", "together"]
+            "enum": ["ollama", "openrouter", "groq", "huggingface", "together"]
           },
           "minItems": 1,
           "uniqueItems": true
@@ -56,7 +56,7 @@
             "provider": {
               "type": "string",
               "description": "Provider to use for classification",
-              "enum": ["ollama", "groq", "huggingface", "together"]
+              "enum": ["ollama", "openrouter", "groq", "huggingface", "together"]
             },
             "model": {
               "type": "string",
@@ -99,7 +99,7 @@
             "defaultProvider": {
               "type": "string",
               "description": "Default provider for prompt processing",
-              "enum": ["ollama", "groq", "huggingface", "together"]
+              "enum": ["ollama", "openrouter", "groq", "huggingface", "together"]
             }
           },
           "additionalProperties": false
@@ -109,6 +109,9 @@
           "description": "Configuration for each LLM provider",
           "properties": {
             "ollama": {
+              "$ref": "#/definitions/Provider"
+            },
+            "openrouter": {
               "$ref": "#/definitions/Provider"
             },
             "groq": {
@@ -491,7 +494,7 @@
           "description": "Ordered list of providers by priority",
           "items": {
             "type": "string",
-            "enum": ["ollama", "groq", "huggingface", "together"]
+            "enum": ["ollama", "openrouter", "groq", "huggingface", "together"]
           },
           "minItems": 1,
           "uniqueItems": true
@@ -501,7 +504,7 @@
           "description": "Enable fallback or specify fallback providers",
           "items": {
             "type": "string",
-            "enum": ["ollama", "groq", "huggingface", "together"]
+            "enum": ["ollama", "openrouter", "groq", "huggingface", "together"]
           }
         }
       },
