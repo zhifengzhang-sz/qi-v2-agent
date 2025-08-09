@@ -45,6 +45,7 @@ export interface IInputManager {
   onShiftTab(callback: () => void): void;
   onEscape(callback: () => void): void;
   onCtrlC(callback: () => void): void;
+  onCtrlD(callback: () => void): void;
 
   /**
    * Set the prompt string

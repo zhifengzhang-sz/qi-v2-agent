@@ -11,8 +11,10 @@ import BigText from 'ink-big-text'
 import { StateIndicator } from './StateIndicator.js'
 import { InputBox } from './InputBox.js'
 import { OutputDisplay, type OutputMessage } from './OutputDisplay.js'
+import { LoadingIndicator } from './LoadingIndicator.js'
+import { PermissionDialog, type PermissionRequest } from './PermissionDialog.js'
 import type { AppState, AppSubState } from '../../../abstractions/index.js'
-import { styles, defaultTheme, getInputBorderColor, textStyles, createProgressBar } from '../styles/theme.js'
+import { styles, defaultTheme, getInputBorderColor, textStyles } from '../styles/theme.js'
 
 interface MainLayoutProps {
   state: AppState
@@ -29,8 +31,11 @@ interface MainLayoutProps {
   mode?: string
   isProcessing?: boolean
   currentPhase?: string
-  progress?: number
   framework?: any
+  permissionRequest?: PermissionRequest | null
+  onPermissionApprove?: (requestId: string, remember?: boolean) => void
+  onPermissionDeny?: (requestId: string, remember?: boolean) => void
+  onPermissionDismiss?: () => void
 }
 
 export const MainLayout = memo(function MainLayout({
@@ -48,21 +53,37 @@ export const MainLayout = memo(function MainLayout({
   mode = 'interactive',
   isProcessing = false,
   currentPhase = '',
-  progress = 0,
-  framework
+  framework,
+  permissionRequest = null,
+  onPermissionApprove,
+  onPermissionDeny,
+  onPermissionDismiss
 }: MainLayoutProps) {
   return (
     <Box flexDirection="column" height="100%" width="100%">
-      {/* Header */}
+      {/* Header - Claude Code style */}
       <Box {...styles.header}>
-        <Gradient name={defaultTheme.gradients.rainbow}>
-          <Text {...textStyles.header}>QI CLI</Text>
-        </Gradient>
+        <Text color="#007acc" bold>
+          █ Qi CLI
+        </Text>
+        <Text color="dim" dimColor>
+          {' '}– AI-powered development assistant
+        </Text>
       </Box>
       
       {/* Main Content Area */}
       <Box {...styles.content}>
         <OutputDisplay messages={messages} />
+        
+        {/* Permission Dialog Overlay */}
+        {permissionRequest && (
+          <PermissionDialog
+            request={permissionRequest}
+            onApprove={onPermissionApprove || (() => {})}
+            onDeny={onPermissionDeny || (() => {})}
+            onDismiss={onPermissionDismiss || (() => {})}
+          />
+        )}
       </Box>
       
       {/* Input Area */}
@@ -82,37 +103,37 @@ export const MainLayout = memo(function MainLayout({
         />
       </Box>
       
-      {/* Progress Bar - Shows during processing */}
-      {isProcessing && progress > 0 && (
+      {/* Processing Indicator - Simple and real */}
+      {isProcessing && currentPhase && (
         <Box paddingX={2} paddingY={0}>
-          <Text {...textStyles.progress}>
-            {createProgressBar(progress)} {currentPhase}
+          <Text color="#ff9800">
+            {currentPhase}...
           </Text>
         </Box>
       )}
 
-      {/* Status Line - Zero gap with input */}
+      {/* Status Line - Claude Code style */}
       <Box {...styles.statusLine}>
         <Box {...styles.statusLeft}>
-          <Gradient colors={defaultTheme.gradients.provider}>
-            <Text {...textStyles.provider}>{provider}</Text>
-          </Gradient>
-          <Text {...textStyles.separator}> → </Text>
-          <Gradient colors={defaultTheme.gradients.model}>
-            <Text {...textStyles.model}>{model}</Text>
-          </Gradient>
-          <Text {...textStyles.separator}> | </Text>
-          <Text {...textStyles.mode}>{mode}</Text>
+          <Text color="#ff6b35" bold>{provider}</Text>
+          <Text color="dim" dimColor> → </Text>
+          <Text color="#4caf50" bold>{model}</Text>
+          <Text color="dim" dimColor> • </Text>
+          <Text color="#007acc">{mode}</Text>
         </Box>
         {isProcessing ? (
           <Box {...styles.statusRight}>
-            <Text {...textStyles.processing}>⚡ {currentPhase}</Text>
-            <Text {...textStyles.separator}> | </Text>
-            <Text {...textStyles.progress}>Esc to cancel</Text>
+            <LoadingIndicator 
+              message={currentPhase || 'Processing'} 
+              showAnimation={true}
+              color="#ff9800"
+            />
+            <Text color="dim" dimColor> • </Text>
+            <Text color="#2196f3">Esc to cancel</Text>
           </Box>
         ) : (
           <Box {...styles.statusRight}>
-            <Text {...textStyles.separator}>Ctrl+C to clear • Ctrl+D to exit</Text>
+            <Text color="dim" dimColor>Ctrl+C clear • Ctrl+D exit</Text>
           </Box>
         )}
       </Box>

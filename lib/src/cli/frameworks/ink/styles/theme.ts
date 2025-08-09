@@ -42,32 +42,37 @@ export interface CLITheme {
     headerAlignment: 'left' | 'center' | 'right';
     statusAlignment: 'left' | 'center' | 'right';
   };
+  animation: {
+    loadingFrames: string[];
+    processingMessages: string[];
+    interval: number;
+  };
 }
 
 export const defaultTheme: CLITheme = {
   colors: {
-    primary: 'cyan',
-    secondary: 'magenta', 
-    accent: 'yellow',
-    success: 'green',
-    warning: 'yellow',
-    error: 'red',
-    info: 'blue',
-    dim: 'dim',
-    text: 'white',
-    background: 'black',
+    primary: '#007acc',     // Claude Code blue
+    secondary: '#ff6b35',   // Claude Code orange accent
+    accent: '#4caf50',      // Claude Code green
+    success: '#4caf50',     // Green for success states
+    warning: '#ff9800',     // Orange for warnings
+    error: '#f44336',       // Red for errors
+    info: '#2196f3',        // Blue for info
+    dim: 'dim',             // Dimmed text
+    text: '#e0e0e0',        // Light gray text (better than white)
+    background: '#0d1117',  // Dark background like GitHub/Claude Code
   },
   gradients: {
-    header: ['magenta', 'cyan', 'blue'],
-    provider: ['magenta', 'cyan'],
-    model: ['cyan', 'blue'],
+    header: ['#007acc', '#0099ff', '#00bfff'],  // Blue gradient
+    provider: ['#ff6b35', '#ff8c42'],           // Orange gradient  
+    model: ['#4caf50', '#66bb6a'],              // Green gradient
     rainbow: 'rainbow',
   },
   borders: {
     input: {
-      style: 'single',
-      colorActive: 'green',
-      colorBusy: 'yellow',
+      style: 'round',       // Softer rounded borders like Claude Code
+      colorActive: '#4caf50',
+      colorBusy: '#ff9800',
     },
   },
   spacing: {
@@ -81,6 +86,20 @@ export const defaultTheme: CLITheme = {
   layout: {
     headerAlignment: 'center',
     statusAlignment: 'left',
+  },
+  animation: {
+    loadingFrames: ['·', '✢', '✳', '∗', '✻', '✽'],
+    processingMessages: [
+      'Clauding',
+      'Finagling', 
+      'Processing',
+      'Thinking',
+      'Computing',
+      'Analyzing',
+      'Working',
+      'Generating'
+    ],
+    interval: 120, // ms between frame changes
   },
 };
 
@@ -96,7 +115,8 @@ export const styles = {
   inputContainer: {
     borderStyle: defaultTheme.borders.input.style,
     paddingX: defaultTheme.spacing.sm,
-    paddingY: defaultTheme.spacing.xs,
+    paddingY: defaultTheme.spacing.none, // Already at zero
+    minHeight: 1, // Force minimum height
   },
   statusLine: {
     paddingX: defaultTheme.spacing.sm,
@@ -122,17 +142,20 @@ export const getInputBorderColor = (state: 'ready' | 'busy') => {
 
 export const textStyles = {
   header: {
-    color: defaultTheme.colors.primary,
+    color: defaultTheme.colors.text,
     bold: true,
   },
   provider: {
+    color: defaultTheme.colors.text,
     bold: true,
   },
   model: {
+    color: defaultTheme.colors.text,
     bold: true,
   },
   mode: {
     color: defaultTheme.colors.accent,
+    bold: false,
   },
   separator: {
     color: defaultTheme.colors.dim,
@@ -157,4 +180,21 @@ export const createProgressBar = (progress: number, width: number = textStyles.p
   const bar = textStyles.progressBar.complete.repeat(filled) + textStyles.progressBar.incomplete.repeat(empty);
   const percentage = Math.round(progress * 100);
   return `[${bar}] ${percentage}%`;
+};
+
+/**
+ * Animation utilities inspired by Claude Code's loading patterns
+ */
+export const getLoadingFrame = (frameIndex: number): string => {
+  return defaultTheme.animation.loadingFrames[frameIndex % defaultTheme.animation.loadingFrames.length];
+};
+
+export const getProcessingMessage = (messageIndex: number): string => {
+  return defaultTheme.animation.processingMessages[messageIndex % defaultTheme.animation.processingMessages.length];
+};
+
+export const createAnimatedLoader = (frameIndex: number, messageIndex: number): string => {
+  const frame = getLoadingFrame(frameIndex);
+  const message = getProcessingMessage(messageIndex);
+  return `${frame} ${message}...`;
 };

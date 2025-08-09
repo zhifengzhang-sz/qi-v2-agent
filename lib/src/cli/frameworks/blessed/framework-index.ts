@@ -1,26 +1,44 @@
 /**
- * neo-blessed Framework (STUB)
+ * neo-blessed Framework
  * 
- * Traditional TUI framework implementation stubs.
- * These will be expanded when neo-blessed framework support is fully implemented.
+ * Complete traditional TUI framework implementation using neo-blessed.
+ * Provides widget-based terminal interface with efficient rendering.
  * 
- * Dependencies: bun add neo-blessed @types/blessed
+ * Dependencies: neo-blessed @types/blessed
  */
 
-// Stub implementations
+// Core implementations
 export { BlessedTerminal, isBlessedAvailable } from './BlessedTerminal.js';
-
-// TODO: Implement remaining components when neo-blessed support is added
-// export { BlessedInputManager } from './BlessedInputManager.js';
-// export { BlessedProgressRenderer } from './BlessedProgressRenderer.js';
-// export { BlessedModeRenderer } from './BlessedModeRenderer.js';
-// export { BlessedStreamRenderer } from './BlessedStreamRenderer.js';
+export { BlessedInputManager } from './BlessedInputManager.js';
+export { BlessedProgressRenderer } from './BlessedProgressRenderer.js';
+export { BlessedModeRenderer } from './BlessedModeRenderer.js';
+export { BlessedStreamRenderer } from './BlessedStreamRenderer.js';
 
 // Re-export interfaces for convenience
 export type {
   ITerminal,
   TerminalDimensions,
 } from '../../abstractions/ITerminal.js';
+
+export type {
+  IInputManager,
+  InputCallback,
+  KeypressCallback,
+} from '../../abstractions/IInputManager.js';
+
+export type {
+  IProgressRenderer,
+  ProgressConfig,
+} from '../../abstractions/IProgressRenderer.js';
+
+export type {
+  IModeRenderer,
+  CLIMode,
+} from '../../abstractions/IModeRenderer.js';
+
+export type {
+  IStreamRenderer,
+} from '../../abstractions/IStreamRenderer.js';
 
 /**
  * neo-blessed framework availability check

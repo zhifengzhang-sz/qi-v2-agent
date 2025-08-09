@@ -21,6 +21,8 @@ import { createPromptHandler } from '@qi/agent/prompt';
 import { createCommandHandler } from '@qi/agent/command';
 import { createPromptApp } from '@qi/agent';
 import { setupQuickCLI } from '@qi/agent/cli';
+// Import TUI factory dynamically to avoid compilation issues
+// import { createBlessedTUICLI } from '../lib/src/cli/factories/createBlessedTUICLI.js';
 
 // Import app-specific event types
 import type {
@@ -50,15 +52,18 @@ class QiPromptCLI {
   private debugMode: boolean;
   private framework?: 'readline' | 'ink' | 'blessed';
   private autoDetect: boolean;
+  private useTUI: boolean = false;
 
   constructor(options: { 
     debug?: boolean; 
     framework?: 'readline' | 'ink' | 'blessed';
     autoDetect?: boolean;
+    useTUI?: boolean;
   } = {}) {
     this.debugMode = options.debug ?? false;
     this.framework = options.framework;
     this.autoDetect = options.autoDetect ?? false;
+    this.useTUI = options.useTUI ?? false;
     
     // Remove debug logging for cleaner output
     // if (this.debugMode) {
@@ -118,17 +123,72 @@ class QiPromptCLI {
       await this.orchestrator.initialize();
       console.log('✅ PromptApp orchestrator initialized');
 
+      // Set environment variable for TUI mode if requested
+      if (this.useTUI) {
+        process.env.QI_BLESSED_TUI = 'true';
+        console.log('🎨 Enabling Blessed TUI mode...');
+      }
+      
       // Create event-driven CLI with framework selection and configuration support
-      this.cli = setupQuickCLI({
-        framework: this.framework,
-        agent: this.orchestrator,
-        enableHotkeys: true,
-        enableStreaming: true,
-        debug: this.debugMode,
-        commandHandler: this.commandHandler, // Connect app's CommandHandler to CLI
-        autoDetect: this.autoDetect,
-        args: process.argv.slice(2), // Pass CLI args for configuration loading
-      });
+      if (this.useTUI) {
+        // Import TUI factory dynamically to avoid compilation issues
+        const { createBlessedTUICLI } = await import('../../../lib/src/cli/factories/createBlessedTUICLI.js');
+        const { QiCoreEventManager, QiCoreCommandRouter, QiCoreAgentConnector } = await import('../../../lib/src/cli/services/index.js');
+        
+        // Create shared QiCore services for TUI
+        const eventManager = new QiCoreEventManager();
+        const commandRouter = new QiCoreCommandRouter();
+        const agentConnector = new QiCoreAgentConnector();
+        
+        const cliResult = await createBlessedTUICLI(eventManager, commandRouter, agentConnector, {
+          enableHotkeys: true,
+          enableModeIndicator: true,
+          enableProgressDisplay: true,
+          enableStreaming: true,
+          prompt: "> ",
+          colors: true,
+          animations: true,
+          historySize: 100,
+          autoComplete: false,
+          streamingThrottle: 10,
+          maxBufferSize: 1000000,
+          debug: this.debugMode,
+        });
+        
+        if (cliResult.tag === 'failure') {
+          throw new Error(`Failed to create TUI CLI: ${cliResult.error.message}`);
+        }
+        
+        this.cli = cliResult.value;
+        
+        // Connect agent
+        this.cli.connectAgent(this.orchestrator);
+        
+        // Setup bidirectional communication (same as setupQuickCLI)
+        this.cli.on('userInput', ({ input }: { input: any }) => {
+          (this.cli as any).sendToAgent(input);
+        });
+        
+        this.cli.on('command', ({ command, args }: { command: string; args: string[] }) => {
+          const commandInput = `/${command} ${args.join(' ')}`.trim();
+          (this.cli as any).handleInput(commandInput);
+        });
+        
+        this.cli.on('cancelRequested', () => {
+          (this.cli as any).cancelAgent();
+        });
+      } else {
+        this.cli = setupQuickCLI({
+          framework: this.framework,
+          agent: this.orchestrator,
+          enableHotkeys: true,
+          enableStreaming: true,
+          debug: this.debugMode,
+          commandHandler: this.commandHandler,
+          autoDetect: this.autoDetect,
+          args: process.argv.slice(2),
+        });
+      }
 
       console.log('✅ Event-driven CLI created');
 
@@ -287,12 +347,14 @@ function parseArgs(): {
   framework?: 'readline' | 'ink' | 'blessed';
   autoDetect: boolean;
   help: boolean;
+  useTUI: boolean;
 } {
   const args = process.argv.slice(2);
   
   const debug = args.includes('--debug') || args.includes('-d');
   const autoDetect = args.includes('--auto-detect') || args.includes('-a');
   const help = args.includes('--help') || args.includes('-h');
+  const useTUI = args.includes('--blessed-tui') || args.includes('--tui');
   
   let framework: 'readline' | 'ink' | 'blessed' | undefined;
   
@@ -316,7 +378,7 @@ function parseArgs(): {
     }
   }
   
-  return { debug, framework, autoDetect, help };
+  return { debug, framework, autoDetect, help, useTUI };
 }
 
 // Display help function
@@ -335,6 +397,7 @@ Usage: bun run qi-prompt [options]
 Options:
   --framework, -f <type>    UI framework (${available.join('|')})
   --auto-detect, -a         Auto-detect best framework for environment
+  --blessed-tui, --tui      Enable blessed TUI mode with multi-panel interface
   --debug, -d               Enable debug mode
   --help, -h                Display this help message
 
@@ -355,10 +418,12 @@ Framework Information:
   • readline  - Zero dependencies, always available, basic terminal UI
   • ink       - Rich React-based UI with animations and colors ${available.includes('ink') ? '✓' : '✗ (run: bun add ink @inkjs/ui)'}
   • blessed   - Traditional TUI with widget support ${available.includes('blessed') ? '✓' : '✗ (run: bun add neo-blessed)'}
+    --blessed-tui - Rich multi-panel TUI interface with navigation
 
 Examples:
   bun run qi-prompt                    # Use default configuration
   bun run qi-prompt --framework ink   # Use Ink framework (React-based UI)
+  bun run qi-prompt --blessed-tui      # Use Blessed TUI with multi-panel interface
   bun run qi-prompt --auto-detect     # Use recommended framework (${recommended})
   bun run qi-prompt --debug           # Enable debug mode
   
