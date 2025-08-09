@@ -61,6 +61,36 @@ const BUILT_IN_COMMANDS: CommandDefinition[] = [
     category: 'system',
     parameters: [],
   },
+  {
+    name: 'model',
+    description: 'Show or change the current LLM model',
+    usage: '/model [model_name]',
+    aliases: ['m'],
+    category: 'llm',
+    parameters: [
+      {
+        name: 'model_name',
+        type: 'string',
+        required: false,
+        description: 'Model name to switch to',
+      },
+    ],
+  },
+  {
+    name: 'provider',
+    description: 'Show or change the current LLM provider',
+    usage: '/provider [provider_name]',
+    aliases: ['p'],
+    category: 'llm',
+    parameters: [
+      {
+        name: 'provider_name',
+        type: 'string',
+        required: false,
+        description: 'Provider name to switch to',
+      },
+    ],
+  },
 ];
 
 /**

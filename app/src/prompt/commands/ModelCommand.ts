@@ -31,7 +31,7 @@ export function createModelCommand(stateManager: IStateManager): {
   };
 
   const handler = async (request: CommandRequest): Promise<CommandResult> => {
-    const modelName = request.parameters.get('arg0') as string;
+    const modelName = request.parameters.get('arg1') as string;
     
     try {
       if (!modelName) {

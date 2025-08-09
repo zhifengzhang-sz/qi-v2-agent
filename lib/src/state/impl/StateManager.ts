@@ -308,6 +308,37 @@ export class StateManager implements IStateManager {
     return [...this.llmConfig.llm.prompt.availableModels];
   }
 
+  updatePromptProvider(provider: string): void {
+    if (!this.promptConfig) {
+      throw new Error('Prompt configuration not loaded');
+    }
+    const availableProviders = this.getAvailablePromptProviders();
+    if (!availableProviders.includes(provider)) {
+      throw new Error(`Provider '${provider}' not available for prompts`);
+    }
+    const oldConfig = { ...this.promptConfig };
+    this.promptConfig = { ...this.promptConfig, provider };
+
+    // Emit state change
+    this.notifyChange({
+      type: 'config',
+      field: 'promptProvider',
+      oldValue: oldConfig,
+      newValue: this.promptConfig,
+      timestamp: new Date(),
+    });
+  }
+
+  getAvailablePromptProviders(): readonly string[] {
+    if (!this.llmConfig?.llm?.providers) {
+      return [];
+    }
+    // Return list of enabled providers
+    return Object.keys(this.llmConfig.llm.providers).filter(
+      providerId => this.llmConfig?.llm?.providers?.[providerId]?.enabled === true
+    );
+  }
+
   /**
    * Extract LLMConfig structure that the prompt module expects
    * This removes our classifier/prompt sections and returns the traditional structure

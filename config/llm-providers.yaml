@@ -3,10 +3,10 @@
 
 llm:
   # Default provider selection strategy
-  defaultProvider: "ollama"
+  defaultProvider: "openrouter"
   
   # Fallback chain - providers to try in order if primary fails
-  fallbackChain: ["ollama", "groq", "huggingface", "together"]
+  fallbackChain: ["openrouter", "ollama", "groq", "huggingface", "together"]
   
   # Request timeout and retry configuration
   timeout: 30000  # 30 seconds
@@ -28,9 +28,19 @@ llm:
 
   # LLM configuration for user prompts (user-changeable)
   prompt:
-    currentModel: "qwen3:0.6b"  # Currently selected model
-    availableModels: ["llama3.2:3b", "qwen3:0.6b"]  # User can switch between these
-    defaultProvider: "ollama"
+    currentModel: "qwen/qwen3-8b:free"  # Currently selected model
+    availableModels: [
+      "qwen/qwen3-8b:free", 
+      "qwen/qwen3-14b:free", 
+      "qwen/qwen3-30b-a3b:free", 
+      "qwen/qwen3-coder:free",
+      "qwen/qwen3-8b",
+      "qwen/qwen3-14b",
+      "anthropic/claude-3.5-haiku", 
+      "meta-llama/llama-3.2-3b-instruct", 
+      "google/gemini-flash-1.5"
+    ]  # User can switch between these
+    defaultProvider: "openrouter"
 
   # Provider configurations
   providers:
@@ -64,6 +74,131 @@ llm:
         endpoint: "/api/tags"
         interval: 60000  # 1 minute
     
+    # OpenRouter - Access to multiple AI models through single API
+    openrouter:
+      name: "OpenRouter"
+      type: "api"
+      enabled: true
+      baseURL: "https://openrouter.ai/api/v1"
+      apiKey: "${OPENROUTER_API_KEY}"
+      models:
+        - name: "anthropic/claude-3.5-haiku"
+          displayName: "Claude 3.5 Haiku"
+          maxTokens: 8192
+          contextWindow: 200000
+          capabilities: ["completion", "chat", "reasoning"]
+          rateLimit:
+            requestsPerMinute: 500
+            tokensPerMinute: 100000
+          defaultParameters:
+            temperature: 0.7
+            max_tokens: 4096
+        - name: "meta-llama/llama-3.2-3b-instruct"
+          displayName: "Llama 3.2 3B Instruct"
+          maxTokens: 8192
+          contextWindow: 131072
+          capabilities: ["completion", "chat"]
+          rateLimit:
+            requestsPerMinute: 200
+            tokensPerMinute: 40000
+          defaultParameters:
+            temperature: 0.8
+            max_tokens: 2048
+        - name: "google/gemini-flash-1.5"
+          displayName: "Gemini Flash 1.5"
+          maxTokens: 8192
+          contextWindow: 1048576
+          capabilities: ["completion", "chat", "vision", "multimodal"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.9
+            max_tokens: 4096
+        - name: "openai/gpt-4o-mini"
+          displayName: "GPT-4o Mini"
+          maxTokens: 16384
+          contextWindow: 128000
+          capabilities: ["completion", "chat", "reasoning", "vision"]
+          rateLimit:
+            requestsPerMinute: 500
+            tokensPerMinute: 200000
+          defaultParameters:
+            temperature: 0.7
+            max_tokens: 4096
+        - name: "qwen/qwen3-8b:free"
+          displayName: "Qwen3 8B (Free)"
+          maxTokens: 8192
+          contextWindow: 32768
+          capabilities: ["completion", "chat", "reasoning"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.8
+            max_tokens: 2048
+        - name: "qwen/qwen3-14b:free"
+          displayName: "Qwen3 14B (Free)"
+          maxTokens: 8192
+          contextWindow: 32768
+          capabilities: ["completion", "chat", "reasoning"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.8
+            max_tokens: 2048
+        - name: "qwen/qwen3-30b-a3b:free"
+          displayName: "Qwen3 30B A3B (Free)"
+          maxTokens: 8192
+          contextWindow: 32768
+          capabilities: ["completion", "chat", "reasoning"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.8
+            max_tokens: 4096
+        - name: "qwen/qwen3-coder:free"
+          displayName: "Qwen3 Coder (Free)"
+          maxTokens: 8192
+          contextWindow: 32768
+          capabilities: ["completion", "chat", "code"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.3
+            max_tokens: 2048
+        - name: "qwen/qwen3-8b"
+          displayName: "Qwen3 8B"
+          maxTokens: 8192
+          contextWindow: 32768
+          capabilities: ["completion", "chat", "reasoning"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.8
+            max_tokens: 2048
+        - name: "qwen/qwen3-14b"
+          displayName: "Qwen3 14B"
+          maxTokens: 8192
+          contextWindow: 32768
+          capabilities: ["completion", "chat", "reasoning"]
+          rateLimit:
+            requestsPerMinute: 1000
+            tokensPerMinute: 1000000
+          defaultParameters:
+            temperature: 0.8
+            max_tokens: 2048
+      authentication:
+        type: "bearer"
+        headerName: "Authorization"
+      rateLimit:
+        requestsPerMinute: 500
+        tokensPerMinute: 100000
+
     # Groq - High-speed inference with free tier
     groq:
       name: "Groq"
@@ -206,23 +341,23 @@ llm:
 strategies:
   # Cost optimization - prefer free/local models
   cost:
-    priority: ["ollama", "huggingface", "groq", "together"]
+    priority: ["ollama", "huggingface", "openrouter", "groq", "together"]
     fallback: true
   
   # Speed optimization - prefer fastest inference
   speed:
-    priority: ["groq", "together", "ollama", "huggingface"]
+    priority: ["groq", "openrouter", "together", "ollama", "huggingface"]
     fallback: true
   
   # Quality optimization - prefer most capable models
   quality:
-    priority: ["together", "groq", "ollama", "huggingface"]
+    priority: ["openrouter", "together", "groq", "ollama", "huggingface"]
     fallback: true
   
   # Local-first - prefer local models, fallback to APIs
   local:
     priority: ["ollama"]
-    fallback: ["groq", "together", "huggingface"]
+    fallback: ["openrouter", "groq", "together", "huggingface"]
 
 # Monitoring and observability
 monitoring:
@@ -244,6 +379,9 @@ monitoring:
 # Environment variable mappings
 environment:
   variables:
+    - name: "OPENROUTER_API_KEY"
+      required: false
+      description: "API key for OpenRouter service (access to Claude, GPT, Gemini, etc.)"
     - name: "GROQ_API_KEY"
       required: false
       description: "API key for Groq inference service"

@@ -234,7 +234,7 @@ function parseArgValue(value: string, key: string): any {
  */
 function validateConfig(config: CLIConfigWithFramework): CLIConfigWithFramework {
   // Validate framework
-  const validFrameworks: CLIFramework[] = ['readline', 'ink', 'blessed'];
+  const validFrameworks: CLIFramework[] = ['readline', 'ink'];
   if (!validFrameworks.includes(config.framework)) {
     console.warn(`Warning: Invalid framework '${config.framework}', using 'readline'`);
     config.framework = 'readline';
@@ -271,13 +271,6 @@ export function getAvailableFrameworks(): CLIFramework[] {
     // Ink not available
   }
   
-  // Check if neo-blessed is available
-  try {
-    require('neo-blessed');
-    frameworks.push('blessed');
-  } catch {
-    // neo-blessed not available
-  }
   
   return frameworks;
 }
@@ -293,10 +286,6 @@ export function autoDetectFramework(): CLIFramework {
     return 'ink';
   }
   
-  // Fall back to blessed if available
-  if (available.includes('blessed')) {
-    return 'blessed';
-  }
   
   // Default to readline
   return 'readline';

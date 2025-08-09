@@ -303,21 +303,6 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
   const { exit } = useApp();
   
-  // Global input handler to intercept Ctrl+C before TextInput can block it
-  useInput((inputChar, key) => {
-    // Handle Ctrl+C to clear input - high priority handler
-    if (key.ctrl && inputChar === 'c') {
-      // Emit a custom event that InputBox can listen to
-      framework.emit('clearInput', { reason: 'ctrl+c' });
-      return;
-    }
-    
-    // Handle Ctrl+D for exit
-    if (key.ctrl && inputChar === 'd') {
-      exit();
-      return;
-    }
-  });
 
   // Get real provider/model info from connected agent
   useEffect(() => {
@@ -353,9 +338,39 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     // Update agent info initially and when framework changes
     getAgentInfo();
     
-    // Set up an interval to refresh agent info periodically - less frequent to avoid flicker
-    const interval = setInterval(getAgentInfo, 10000); // Reduced from 2s to 10s
-    return () => clearInterval(interval);
+    // Listen for state changes to refresh immediately
+    const handleStateChange = (event: any) => {
+      // Refresh provider info when config changes (provider/model switches)
+      if (event.type === 'config') {
+        getAgentInfo();
+      }
+    };
+    
+    // Subscribe to state changes from the agent's state manager
+    try {
+      const agent = (framework as any).connectedAgent;
+      if (agent?.stateManager?.on) {
+        agent.stateManager.on('stateChange', handleStateChange);
+      }
+    } catch (error) {
+      // Ignore subscription errors
+    }
+    
+    // Set up an interval to refresh agent info periodically as fallback
+    const interval = setInterval(getAgentInfo, 2000);
+    
+    return () => {
+      clearInterval(interval);
+      // Clean up state change listener
+      try {
+        const agent = (framework as any).connectedAgent;
+        if (agent?.stateManager?.off) {
+          agent.stateManager.off('stateChange', handleStateChange);
+        }
+      } catch (error) {
+        // Ignore cleanup errors
+      }
+    };
   }, [framework]);
 
   // Subscribe to framework events
@@ -377,7 +392,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
       // Use appropriate message type based on content - Claude Code style differentiation
       let message: OutputMessage;
       
-      if (data.type === 'complete' || data.type === 'response') {
+      if (data.type === 'complete') {
         // This is likely an AI response
         message = createAssistantMessage(data.content);
       } else if (data.type === 'streaming') {
@@ -537,7 +552,14 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   }, [framework, state, config, providerInfo]);
 
   const handleCancel = useCallback(() => {
-    // Reset processing state without adding system message
+    // Only proceed if actually processing
+    if (!state.isProcessing) return;
+    
+    // Add a brief cancelled message for user feedback
+    const cancelMessage = createSystemMessage('Request cancelled');
+    setMessages(prev => [...prev, cancelMessage]);
+    
+    // Reset processing state
     setState(prev => ({ 
       ...prev, 
       isProcessing: false, 
@@ -546,7 +568,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     
     // Emit cancel event - the setupQuickCLI will handle agent cancellation
     framework.emit('cancelRequested', { reason: 'user_escape' });
-  }, [framework]);
+  }, [framework, state.isProcessing]);
 
   const handleClear = useCallback(() => {
     // Clear input without adding system feedback message
@@ -574,6 +596,37 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     setPermissionRequest(null);
   }, []);
 
+  // Global input handler to intercept Ctrl+C, Esc, and Shift+Tab before TextInput can block them
+  useInput((inputChar, key) => {
+    // Handle Ctrl+C to clear input - high priority handler
+    if (key.ctrl && inputChar === 'c') {
+      // Emit a custom event that InputBox can listen to
+      framework.emit('clearInput', { reason: 'ctrl+c' });
+      return;
+    }
+    
+    // Handle Ctrl+D for exit
+    if (key.ctrl && inputChar === 'd') {
+      exit();
+      return;
+    }
+    
+    // Handle Esc to cancel processing
+    if (key.escape) {
+      // Only cancel if we're actually processing
+      if (state.isProcessing) {
+        // Call the cancel handler that's passed to MainLayout
+        handleCancel();
+      }
+      return;
+    }
+    
+    // Handle Shift+Tab to cycle modes
+    if (key.shift && key.tab) {
+      handleStateChange();
+      return;
+    }
+  });
 
   return (
     <MainLayout

@@ -4,7 +4,6 @@
  * Provides a unified interface for creating CLI instances with different frameworks:
  * - readline (default, zero dependencies)
  * - ink (React-based rich UI)
- * - blessed (traditional TUI widgets)
  */
 
 import {
@@ -25,12 +24,6 @@ import {
   checkReadlineSupport,
 } from './createReadlineCLI.js';
 
-import {
-  createBlessedCLI,
-  createValidatedBlessedCLI,
-  createBlessedCLIAsync,
-  checkBlessedFrameworkSupport,
-} from './createBlessedCLI.js';
 
 // Import Ink framework
 import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework.js';
@@ -38,7 +31,7 @@ import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework.js';
 /**
  * Framework types supported by the CLI
  */
-export type CLIFramework = 'readline' | 'ink' | 'blessed';
+export type CLIFramework = 'readline' | 'ink';
 
 /**
  * Extended CLI configuration with framework selection
@@ -81,8 +74,6 @@ export function createCLI(config: Partial<CLIConfigWithFramework> = {}): Result<
     case 'ink':
       return createInkCLI(config);
       
-    case 'blessed':
-      return createBlessedCLI(config);
       
     default:
       return Err(cliFactoryError(
@@ -91,7 +82,7 @@ export function createCLI(config: Partial<CLIConfigWithFramework> = {}): Result<
         { 
           framework,
           operation: 'createCLI',
-          availableFrameworks: ['readline', 'ink', 'blessed']
+          availableFrameworks: ['readline', 'ink']
         }
       ));
   }
@@ -118,8 +109,6 @@ export function createValidatedCLI(config: Partial<CLIConfigWithFramework> = {})
         case 'ink':
           return createValidatedInkCLI(config);
           
-        case 'blessed':
-          return createValidatedBlessedCLI(config);
           
         default:
           return Err(cliFactoryError(
@@ -150,8 +139,6 @@ export async function createCLIAsync(config: Partial<CLIConfigWithFramework> = {
     case 'ink':
       return await createInkCLIAsync(config);
       
-    case 'blessed':
-      return await createBlessedCLIAsync(config);
       
     default:
       return Err(cliFactoryError(
@@ -169,7 +156,6 @@ export function getFrameworkSupport(): Record<CLIFramework, any> {
   return {
     readline: checkReadlineSupport(),
     ink: checkInkSupport(),
-    blessed: checkBlessedSupport(),
   };
 }
 
@@ -202,17 +188,6 @@ export function checkFrameworkSupport(framework: CLIFramework): Result<void, QiE
       return Ok(void 0);
     }
     
-    case 'blessed': {
-      const support = checkBlessedSupport();
-      if (!support.available) {
-        return Err(cliFactoryError(
-          'BLESSED_NOT_SUPPORTED',
-          'neo-blessed framework is not available. Run: bun add neo-blessed',
-          { framework, supportCheck: support }
-        ));
-      }
-      return Ok(void 0);
-    }
     
     default:
       return Err(cliFactoryError(
@@ -238,24 +213,16 @@ export function recommendFramework(): {
     return {
       framework: 'ink',
       reason: 'Rich React-based UI with excellent terminal support',
-      alternatives: ['blessed', 'readline'],
+      alternatives: ['readline'],
     };
   }
   
-  // Check if neo-blessed is available for TUI applications
-  if (support.blessed.available && support.readline.terminal) {
-    return {
-      framework: 'blessed',
-      reason: 'Traditional TUI with widget support',
-      alternatives: ['readline', 'ink'],
-    };
-  }
   
   // Default to readline (always available)
   return {
     framework: 'readline',
     reason: 'Zero dependencies, always available',
-    alternatives: ['ink', 'blessed'],
+    alternatives: ['ink'],
   };
 }
 
@@ -286,7 +253,6 @@ function createInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, Qi
   }
 }
 
-// Now imported from createBlessedCLI.ts
 
 function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
   // Run validation first
@@ -299,13 +265,11 @@ function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFram
   );
 }
 
-// Now imported from createBlessedCLI.ts
 
 async function createInkCLIAsync(config: Partial<CLIConfig> = {}): Promise<Result<ICLIFramework, QiError>> {
   return createInkCLI(config);
 }
 
-// Now imported from createBlessedCLI.ts
 
 // Support checking functions
 
@@ -329,7 +293,6 @@ function checkInkSupport(): { available: boolean; reason: string; packages?: str
 }
 
 // Use the imported function
-const checkBlessedSupport = checkBlessedFrameworkSupport;
 
 /**
  * Backward compatibility function
@@ -352,12 +315,9 @@ export function getAvailableFrameworks(): CLIFramework[] {
     frameworks.push('ink');
   }
   
-  if (checkBlessedSupport().available) {
-    frameworks.push('blessed');
-  }
   
   return frameworks;
 }
 
 // Export the framework-specific factories for direct use
-export { createInkCLI, createBlessedCLI };
+export { createInkCLI };
