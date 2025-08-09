@@ -1,167 +1,213 @@
 /**
- * neo-blessed Terminal implementation (STUB)
+ * neo-blessed Terminal implementation
  * 
  * Traditional TUI terminal implementation using neo-blessed framework.
- * This is a stub implementation that will be expanded when blessed support is added.
+ * Provides widget-based terminal operations with efficient rendering.
  */
 
+import * as blessed from 'neo-blessed';
 import type { ITerminal, TerminalDimensions } from '../../abstractions/ITerminal.js';
 
 /**
- * neo-blessed terminal implementation (stub)
+ * neo-blessed terminal implementation
  * 
- * TODO: Implement full blessed terminal operations when blessed framework is added
- * Dependencies: bun add neo-blessed @types/blessed
+ * Uses blessed screen for efficient widget-based terminal operations.
+ * Only draws changes (damage) to screen for optimal performance.
  */
 export class BlessedTerminal implements ITerminal {
   private isDestroyed = false;
-  // TODO: Add blessed.Screen reference when implemented
-  // private screen: blessed.Widgets.Screen;
+  private screen: blessed.Widgets.Screen;
+  private ownScreen: boolean = false;
 
-  constructor() {
-    // TODO: Initialize blessed screen
-    // this.screen = blessed.screen({
-    //   smartCSR: true,
-    //   title: 'CLI Application'
-    // });
+  constructor(screen?: blessed.Widgets.Screen) {
+    if (screen) {
+      // Use provided screen
+      this.screen = screen;
+      this.ownScreen = false;
+    } else {
+      // Create own screen
+      this.screen = blessed.screen({
+        smartCSR: true,
+        title: 'Qi CLI Application',
+        cursor: {
+          artificial: true,
+          shape: 'line',
+          blink: true
+        },
+        debug: false,
+        dockBorders: false,
+        ignoreLocked: ['C-c']
+      });
+      this.ownScreen = true;
+      
+      // Setup screen cleanup on destroy
+      this.screen.on('destroy', () => {
+        this.isDestroyed = true;
+      });
+      
+      // Set up signal handlers for proper cleanup
+      this.setupSignalHandlers();
+    }
+  }
+  
+  private setupSignalHandlers(): void {
+    // Handle SIGINT (Ctrl+C) and SIGTERM gracefully
+    const gracefulExit = () => {
+      this.destroy();
+      process.exit(0);
+    };
+    
+    process.on('SIGINT', gracefulExit);
+    process.on('SIGTERM', gracefulExit);
+    process.on('SIGQUIT', gracefulExit);
+    
+    // Handle uncaught exceptions to ensure proper cleanup
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught Exception:', error);
+      this.destroy();
+      process.exit(1);
+    });
   }
 
   write(text: string): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based text output
-    // this.screen.log(text);
-    process.stdout.write(text);
+    // Use blessed screen for output
+    this.screen.program.write(text);
   }
 
   writeLine(text: string = ''): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based line output
-    // this.screen.log(text);
-    process.stdout.write(text + '\n');
+    // Use blessed screen for line output
+    this.screen.program.write(text + '\n');
   }
 
   clear(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based screen clearing
-    // this.screen.clearRegion(0, 0, this.screen.width, this.screen.height);
-    console.clear();
+    // Clear entire screen using blessed
+    this.screen.clearRegion(0, 0, this.screen.width, this.screen.height);
+    this.screen.render();
   }
 
   clearLine(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based line clearing
-    process.stdout.write('\r\x1b[K');
+    // Clear current line using blessed program
+    this.screen.program.write('\r\x1b[K');
   }
 
   cursorToStart(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based cursor positioning
-    process.stdout.write('\r');
+    // Move cursor to start of line
+    this.screen.program.write('\r');
   }
 
   cursorUp(lines: number = 1): void {
     if (this.isDestroyed || lines <= 0) return;
     
-    // TODO: Implement blessed-based cursor movement
-    process.stdout.write(`\x1b[${lines}A`);
+    // Move cursor up using blessed program
+    this.screen.program.cuu(lines);
   }
 
   cursorDown(lines: number = 1): void {
     if (this.isDestroyed || lines <= 0) return;
     
-    // TODO: Implement blessed-based cursor movement
-    process.stdout.write(`\x1b[${lines}B`);
+    // Move cursor down using blessed program
+    this.screen.program.cud(lines);
   }
 
   moveCursor(x: number, y: number): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based cursor positioning
-    const row = Math.max(1, Math.floor(y));
-    const col = Math.max(1, Math.floor(x));
-    process.stdout.write(`\x1b[${row};${col}H`);
+    // Move cursor to absolute position using blessed
+    const row = Math.max(0, Math.floor(y));
+    const col = Math.max(0, Math.floor(x));
+    this.screen.program.cup(row, col);
   }
 
   getDimensions(): TerminalDimensions {
-    // TODO: Get dimensions from blessed screen
-    // return {
-    //   width: this.screen.width,
-    //   height: this.screen.height,
-    // };
+    // Get dimensions from blessed screen
     return {
-      width: process.stdout.columns || 80,
-      height: process.stdout.rows || 24,
+      width: this.screen.width,
+      height: this.screen.height,
     };
   }
 
   saveCursor(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based cursor save
-    process.stdout.write('\x1b[s');
+    // Save cursor position using blessed program
+    this.screen.program.sc();
   }
 
   restoreCursor(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based cursor restore
-    process.stdout.write('\x1b[u');
+    // Restore cursor position using blessed program
+    this.screen.program.rc();
   }
 
   hideCursor(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based cursor hiding
-    // this.screen.program.hideCursor();
-    process.stdout.write('\x1b[?25l');
+    // Hide cursor using blessed program
+    this.screen.program.civis();
   }
 
   showCursor(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based cursor showing
-    // this.screen.program.showCursor();
-    process.stdout.write('\x1b[?25h');
+    // Show cursor using blessed program
+    this.screen.program.cnorm();
   }
 
   setColor(colorCode: number): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based color setting
-    process.stdout.write(`\x1b[${colorCode}m`);
+    // Set color using blessed program
+    this.screen.program.setFg(colorCode);
   }
 
   resetFormatting(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-based formatting reset
-    process.stdout.write('\x1b[0m');
+    // Reset formatting using blessed program
+    this.screen.program.sgr0();
   }
 
   supportsColor(): boolean {
-    // TODO: Check blessed color support
-    // return this.screen.program.tput && this.screen.program.tput.colors > 0;
-    return process.stdout.isTTY;
+    // Check blessed color support
+    return this.screen.program.tput && this.screen.program.tput.colors > 0;
   }
 
   supportsUnicode(): boolean {
-    // TODO: Check blessed Unicode support
-    return process.platform !== 'win32';
+    // Check blessed Unicode support - blessed generally supports Unicode
+    return this.screen.program.tput && this.screen.program.tput.unicode !== false;
   }
 
   destroy(): void {
     if (this.isDestroyed) return;
     
-    // TODO: Implement blessed-specific cleanup
-    // this.screen.destroy();
+    // Perform blessed-specific cleanup
     this.resetFormatting();
     this.showCursor();
+    
+    // Only destroy screen if we own it
+    if (this.ownScreen) {
+      this.screen.destroy();
+    }
+    
     this.isDestroyed = true;
+  }
+
+  /**
+   * Get the blessed screen instance for use by other blessed components
+   */
+  getScreen(): blessed.Widgets.Screen {
+    return this.screen;
   }
 }
 

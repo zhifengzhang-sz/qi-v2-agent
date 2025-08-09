@@ -238,7 +238,22 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     };
 
     const icon = icons[type] || 'ℹ️';
-    this.terminal.writeLine(`${icon} ${content}`);
+    const message = `${icon} ${content}`;
+    
+    // Check if TUI mode is enabled
+    if (this.isTUIMode()) {
+      const tuiLayout = this.getTUILayout();
+      if (tuiLayout) {
+        // Route message to TUI main panel instead of terminal.writeLine()
+        tuiLayout.addToMain(message);
+      } else {
+        // Fallback to terminal if TUI layout not available
+        this.terminal.writeLine(message);
+      }
+    } else {
+      // Regular mode: use terminal.writeLine()
+      this.terminal.writeLine(message);
+    }
     
     this.eventManager.emit('messageReceived', { content, type });
   }
@@ -351,16 +366,37 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   onAgentComplete(result: any): void {
     this.state.isProcessing = false;
     
+    const wasStreaming = this.state.isStreamingActive;
+    
     if (this.state.isStreamingActive) {
       this.completeStreaming('Response completed');
     }
     
-    // Extract and display result
+    // Extract and display result - but only if we weren't streaming 
+    // (streaming already sent the content)
     const content = this.extractResultContent(result);
     this.progressRenderer.hideAndReplace();
     
-    if (content) {
-      this.terminal.writeLine(content + '\n');
+    if (content && !wasStreaming) {
+      // Only display content if it wasn't already streamed
+      if (this.isTUIMode()) {
+        const tuiLayout = this.getTUILayout();
+        if (tuiLayout) {
+          // Route response content to TUI main panel
+          tuiLayout.addToMain(content);
+          
+          // Add AI response to conversation history for non-streaming
+          const timestamp = new Date().toLocaleTimeString();
+          const responsePreview = content.substring(0, 100) + (content.length > 100 ? '...' : '');
+          tuiLayout.addToContext(`{bold}{green-fg}[${timestamp}] AI:{/green-fg}{/bold} ${responsePreview}`);
+        } else {
+          // Fallback to terminal if TUI layout not available
+          this.terminal.writeLine(content + '\n');
+        }
+      } else {
+        // Regular mode: use terminal.writeLine()
+        this.terminal.writeLine(content + '\n');
+      }
     }
     
     this.showPrompt();
@@ -652,6 +688,28 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   private isPromptActive(): boolean {
     return !this.state.isProcessing && !this.state.isStreamingActive;
+  }
+
+  /**
+   * Check if TUI mode is enabled
+   */
+  private isTUIMode(): boolean {
+    // Check if input manager has TUI layout (blessed with TUI)
+    if ((this.inputManager as any).getTUILayout) {
+      const tuiLayout = (this.inputManager as any).getTUILayout();
+      return tuiLayout !== undefined;
+    }
+    return false;
+  }
+
+  /**
+   * Get TUI layout instance if available
+   */
+  private getTUILayout(): any {
+    if ((this.inputManager as any).getTUILayout) {
+      return (this.inputManager as any).getTUILayout();
+    }
+    return null;
   }
 }
 

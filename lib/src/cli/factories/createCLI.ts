@@ -25,6 +25,13 @@ import {
   checkReadlineSupport,
 } from './createReadlineCLI.js';
 
+import {
+  createBlessedCLI,
+  createValidatedBlessedCLI,
+  createBlessedCLIAsync,
+  checkBlessedFrameworkSupport,
+} from './createBlessedCLI.js';
+
 // Import Ink framework
 import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework.js';
 
@@ -279,31 +286,7 @@ function createInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, Qi
   }
 }
 
-function createBlessedCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  try {
-    // Check if neo-blessed is available
-    const support = checkBlessedSupport();
-    if (!support.available) {
-      return Err(cliFactoryError(
-        'BLESSED_NOT_AVAILABLE',
-        `neo-blessed framework not available: ${support.reason}. Install with: bun add ${support.packages?.join(' ')}`,
-        { framework: 'blessed', operation: 'createBlessedCLI', supportCheck: support }
-      ));
-    }
-    
-    // Import Blessed CLI implementation
-    const { createBlessedCLIImpl } = require('../frameworks/blessed/index.js');
-    const cli = createBlessedCLIImpl(config);
-    
-    return Ok(cli);
-  } catch (error: any) {
-    return Err(cliFactoryError(
-      'BLESSED_CREATION_FAILED',
-      `Failed to create Blessed CLI: ${error.message}`,
-      { framework: 'blessed', operation: 'createBlessedCLI' }
-    ));
-  }
-}
+// Now imported from createBlessedCLI.ts
 
 function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
   // Run validation first
@@ -316,24 +299,13 @@ function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFram
   );
 }
 
-function createValidatedBlessedCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  // Run validation first
-  const validationResult = checkFrameworkSupport('blessed');
-  
-  return match(
-    () => createBlessedCLI(config),
-    (error) => Err(error),
-    validationResult
-  );
-}
+// Now imported from createBlessedCLI.ts
 
 async function createInkCLIAsync(config: Partial<CLIConfig> = {}): Promise<Result<ICLIFramework, QiError>> {
   return createInkCLI(config);
 }
 
-async function createBlessedCLIAsync(config: Partial<CLIConfig> = {}): Promise<Result<ICLIFramework, QiError>> {
-  return createBlessedCLI(config);
-}
+// Now imported from createBlessedCLI.ts
 
 // Support checking functions
 
@@ -356,23 +328,8 @@ function checkInkSupport(): { available: boolean; reason: string; packages?: str
   }
 }
 
-function checkBlessedSupport(): { available: boolean; reason: string; packages?: string[] } {
-  try {
-    // Try to require blessed
-    require('neo-blessed');
-    
-    return {
-      available: true,
-      reason: 'neo-blessed package is available',
-    };
-  } catch (error) {
-    return {
-      available: false,
-      reason: 'neo-blessed package not found',
-      packages: ['neo-blessed'],
-    };
-  }
-}
+// Use the imported function
+const checkBlessedSupport = checkBlessedFrameworkSupport;
 
 /**
  * Backward compatibility function

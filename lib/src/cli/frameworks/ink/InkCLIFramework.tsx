@@ -17,7 +17,8 @@ import type {
   MessageType,
 } from '../../abstractions/ICLIFramework.js';
 import { MainLayout } from './components/MainLayout.js';
-import { createOutputMessage, type OutputMessage } from './components/OutputDisplay.js';
+import { createOutputMessage, createUserMessage, createAssistantMessage, createSystemMessage, type OutputMessage } from './components/OutputDisplay.js';
+import { createPermissionRequest, type PermissionRequest } from './components/PermissionDialog.js';
 
 /**
  * Default CLI configuration for Ink
@@ -291,15 +292,15 @@ interface InkCLIAppProps {
 function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   // Initialize messages with welcome message
   const [messages, setMessages] = useState<OutputMessage[]>(() => [
-    createOutputMessage('Welcome to Qi CLI with Ink! Type /help for commands.', 'info')
+    createSystemMessage('Welcome to Qi CLI with Ink! Type /help for commands.')
   ]);
   const [state, setState] = useState({
     ...initialState,
     currentPhase: '',
-    progress: 0,
   });
   const [taskName, setTaskName] = useState<string>();
   const [providerInfo, setProviderInfo] = useState({ provider: 'ollama', model: 'qwen3:0.6b' });
+  const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
   const { exit } = useApp();
   
   // Global input handler to intercept Ctrl+C before TextInput can block it
@@ -360,7 +361,33 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   // Subscribe to framework events
   useEffect(() => {
     const handleMessageReceived = (data: { content: string; type: MessageType }) => {
-      const message = createOutputMessage(data.content, data.type);
+      // Filter out generic processing messages
+      const genericMessages = [
+        'Processing request...',
+        'Task completed successfully',
+        'Request processed',
+        'Processing...',
+        'Task complete'
+      ];
+      
+      if (genericMessages.includes(data.content.trim())) {
+        return; // Skip these generic messages
+      }
+      
+      // Use appropriate message type based on content - Claude Code style differentiation
+      let message: OutputMessage;
+      
+      if (data.type === 'complete' || data.type === 'response') {
+        // This is likely an AI response
+        message = createAssistantMessage(data.content);
+      } else if (data.type === 'streaming') {
+        // Streaming AI response
+        message = createAssistantMessage(data.content, false);
+      } else {
+        // System messages (info, warning, error, etc.)
+        message = createOutputMessage(data.content, data.type);
+      }
+      
       setMessages(prev => [...prev, message]);
     };
 
@@ -373,8 +400,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
         ...prev, 
         isProcessing: true, 
         lastActivity: new Date(),
-        currentPhase: data.phase,
-        progress: data.progress
+        currentPhase: data.phase
       }));
       // Don't add ugly progress messages - let the UI handle progress display
     };
@@ -383,13 +409,13 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
       // Update the last message if it's a streaming message, or create new one
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1];
-        if (lastMessage && lastMessage.type === 'streaming') {
+        if (lastMessage && (lastMessage.type === 'streaming' || lastMessage.sender === 'assistant')) {
           return [
             ...prev.slice(0, -1),
             { ...lastMessage, content: lastMessage.content + data.content }
           ];
         } else {
-          return [...prev, createOutputMessage(data.content, 'streaming')];
+          return [...prev, createAssistantMessage(data.content, false)];
         }
       });
     };
@@ -400,7 +426,6 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
         isStreamingActive: false, 
         isProcessing: false,
         currentPhase: '',
-        progress: 0,
         lastActivity: new Date() 
       }));
     };
@@ -421,16 +446,15 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   }, [framework]);
 
   const handleInput = useCallback((input: string) => {
-    // Add user's input to the message display
-    const userMessage = createOutputMessage(`> ${input}`, 'info');
+    // Add user's input to the message display using Claude Code style
+    const userMessage = createUserMessage(input);
     setMessages(prev => [...prev, userMessage]);
     
     // Clear progress state when starting new request
     setState(prev => ({ 
       ...prev, 
       isProcessing: true,
-      currentPhase: 'processing',
-      progress: 0 
+      currentPhase: 'Processing'
     }));
     
     // Just emit the userInput event - setupQuickCLI handles the rest
@@ -446,25 +470,78 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   }, [framework]);
 
   const handleCommand = useCallback((command: string, args: string[]) => {
-    // Add command message to display
-    const commandMessage = createOutputMessage(`/${command} ${args.join(' ')}`, 'info');
+    // Add command as user message (like user typed it)
+    const commandMessage = createUserMessage(`/${command} ${args.join(' ')}`);
     setMessages(prev => [...prev, commandMessage]);
     
-    // Emit command event - the setupQuickCLI will handle routing to agent
-    framework.emit('command', { command, args });
-  }, [framework]);
+    // Handle built-in commands locally
+    switch (command) {
+      case 'help':
+        const helpMessage = createSystemMessage(
+          'Available commands:\n' +
+          '/help - Show this help message\n' +
+          '/clear - Clear conversation history\n' +
+          '/model - Switch AI model (not implemented)\n' +
+          '/status - Show system status\n' +
+          '/config - View configuration\n' +
+          '/permission - Demo permission dialog'
+        );
+        setMessages(prev => [...prev, helpMessage]);
+        break;
+        
+      case 'clear':
+        setMessages([createSystemMessage('Conversation history cleared')]);
+        break;
+        
+      case 'status':
+        const statusMessage = createSystemMessage(
+          `System Status:\n` +
+          `Mode: ${state.mode}\n` +
+          `Processing: ${state.isProcessing ? 'Yes' : 'No'}\n` +
+          `Provider: ${providerInfo.provider}\n` +
+          `Model: ${providerInfo.model}\n` +
+          `Uptime: ${Math.floor((Date.now() - state.startTime.getTime()) / 1000)}s`
+        );
+        setMessages(prev => [...prev, statusMessage]);
+        break;
+        
+      case 'config':
+        const configMessage = createSystemMessage(
+          `Configuration:\n` +
+          `Colors: ${config.colors ? 'Enabled' : 'Disabled'}\n` +
+          `Animations: ${config.animations ? 'Enabled' : 'Disabled'}\n` +
+          `History Size: ${config.historySize}\n` +
+          `Streaming: ${config.enableStreaming ? 'Enabled' : 'Disabled'}`
+        );
+        setMessages(prev => [...prev, configMessage]);
+        break;
+        
+      case 'permission':
+        const request = createPermissionRequest(
+          'file-editor',
+          'modify files',
+          'The AI wants to edit source code files in your project.',
+          [
+            'May overwrite existing files',
+            'Could introduce bugs or security issues',
+            'Changes might be difficult to revert'
+          ]
+        );
+        setPermissionRequest(request);
+        break;
+        
+      default:
+        // For unrecognized commands, emit to agent/CLI system
+        framework.emit('command', { command, args });
+    }
+  }, [framework, state, config, providerInfo]);
 
   const handleCancel = useCallback(() => {
-    // Add cancellation message
-    const cancelMessage = createOutputMessage('Request cancelled', 'warning');
-    setMessages(prev => [...prev, cancelMessage]);
-    
-    // Reset processing state
+    // Reset processing state without adding system message
     setState(prev => ({ 
       ...prev, 
       isProcessing: false, 
-      currentPhase: '', 
-      progress: 0 
+      currentPhase: ''
     }));
     
     // Emit cancel event - the setupQuickCLI will handle agent cancellation
@@ -472,10 +549,31 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   }, [framework]);
 
   const handleClear = useCallback(() => {
-    // Add clear message to show user feedback
-    const clearMessage = createOutputMessage('Prompt cleared', 'info');
-    setMessages(prev => [...prev, clearMessage]);
+    // Clear input without adding system feedback message
+    // The visual feedback is the cleared input itself
   }, []);
+
+  // Permission dialog handlers
+  const handlePermissionApprove = useCallback((requestId: string, remember?: boolean) => {
+    const systemMessage = createSystemMessage(`Tool permission approved${remember ? ' (remembered)' : ''}`);
+    setMessages(prev => [...prev, systemMessage]);
+    setPermissionRequest(null);
+    // Emit approval event for the agent/CLI system
+    framework.emit('permissionApproved', { requestId, remember });
+  }, [framework]);
+
+  const handlePermissionDeny = useCallback((requestId: string, remember?: boolean) => {
+    const systemMessage = createSystemMessage(`Tool permission denied${remember ? ' (remembered)' : ''}`);
+    setMessages(prev => [...prev, systemMessage]);
+    setPermissionRequest(null);
+    // Emit denial event for the agent/CLI system
+    framework.emit('permissionDenied', { requestId, remember });
+  }, [framework]);
+
+  const handlePermissionDismiss = useCallback(() => {
+    setPermissionRequest(null);
+  }, []);
+
 
   return (
     <MainLayout
@@ -493,8 +591,11 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
       mode={state.mode}
       isProcessing={state.isProcessing}
       currentPhase={state.currentPhase}
-      progress={state.progress}
       framework={framework}
+      permissionRequest={permissionRequest}
+      onPermissionApprove={handlePermissionApprove}
+      onPermissionDeny={handlePermissionDeny}
+      onPermissionDismiss={handlePermissionDismiss}
     />
   );
 }

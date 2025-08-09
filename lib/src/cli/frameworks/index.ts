@@ -13,7 +13,7 @@ export * from './readline/index.js';
 // Ink framework (stub implementation - requires: bun add ink @inkjs/ui)
 export * from './ink/framework-index.js';
 
-// neo-blessed framework (stub implementation - requires: bun add neo-blessed)
+// neo-blessed framework (complete implementation - requires: bun add neo-blessed)
 export * from './blessed/framework-index.js';
 
 // Framework support checking

@@ -29,6 +29,7 @@
     "chalk": "^5.4.1"
   },
   "dependencies": {
+    "@types/blessed": "^0.1.25",
     "@types/js-yaml": "^4.0.9",
     "ink-big-text": "^2.0.0",
     "ink-gradient": "^3.0.0",
@@ -37,6 +38,7 @@
     "ink-text-input": "^6.0.0",
     "js-yaml": "^4.1.0",
     "multi-llm-ts": "^4.2.2",
+    "neo-blessed": "^0.2.0",
     "react-devtools-core": "^6.1.5",
     "yaml": "^2.8.0"
   }
