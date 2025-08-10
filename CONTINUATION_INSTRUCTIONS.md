@@ -1,248 +1,194 @@
-# 🔄 Continuation Instructions for Qi V2 Agent v-0.5.x
+# 🚨 CRITICAL: Major Architecture Cleanup Required
 
 ## 📋 **Session Context Summary**
 
-You are continuing work on **Qi V2 Agent v-0.5.x Toolbox Preview** - a sophisticated CLI application with file reference workflows and tool registry architecture.
+**URGENT**: The v-0.5.x implementation became a **major architectural mess** that needs complete refactoring before proceeding.
 
-### 🎯 **Current Status**: v-0.5.x Toolbox Preview
+### 🎯 **Current Status**: BROKEN ARCHITECTURE (v-0.5.x)
 - **Version Format**: Always use `v-x.x.x` format (e.g., v-0.5.x, v-0.6.x)
-- **Architecture**: Toolbox-based preview of v-0.8.x full agent capabilities  
-- **Main File**: Single `app/src/prompt/qi-prompt.ts` (no file proliferation)
-- **Approach**: Version control strategy, not separate files
+- **MAJOR PROBLEM**: Toolbox leaked across all layers violating separation of concerns
+- **Files Changed**: 101 files (should have been ~20 files)
+- **Design Issue**: Tools directly imported at app layer instead of contained in workflows
 
 ---
 
-## 🏗️ **Architecture Overview**
+## 🚨 **ARCHITECTURAL DISASTER ANALYSIS**
 
-### **Design Philosophy**
-```
-v-0.4.x: Pure prompt app ✅
-v-0.5.x: Toolbox preview ← CURRENT
-v-0.6.x: Full toolbox (100+ tools, MCP)
-v-0.7.x: Advanced workflows  
-v-0.8.x: Full agent capabilities
-```
+### 🔴 **What Went Wrong**
+The toolbox implementation violated **fundamental separation of concerns**:
 
-### **Core Components**
 ```typescript
-// Single consolidated application
-app/src/prompt/qi-prompt.ts              # Main CLI app (700+ lines)
+// ❌ WRONG: qi-prompt.ts directly managing tools (current broken state)
+import { ToolRegistry, FileContentResolver, ProjectStructureScanner } from 'tools';
+this.toolRegistry = new ToolRegistry();
+this.toolRegistry.register(fileResolver, {...});
+this.contextManager = new ToolbasedContextManager(appContext, this.toolRegistry);
 
-// Toolbox library components  
-lib/src/tools/files/FileContentResolver.ts          # File loading
-lib/src/tools/files/ProjectStructureScanner.ts     # Project discovery
-lib/src/tools/parsing/FileReferenceParser.ts       # @file pattern parsing
-lib/src/tools/context/SessionManager.ts            # Session persistence
-lib/src/tools/ToolRegistry.ts                      # Tool management
-
-// Workflow system
-lib/src/workflows/WorkflowManager.ts               # Workflow orchestration
-lib/src/workflows/FileReferenceWorkflow.ts        # @file processing
-lib/src/workflows/SimpleWorkflow.ts               # Base workflow classes
-
-// Enhanced context & classification
-lib/src/context/impl/ToolbasedContextManager.ts    # Tool-driven context
-lib/src/classifier/impl/FileReferenceClassifier.ts # @file detection
+// ❌ Result: 101 files changed, tools leaked across all layers
 ```
 
-### **Tool Registry Architecture**
-- **4 Tools across 3 Categories**:
-  - **Files**: FileContentResolver, ProjectStructureScanner
-  - **Parsing**: FileReferenceParser  
-  - **Context**: SessionManager
-- **Composable Design**: Tools can be combined and reused
-- **Registry Pattern**: Central registration and discovery
+### ✅ **How It Should Be**
+Tools should be **hidden inside workflows only**:
+
+```typescript
+// ✅ CORRECT: Clean separation (target architecture)
+import { WorkflowManager } from 'workflows';
+this.workflowManager = new WorkflowManager(); // Tools hidden inside
+this.contextManager = new ContextManager(appContext); // No tool dependency
+
+// ✅ Result: ~20 files changed, clean layer boundaries
+```
+
+### 🏗️ **Correct Architecture Layers**
+```
+App Layer (qi-prompt.ts)
+├── Should only import: WorkflowManager, ContextManager, Classifier
+└── WorkflowManager (lib/src/workflows/)
+    ├── Internally manages: ToolRegistry
+    ├── Internal tools: FileContentResolver, ProjectStructureScanner, etc.
+    └── Provides: clean workflow API to app layer
+```
+
+### 🚫 **Current Broken Architecture**
+```
+App Layer (qi-prompt.ts) 
+├── ❌ Directly imports: ToolRegistry, FileContentResolver, etc.
+├── ❌ Creates: ToolbasedContextManager  
+├── ❌ Manages: tool lifecycle
+└── ❌ Result: Cross-cutting toolbox concerns everywhere
+```
 
 ---
 
-## ✨ **Implemented Features**
+## 🔧 **MANDATORY REFACTORING REQUIRED**
+
+### 🎯 **Phase 1: Architectural Cleanup (URGENT)**
+Before any new features, the architecture must be fixed:
+
+#### **Step 1: Revert ToolbasedContextManager**
+```bash
+# Remove the tool-aware context manager
+rm lib/src/context/impl/ToolbasedContextManager.ts
+# Revert to standard ContextManager in qi-prompt.ts
+```
+
+#### **Step 2: Move Tools Inside WorkflowManager** 
+```typescript
+// In WorkflowManager.ts - make tools internal
+class WorkflowManager {
+  private toolRegistry: ToolRegistry;  // Move here
+  private fileResolver: FileContentResolver;  // Move here
+  
+  constructor() {
+    this.initializeInternalTools();  // Hide tool setup
+  }
+  
+  // Public API - no tool exposure
+  async executeWorkflow(input: WorkflowInput): Promise<WorkflowResult>
+  getStats(): WorkflowStats
+  // Remove: getToolRegistry(), listTools(), etc.
+}
+```
+
+#### **Step 3: Clean qi-prompt.ts**
+```typescript
+// Remove all tool imports
+// Remove: ToolRegistry, FileContentResolver, etc.
+// Remove: ToolbasedContextManager
+// Keep only: WorkflowManager import
+
+// Clean constructor
+constructor() {
+  this.workflowManager = new WorkflowManager(); // Tools hidden
+  this.contextManager = new ContextManager(appContext); // Standard
+  // Remove: tool registry setup, tool registration
+}
+```
+
+#### **Step 4: Route Commands Through WorkflowManager**
+```typescript
+// /tools command should call workflowManager.getToolInfo()
+// /workflows already routes correctly  
+// Remove: direct tool registry access
+```
+
+### 📊 **Expected Cleanup Results**
+- **Files Reverted**: ~80 files (only workflow files should change)
+- **Clean Boundaries**: App → Workflow → Tools (proper layering)
+- **Testability**: Each layer independently testable
+- **Maintainability**: Changes to tools don't affect app layer
+
+---
+
+## ⚠️ **What Currently "Works" (But Badly Architected)**
+
+**Note**: These features work but are implemented with terrible architecture that must be fixed:
 
 ### 🧰 **Toolbox System**
-- ✅ **Tool Registry**: 4 tools registered across 3 categories
-- ✅ **Tool Commands**: `/tools` lists registered tools with descriptions
+- ✅ **Tool Registry**: 4 tools registered (but exposed at wrong layer)
+- ✅ **Tool Commands**: `/tools` lists tools (but directly accesses registry)
 - ✅ **Tool Integration**: All tools properly initialized and available
 - ✅ **Tool Statistics**: Runtime stats tracking and reporting
 
 ### 📁 **File Reference System** 
-- ✅ **Pattern Detection**: FileReferenceClassifier detects `@file.txt` patterns
-- ✅ **Workflow Routing**: FILE_REFERENCE workflow triggered for @file inputs
-- ⚠️ **Content Inclusion**: Partially working (workflow executes, content inclusion needs debugging)
-- ✅ **Multiple Files**: Support for `@file1.ts @file2.js explain both`
+- ❌ **BROKEN**: FileReferenceClassifier wrongly created as separate component
+- ⚠️ **Content Inclusion**: Doesn't work due to architectural mess
+- ❌ **Multiple Files**: Implemented but through wrong abstraction layers
 
 ### 🔄 **Workflow System**
-- ✅ **WorkflowManager**: Tracks execution statistics and performance
-- ✅ **FILE_REFERENCE Workflow**: Processes @file + prompt combinations
-- ✅ **Classification Integration**: FileReferenceClassifier routes to workflows
-- ✅ **Statistics**: `/workflows` command shows execution stats
-
-### 🎨 **CLI Enhancements**
-- ✅ **Dual Framework**: Both Ink (rich UI) and readline (basic terminal)
-- ✅ **Enhanced Commands**: `/tools`, `/workflows`, `/files`, `/project`
-- ✅ **Help System**: Comprehensive help with versioning roadmap
-- ✅ **Session Management**: Auto-persistence with `.claude-sessions`
-- ✅ **Project Awareness**: Auto-detects project structure and CLAUDE.md
-
-### 🔧 **Event Architecture**
-- ✅ **processInput Events**: PromptAppOrchestrator emits processInput events
-- ✅ **Event Wiring**: qi-prompt.ts listens for workflow and enhancement events  
-- ✅ **Bidirectional Flow**: CLI ↔ Agent ↔ Toolbox event communication
+- ⚠️ **WorkflowManager**: Works but tools leaked outside its boundaries
+- ⚠️ **FILE_REFERENCE Workflow**: Functional but depends on external tool registry
+- ❌ **Clean API**: Exposes internal tool details to app layer
 
 ---
 
-## 🐛 **Known Issues**
+## 🎯 **REFACTORING PRIORITY ORDER**
 
-### **File Reference Workflow Issue**
-**Status**: Partially working - classification works, content inclusion needs debugging
+### 🚨 **Phase 1: Emergency Architecture Fix (MANDATORY)**
+**Do this FIRST before any feature work:**
 
-**What Works**:
-- ✅ FileReferenceClassifier correctly detects `@file.txt` patterns
-- ✅ Workflow system triggers FILE_REFERENCE workflow
-- ✅ processInput events properly emitted and received
-- ✅ Tool registry and file resolution tools available
+1. **Remove ToolbasedContextManager** - revert to standard ContextManager
+2. **Move all tools inside WorkflowManager** - hide them completely
+3. **Clean qi-prompt.ts** - remove all tool imports and direct tool access
+4. **Fix /tools command** - route through WorkflowManager API
+5. **Remove FileReferenceClassifier** - move logic into WorkflowManager
 
-**What Doesn't Work**:
-- ❌ File content not properly included in final prompt sent to LLM
-- ❌ User sees generic LLM response instead of file-aware response
+**Goal**: Reduce to ~20 file changes, proper layer separation
 
-**Test Case That Fails**:
-```bash
-Input: "@app/src/prompt can you review this dir"
-Expected: LLM receives enhanced prompt with directory contents
-Actual: LLM receives original prompt without file content
-```
+### 🔧 **Phase 2: Fix File References (After Architecture Fixed)**
+**Only after Phase 1 is complete:**
 
-**Debugging Next Steps**:
-1. **Check Content Resolution**: Verify FileContentResolver actually loads file content
-2. **Trace Event Flow**: Follow workflowOutput/enhancedPrompt events to final LLM call
-3. **Inspect Context Manager**: Ensure ToolbasedContextManager properly enhances prompts
-4. **Test Tool Integration**: Verify tools are properly registered and callable
+1. **Debug content inclusion** in FileReferenceWorkflow
+2. **Test @file patterns** through clean WorkflowManager API
+3. **Add proper error handling** for file resolution failures
+
+### ⚠️ **Phase 3: Future Features (Much Later)**
+**Don't even think about this until Phases 1-2 are done:**
+- v-0.6.x planning
+- MCP integration  
+- Additional tools
 
 ---
 
-## 🚀 **How to Continue**
+## 💡 **Key Lesson Learned**
 
-### **Immediate Priority: Fix File Reference Workflow**
+**The high file count (101 files) was a RED FLAG** indicating architectural violations:
+- Tools should be **internal** to workflows
+- App layer should have **minimal imports**
+- Cross-cutting concerns are usually **design smells**
 
-#### **Step 1: Debug File Content Resolution**
-```bash
-# Test the tool directly
-cd /home/zzhang/dev/qi/github/qi-v2-agent
-bun -e "
-import { FileContentResolver } from './lib/src/tools/files/FileContentResolver.js';
-const resolver = new FileContentResolver();
-const result = await resolver.execute('app/src/prompt/qi-prompt.ts');
-console.log('File resolved:', result.exists, result.content?.length);
-"
-```
-
-#### **Step 2: Test Workflow Execution**
-```bash
-# Test classifier and workflow chain
-bun -e "
-import { FileReferenceClassifier } from './lib/src/classifier/impl/FileReferenceClassifier.js';
-const classifier = new FileReferenceClassifier();
-const result = await classifier.classify('@app/src/prompt explain this');
-console.log('Classification:', result.type, result.extractedData);
-"
-```
-
-#### **Step 3: Trace Event Flow**
-Add debug logging to trace events:
-```typescript
-// In qi-prompt.ts, add logging to workflow event handlers
-this.orchestrator.on('workflowOutput', (event) => {
-  console.log('🎉 WORKFLOW DEBUG:', {
-    original: event.original,
-    enhanced: event.enhanced.substring(0, 100),
-    workflow: event.workflow
-  });
-});
-```
-
-### **Testing the Application**
-```bash
-# Start the application
-cd /home/zzhang/dev/qi/github/qi-v2-agent
-bun app/src/prompt/qi-prompt.ts --framework readline --debug
-
-# Test file reference
-> @VERSION.md summarize this file
-
-# Check toolbox status  
-> /tools
-> /workflows
-> /project
-```
+**Never again**: When adding a new concern, keep it contained within its responsible layer.
 
 ---
 
-## 📚 **Key Files to Understand**
-
-### **Primary Application**
-- `app/src/prompt/qi-prompt.ts` - Main CLI app with toolbox integration
-
-### **Critical Workflow Files**
-- `lib/src/workflows/WorkflowManager.ts` - Orchestrates workflow execution
-- `lib/src/workflows/FileReferenceWorkflow.ts` - Handles @file patterns  
-- `lib/src/classifier/impl/FileReferenceClassifier.ts` - Detects file references
-
-### **Context & Tool Integration**
-- `lib/src/context/impl/ToolbasedContextManager.ts` - Enhanced context management
-- `lib/src/tools/files/FileContentResolver.ts` - Loads file content
-- `lib/src/agent/PromptAppOrchestrator.ts` - Event orchestration (recently modified)
-
-### **Configuration**
-- `VERSION.md` - Version history and current status
-- `config/llm-providers.yaml` - LLM configuration
-- `.claude-sessions/` - Session persistence storage
-
----
-
-## 🎯 **Next Development Phases**
-
-### **v-0.5.x Completion** (Current Priority)
-- 🔧 **Debug file reference workflow**: Fix content inclusion in prompts
-- 🧪 **Add workflow tests**: Comprehensive testing of @file patterns
-- 📝 **Improve error handling**: Better error messages for file resolution failures
-- 🔍 **Performance optimization**: Large file handling and caching
-
-### **v-0.6.x Planning** (Future)
-- 📦 **MCP Integration**: Model Context Protocol server support
-- 🛠️ **100+ Tools**: Expand tool registry with comprehensive tool ecosystem
-- 🔗 **Tool Chaining**: Complex tool composition and dependencies
-- 🎨 **Plugin Architecture**: Custom tool development framework
-
-### **Development Guidelines**
-- **Always use v-x.x.x version format**
-- **Single file approach**: Enhance qi-prompt.ts, don't create new files
-- **Tool-first**: All new functionality should be tool-based
-- **Event-driven**: Use events for component communication
-- **Test thoroughly**: File references are the core v-0.5.x feature
-
----
-
-## 🔍 **Debugging Commands**
+## 🔍 **Current State Assessment**
 
 ```bash
-# Check current git status
-git status
-
-# Run with full debug output  
-bun app/src/prompt/qi-prompt.ts --debug --framework readline
-
-# Test file reference patterns
-echo "@package.json explain dependencies" | bun app/src/prompt/qi-prompt.ts --framework readline
-
-# Check tool registry
-bun -e "
-import { ToolRegistry } from './lib/src/tools/ToolRegistry.js';
-const registry = new ToolRegistry();
-console.log('Registry methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(registry)));
-"
-
-# Verify file resolution  
-ls -la app/src/prompt/
-ls -la lib/src/tools/files/
+# The codebase is currently in a BROKEN architectural state
+# Feature: File references work partially
+# Architecture: Completely violated separation of concerns  
+# Priority: Fix architecture first, features second
+# Risk: Without fix, every new feature will make it worse
 ```
 
-**Remember**: You are working on a sophisticated toolbox architecture that's a preview of full agent capabilities. The core feature (file references with @patterns) is 90% implemented - just needs the final content inclusion debugging.
+**Bottom Line**: Stop all feature development. Fix the architecture mess first. Then continue with clean, maintainable development.
