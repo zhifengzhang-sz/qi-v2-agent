@@ -333,7 +333,7 @@ export class CommandHandler implements ICommandHandler {
       async (_request: CommandRequest) => {
         // Initiate graceful shutdown
         process.stdout.write('\\n👋 Goodbye!\\n');
-        
+
         // Use setTimeout to allow the message to be displayed before exiting
         setTimeout(() => {
           process.exit(0);

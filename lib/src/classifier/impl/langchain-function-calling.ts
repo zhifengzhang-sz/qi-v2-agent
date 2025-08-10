@@ -3,34 +3,66 @@
  *
  * Automatically detects provider from model name and uses appropriate LLM class:
  * - Ollama models: ChatOllama with local endpoint
- * - OpenRouter models: ChatOpenAI with OpenRouter endpoint  
+ * - OpenRouter models: ChatOpenAI with OpenRouter endpoint
  * - OpenAI models: ChatOpenAI with OpenAI endpoint
  * - Anthropic models: ChatAnthropic
- * 
+ *
  * Replaces the old ChatOllama-hardcoded implementation with flexible provider support.
  */
 
-import { failure, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
-import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
-import { 
-  globalSchemaRegistry, 
-  type SchemaEntry,
-  type SchemaSelectionCriteria 
-} from '../schema-registry.js';
-import { 
-  detectProviderFromModel, 
-  createLLMInstance, 
-  validateProviderAvailability,
-  debugProviderDetection,
-  type DetectedProviderConfig
-} from '../shared/provider-map.js';
-import { detectCommand } from './command-detection-utils.js';
+import type { ChatAnthropic } from '@langchain/anthropic';
+import type { ChatOllama } from '@langchain/ollama';
+import type { ChatOpenAI } from '@langchain/openai';
+import {
+  type ErrorCategory,
+  failure,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type {
   ClassificationMethod,
   ClassificationResult,
   IClassificationMethod,
   ProcessingContext,
 } from '../abstractions/index.js';
+import {
+  globalSchemaRegistry,
+  type SchemaEntry,
+  type SchemaSelectionCriteria,
+} from '../schema-registry.js';
+import {
+  type BaseClassificationErrorContext,
+  createClassificationError,
+} from '../shared/error-types.js';
+import {
+  createLLMInstance,
+  type DetectedProviderConfig,
+  debugProviderDetection,
+  validateProviderAvailability,
+} from '../shared/provider-map.js';
+import { detectCommand } from './command-detection-utils.js';
+
+/**
+ * Structured output from LangChain function calling
+ */
+interface LangChainClassificationOutput {
+  type: 'prompt' | 'workflow' | 'command';
+  confidence: number;
+  reasoning?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Debug-enhanced classification output
+ */
+interface DebugLangChainOutput extends LangChainClassificationOutput {
+  __debug_timing?: number;
+  __debug_method?: string;
+  __debug_provider?: string;
+}
 
 /**
  * Custom error factory for LangChain function calling classification errors
@@ -40,7 +72,8 @@ const createLangChainFunctionCallingError = (
   message: string,
   category: ErrorCategory,
   context: Partial<BaseClassificationErrorContext> = {}
-): QiError => createClassificationError('langchain-function-calling', code, message, category, context);
+): QiError =>
+  createClassificationError('langchain-function-calling', code, message, category, context);
 
 /**
  * Configuration for LangChain function calling classification method
@@ -51,11 +84,11 @@ export interface LangChainFunctionCallingConfig {
   apiKey?: string;
   temperature?: number;
   timeout?: number;
-  
+
   // Schema selection options
   schemaName?: string;
   schemaSelectionCriteria?: SchemaSelectionCriteria;
-  
+
   // Provider override options
   forceProvider?: string;
   enableProviderDebug?: boolean;
@@ -65,7 +98,7 @@ export interface LangChainFunctionCallingConfig {
  * Provider-agnostic LangChain function calling classification method
  */
 export class LangChainFunctionCallingClassificationMethod implements IClassificationMethod {
-  private llmWithStructuredOutput: any;
+  private llmWithStructuredOutput: ChatOllama | ChatOpenAI | ChatAnthropic | null = null;
   private config: LangChainFunctionCallingConfig;
   private initialized: boolean = false;
   private selectedSchema: SchemaEntry | null = null;
@@ -76,12 +109,18 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
       modelId: 'llama3.2:3b', // Default to Ollama model
       temperature: 0.1,
       timeout: 30000,
-      ...config
+      ...config,
     };
   }
 
   private async initializeLLM(): Promise<void> {
     try {
+      // Validate required configuration
+      if (!this.config.modelId) {
+        throw new Error('modelId is required for LangChain function calling method');
+      }
+      const modelId = this.config.modelId;
+
       // Select schema - explicit error if selection fails
       const schemaResult = this.selectSchema();
       const selectedSchema = await match(
@@ -92,35 +131,40 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
         schemaResult
       );
       this.selectedSchema = selectedSchema;
-      
+
       // Detect and validate provider
-      const validation = validateProviderAvailability(this.config.modelId!);
+      const validation = validateProviderAvailability(modelId);
       if (!validation.isSupported) {
         throw new Error(`Provider validation failed: ${validation.errors.join(', ')}`);
       }
-      
-      this.detectedProvider = validation.provider!;
-      
+      if (!validation.provider) {
+        throw new Error('Provider detection failed: no provider found');
+      }
+
+      this.detectedProvider = validation.provider;
+
       // Debug output if enabled
       if (this.config.enableProviderDebug) {
-        const debug = debugProviderDetection(this.config.modelId!);
+        const debug = debugProviderDetection(modelId);
         console.log('🔍 Provider Detection Debug:', JSON.stringify(debug, null, 2));
       }
-      
+
       // Create LLM instance using provider map
-      const llm = await createLLMInstance(this.config.modelId!, {
+      const llm = await createLLMInstance(modelId, {
         baseUrl: this.config.baseUrl, // Override if provided
-        apiKey: this.config.apiKey,   // Override if provided  
+        apiKey: this.config.apiKey, // Override if provided
         temperature: this.config.temperature,
         timeout: this.config.timeout,
       });
 
       // Use function calling method - works across all providers
-      this.llmWithStructuredOutput = (llm as any).withStructuredOutput(this.selectedSchema.schema, {
+      // Note: withStructuredOutput is available on all LangChain chat models
+      this.llmWithStructuredOutput = (
+        llm as ChatOllama | ChatOpenAI | ChatAnthropic
+      ).withStructuredOutput(this.selectedSchema.schema, {
         name: this.selectedSchema.metadata.name,
-        method: "functionCalling",
-      });
-      
+        method: 'functionCalling',
+      }) as unknown as ChatOllama | ChatOpenAI | ChatAnthropic;
     } catch (error) {
       throw new Error(
         `Failed to initialize LangChain function calling method: ${error instanceof Error ? error.message : String(error)}`
@@ -133,12 +177,14 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
    */
   private selectSchema(): Result<SchemaEntry, QiError> {
     if (!this.config.schemaName) {
-      return failure(createLangChainFunctionCallingError(
-        'NO_SCHEMA_SPECIFIED',
-        'Schema name must be explicitly provided - no default schema allowed',
-        'VALIDATION',
-        { operation: 'selectSchema' }
-      ));
+      return failure(
+        createLangChainFunctionCallingError(
+          'NO_SCHEMA_SPECIFIED',
+          'Schema name must be explicitly provided - no default schema allowed',
+          'VALIDATION',
+          { operation: 'selectSchema' }
+        )
+      );
     }
     return globalSchemaRegistry.getSchema(this.config.schemaName);
   }
@@ -154,17 +200,18 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
       async () => {
         return await this.classifyInternal(input, context);
       },
-      (error: unknown) => createLangChainFunctionCallingError(
-        'CLASSIFICATION_FAILED',
-        `LangChain function calling classification failed: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
-        { 
-          error: String(error), 
-          method: 'functionCalling', 
-          provider: this.detectedProvider?.providerName,
-          model: this.config.modelId
-        }
-      )
+      (error: unknown) =>
+        createLangChainFunctionCallingError(
+          'CLASSIFICATION_FAILED',
+          `LangChain function calling classification failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          {
+            error: String(error),
+            method: 'functionCalling',
+            provider: this.detectedProvider?.providerName,
+            model: this.config.modelId,
+          }
+        )
     );
 
     // Convert Result<T> to ClassificationResult or throw explicit error
@@ -177,9 +224,12 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
     );
   }
 
-  private async classifyInternal(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+  private async classifyInternal(
+    input: string,
+    context?: ProcessingContext
+  ): Promise<ClassificationResult> {
     const startTime = Date.now();
-    
+
     // Validate input - explicit errors
     const validationResult = this.validateInput(input);
     const validatedInput = await match(
@@ -201,8 +251,8 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
           ['optimizedBy', 'command-detection-shortcut'],
           ['actualMethod', 'rule-based-command-detection'],
           ['skipLLM', 'true'],
-          ['provider', this.detectedProvider?.providerName || 'unknown']
-        ])
+          ['provider', this.detectedProvider?.providerName || 'unknown'],
+        ]),
       };
     }
 
@@ -238,37 +288,43 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
 
     // Track performance
     this.trackPerformance(startTime, true);
-    
+
     return finalResult;
   }
 
   private validateInput(input: string): Result<string, QiError> {
     if (!input || typeof input !== 'string') {
-      return failure(createLangChainFunctionCallingError(
-        'INVALID_INPUT',
-        'Input must be a non-empty string',
-        'VALIDATION',
-        { input: String(input) }
-      ));
+      return failure(
+        createLangChainFunctionCallingError(
+          'INVALID_INPUT',
+          'Input must be a non-empty string',
+          'VALIDATION',
+          { input: String(input) }
+        )
+      );
     }
 
     const trimmed = input.trim();
     if (trimmed.length === 0) {
-      return failure(createLangChainFunctionCallingError(
-        'EMPTY_INPUT',
-        'Input cannot be empty or only whitespace',
-        'VALIDATION',
-        { input }
-      ));
+      return failure(
+        createLangChainFunctionCallingError(
+          'EMPTY_INPUT',
+          'Input cannot be empty or only whitespace',
+          'VALIDATION',
+          { input }
+        )
+      );
     }
 
     if (trimmed.length > 10000) {
-      return failure(createLangChainFunctionCallingError(
-        'INPUT_TOO_LONG',
-        'Input exceeds maximum length of 10,000 characters',
-        'VALIDATION',
-        { length: trimmed.length }
-      ));
+      return failure(
+        createLangChainFunctionCallingError(
+          'INPUT_TOO_LONG',
+          'Input exceeds maximum length of 10,000 characters',
+          'VALIDATION',
+          { length: trimmed.length }
+        )
+      );
     }
 
     return success(trimmed);
@@ -277,7 +333,7 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
   private buildPrompt(input: string, context?: ProcessingContext): Result<string, QiError> {
     try {
       const contextStr = this.formatContext(context);
-      
+
       const prompt = `Classify the following user input into one of two categories with high accuracy:
 
 **Categories:**
@@ -300,52 +356,57 @@ ${contextStr}
 
       return success(prompt);
     } catch (error) {
-      return failure(createLangChainFunctionCallingError(
-        'PROMPT_BUILD_FAILED',
-        `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
-        { input, error: String(error) }
-      ));
+      return failure(
+        createLangChainFunctionCallingError(
+          'PROMPT_BUILD_FAILED',
+          `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { input, error: String(error) }
+        )
+      );
     }
   }
 
-  private performClassification(prompt: string): Promise<Result<any, QiError>> {
+  private performClassification(
+    prompt: string
+  ): Promise<Result<LangChainClassificationOutput, QiError>> {
     return fromAsyncTryCatch(
       async () => {
         const startTime = Date.now();
-        
+
         // DEBUG: Log provider info
         if (this.config.enableProviderDebug) {
           console.log('🔍 PROVIDER INFO:', {
             provider: this.detectedProvider?.providerName,
             model: this.config.modelId,
             endpointType: this.detectedProvider?.endpointType,
-            baseUrl: this.detectedProvider?.baseUrl
+            baseUrl: this.detectedProvider?.baseUrl,
           });
-          console.log('🔍 PROMPT SENT:', prompt.substring(0, 200) + '...');
+          console.log('🔍 PROMPT SENT:', `${prompt.substring(0, 200)}...`);
         }
-        
+
         // Use function calling method - works across all providers
         const result = await this.llmWithStructuredOutput.invoke(prompt);
-        
+
         // DEBUG: Always log result for debugging
         console.log('✅ LLM FUNCTION CALLING RESULT:', {
           type: result?.type || 'MISSING',
-          confidence: result?.confidence || 'MISSING', 
+          confidence: result?.confidence || 'MISSING',
           reasoning: result?.reasoning?.substring(0, 100) || 'MISSING',
-          fullResult: JSON.stringify(result, null, 2)
+          fullResult: JSON.stringify(result, null, 2),
         });
-        
+
         const endTime = Date.now();
         const duration = endTime - startTime;
-        
+
         // Add debug info
         if (typeof result === 'object' && result !== null) {
-          (result as any).__debug_timing = duration;
-          (result as any).__debug_method = 'functionCalling';
-          (result as any).__debug_provider = this.detectedProvider?.providerName;
+          const debugResult = result as DebugLangChainOutput;
+          debugResult.__debug_timing = duration;
+          debugResult.__debug_method = 'functionCalling';
+          debugResult.__debug_provider = this.detectedProvider?.providerName;
         }
-        
+
         return result;
       },
       (error: unknown) => {
@@ -355,42 +416,49 @@ ${contextStr}
           stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined,
           provider: this.detectedProvider?.providerName,
           model: this.config.modelId,
-          baseUrl: this.detectedProvider?.baseUrl
+          baseUrl: this.detectedProvider?.baseUrl,
         });
-        
+
         return createLangChainFunctionCallingError(
           'LLM_INVOCATION_FAILED',
           `LLM function calling invocation failed: ${error instanceof Error ? error.message : String(error)}`,
           'NETWORK',
-          { 
-            error: String(error), 
+          {
+            error: String(error),
             method: 'functionCalling',
             provider: this.detectedProvider?.providerName,
-            baseUrl: this.detectedProvider?.baseUrl
+            baseUrl: this.detectedProvider?.baseUrl,
           }
         );
       }
     );
   }
 
-  private processResult(result: any, originalInput: string): Result<ClassificationResult, QiError> {
+  private processResult(
+    result: LangChainClassificationOutput,
+    originalInput: string
+  ): Result<ClassificationResult, QiError> {
     try {
       if (!this.selectedSchema) {
-        return failure(createLangChainFunctionCallingError(
-          'SCHEMA_NOT_SELECTED',
-          'No schema selected for result processing',
-          'SYSTEM'
-        ));
+        return failure(
+          createLangChainFunctionCallingError(
+            'SCHEMA_NOT_SELECTED',
+            'No schema selected for result processing',
+            'SYSTEM'
+          )
+        );
       }
 
       // Validate required fields from function calling result
       if (!result.type || result.confidence === undefined) {
-        return failure(createLangChainFunctionCallingError(
-          'INVALID_FUNCTION_RESULT',
-          'Result missing required fields: type and confidence',
-          'VALIDATION',
-          { result: JSON.stringify(result) }
-        ));
+        return failure(
+          createLangChainFunctionCallingError(
+            'INVALID_FUNCTION_RESULT',
+            'Result missing required fields: type and confidence',
+            'VALIDATION',
+            { result: JSON.stringify(result) }
+          )
+        );
       }
 
       const metadata = new Map<string, string>([
@@ -422,7 +490,7 @@ ${contextStr}
       if (result.indicators && Array.isArray(result.indicators)) {
         extractedData.set('indicators', result.indicators);
       }
-      
+
       if (result.complexity_score !== undefined) {
         extractedData.set('complexity_score', result.complexity_score);
       }
@@ -441,7 +509,10 @@ ${contextStr}
 
       const classificationResult: ClassificationResult = {
         type: result.type,
-        confidence: typeof result.confidence === 'number' ? result.confidence : parseFloat(result.confidence) || 0.5,
+        confidence:
+          typeof result.confidence === 'number'
+            ? result.confidence
+            : parseFloat(result.confidence) || 0.5,
         method: 'langchain-function-calling',
         reasoning: result.reasoning || 'No reasoning provided',
         extractedData,
@@ -450,12 +521,14 @@ ${contextStr}
 
       return success(classificationResult);
     } catch (error) {
-      return failure(createLangChainFunctionCallingError(
-        'RESULT_PROCESSING_FAILED',
-        `Failed to process function calling result: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
-        { error: String(error), result: JSON.stringify(result) }
-      ));
+      return failure(
+        createLangChainFunctionCallingError(
+          'RESULT_PROCESSING_FAILED',
+          `Failed to process function calling result: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { error: String(error), result: JSON.stringify(result) }
+        )
+      );
     }
   }
 
@@ -497,16 +570,20 @@ ${contextStr}
 
   getExpectedAccuracy(): number {
     if (this.selectedSchema) {
-      return this.selectedSchema.metadata.performance_profile.measured_accuracy ?? 
-             this.selectedSchema.metadata.performance_profile.baseline_accuracy_estimate;
+      return (
+        this.selectedSchema.metadata.performance_profile.measured_accuracy ??
+        this.selectedSchema.metadata.performance_profile.baseline_accuracy_estimate
+      );
     }
     return 0.85;
   }
 
   getAverageLatency(): number {
     if (this.selectedSchema) {
-      return this.selectedSchema.metadata.performance_profile.measured_latency_ms ?? 
-             this.selectedSchema.metadata.performance_profile.baseline_latency_estimate_ms;
+      return (
+        this.selectedSchema.metadata.performance_profile.measured_latency_ms ??
+        this.selectedSchema.metadata.performance_profile.baseline_latency_estimate_ms
+      );
     }
     return 7200; // 7.2s baseline estimate
   }
@@ -514,10 +591,13 @@ ${contextStr}
   async isAvailable(): Promise<boolean> {
     try {
       if (!this.detectedProvider) {
-        const validation = validateProviderAvailability(this.config.modelId!);
+        if (!this.config.modelId) {
+          return false;
+        }
+        const validation = validateProviderAvailability(this.config.modelId);
         return validation.isSupported && validation.apiKeyAvailable;
       }
-      
+
       // For Ollama, check if server is running
       if (this.detectedProvider.endpointType === 'ollama') {
         const baseUrl = this.config.baseUrl || this.detectedProvider.baseUrl;
@@ -525,13 +605,13 @@ ${contextStr}
           method: 'GET',
           signal: AbortSignal.timeout(5000),
         });
-        
+
         if (!response.ok) return false;
-        
-        const data = await response.json() as { models?: Array<{ name: string }> };
+
+        const data = (await response.json()) as { models?: Array<{ name: string }> };
         return data.models?.some((model) => model.name === this.config.modelId) || false;
       }
-      
+
       // For other providers, just check if API key is available
       return !!process.env[this.detectedProvider.apiKeyEnv];
     } catch (_error) {

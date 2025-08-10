@@ -1,0 +1,19 @@
+{
+  "id": "3006b63e-214f-4081-8f67-f57cb7e4c59b",
+  "title": "Toolbox CLI Session",
+  "startTime": "2025-08-10T12:48:19.094Z",
+  "lastActivity": "2025-08-10T12:48:19.094Z",
+  "messages": [],
+  "projectPath": "/home/zzhang/dev/qi/github/qi-v2-agent/app",
+  "fileReferences": [],
+  "contextWindow": {
+    "maxTokens": 8000,
+    "currentTokens": 0,
+    "truncated": false
+  },
+  "configuration": {},
+  "metadata": {
+    "createdAt": "2025-08-10T12:48:19.094Z",
+    "version": "1.0"
+  }
+}

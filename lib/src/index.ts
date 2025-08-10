@@ -23,33 +23,16 @@ export {
   createFastClassifier,
   createInputClassifier,
   createRuleBasedClassifier,
+  getClassificationSchema,
+  // Schema registry exports
+  globalSchemaRegistry,
   IClassificationMethod,
   IClassifier,
   ProcessingContext as ClassificationProcessingContext,
-  // Schema registry exports
-  globalSchemaRegistry,
-  getClassificationSchema,
   selectOptimalClassificationSchema,
 } from './classifier/index.js';
-
-// Classification Schemas
-export {
-  ClassificationSchemas,
-  ThreeTypeSchema,
-  SentimentSchema,
-  IntentSchema,
-  TopicSchema,
-  type ThreeTypeResult,
-  type SentimentResult,
-  type IntentResult,
-  type TopicResult,
-  type SchemaKey,
-  type SchemaResult,
-} from './schemas/ClassificationSchemas.js';
-
 // Command Processing
 export * from './command/index.js';
-
 // Context Management
 export {
   AgentSpecialization,
@@ -66,6 +49,20 @@ export {
   SecurityBoundaryManager,
   SecurityRestrictions,
 } from './context/index.js';
+// Classification Schemas
+export {
+  ClassificationSchemas,
+  type IntentResult,
+  IntentSchema,
+  type SchemaKey,
+  type SchemaResult,
+  type SentimentResult,
+  SentimentSchema,
+  type ThreeTypeResult,
+  ThreeTypeSchema,
+  type TopicResult,
+  TopicSchema,
+} from './schemas/ClassificationSchemas.js';
 
 // LLM Integration - removed, use prompt module instead
 

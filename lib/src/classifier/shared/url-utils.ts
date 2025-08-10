@@ -10,7 +10,7 @@
 export function composeOpenAIEndpoint(baseUrl: string): string {
   // Remove trailing slash if present
   const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-  
+
   // Add /v1 if not already present
   return cleanBaseUrl.endsWith('/v1') ? cleanBaseUrl : `${cleanBaseUrl}/v1`;
 }

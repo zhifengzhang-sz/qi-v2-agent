@@ -1,6 +1,6 @@
 /**
  * Classification Schema Registry
- * 
+ *
  * Centralized collection of Zod schemas for different classification tasks.
  * Schemas are defined once and reused across different classifiers.
  */
@@ -12,11 +12,13 @@ import { z } from 'zod';
  * Used for command/prompt/workflow classification
  */
 export const ThreeTypeSchema = z.object({
-  type: z.enum(['command', 'prompt', 'workflow']).describe(
-    'command: System commands starting with "/", ' +
-    'prompt: Single-step conversational requests or questions, ' +
-    'workflow: Multi-step tasks requiring file operations or orchestration'
-  ),
+  type: z
+    .enum(['command', 'prompt', 'workflow'])
+    .describe(
+      'command: System commands starting with "/", ' +
+        'prompt: Single-step conversational requests or questions, ' +
+        'workflow: Multi-step tasks requiring file operations or orchestration'
+    ),
   confidence: z.number().min(0).max(1).describe('Confidence score from 0.0 to 1.0'),
   reasoning: z.string().max(200).describe('Brief explanation of the classification'),
 });
@@ -36,12 +38,16 @@ export const SentimentSchema = z.object({
 export const IntentSchema = z.object({
   intent: z.string().describe('The identified intent or purpose'),
   confidence: z.number().min(0).max(1).describe('Confidence score from 0.0 to 1.0'),
-  entities: z.array(z.object({
-    name: z.string().describe('Entity name or type'),
-    value: z.string().describe('Entity value'),
-    start: z.number().optional().describe('Start position in text'),
-    end: z.number().optional().describe('End position in text'),
-  })).describe('Extracted entities from the input'),
+  entities: z
+    .array(
+      z.object({
+        name: z.string().describe('Entity name or type'),
+        value: z.string().describe('Entity value'),
+        start: z.number().optional().describe('Start position in text'),
+        end: z.number().optional().describe('End position in text'),
+      })
+    )
+    .describe('Extracted entities from the input'),
 });
 
 /**
@@ -72,4 +78,4 @@ export type IntentResult = z.infer<typeof IntentSchema>;
 export type TopicResult = z.infer<typeof TopicSchema>;
 
 export type SchemaKey = keyof typeof ClassificationSchemas;
-export type SchemaResult<K extends SchemaKey> = z.infer<typeof ClassificationSchemas[K]>;
+export type SchemaResult<K extends SchemaKey> = z.infer<(typeof ClassificationSchemas)[K]>;

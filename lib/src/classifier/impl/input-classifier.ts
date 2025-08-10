@@ -35,14 +35,14 @@ export class InputClassifier implements IClassifier {
 
   async classify(input: string, options?: ClassificationOptions): Promise<ClassificationResult> {
     const startTime = Date.now();
-    
+
     // Interface layer delegates to internal method and receives ClassificationResult directly
     // Internal methods handle all QiCore Result<T> complexity and return unwrapped results
     const result = await this.method.classify(input, options?.context);
-    
+
     // Update stats with the result
     this.updateStats(result, Date.now() - startTime);
-    
+
     return result;
   }
 
@@ -54,7 +54,9 @@ export class InputClassifier implements IClassifier {
     // Internal methods handle their own configuration through constructors
     // This method exists for interface compatibility but delegates to internal implementations
     if (config.defaultMethod && config.defaultMethod !== this.method.getMethodName()) {
-      console.warn(`Cannot change classification method from ${this.method.getMethodName()} to ${config.defaultMethod} after construction`);
+      console.warn(
+        `Cannot change classification method from ${this.method.getMethodName()} to ${config.defaultMethod} after construction`
+      );
     }
     // Other configuration options would require method-specific implementation
     // For now, configuration is handled at construction time via factory functions
@@ -88,24 +90,30 @@ export class InputClassifier implements IClassifier {
 
   validateConfig(config: ClassificationConfig): boolean {
     // Simple validation
-    return !!(config.defaultMethod && config.confidenceThreshold >= 0 && config.confidenceThreshold <= 1);
+    return !!(
+      config.defaultMethod &&
+      config.confidenceThreshold >= 0 &&
+      config.confidenceThreshold <= 1
+    );
   }
 
   private updateStats(result: ClassificationResult, processingTime: number): void {
     this._totalClassifications++;
-    
+
     // Update average confidence
-    const totalConfidence = this._averageConfidence * (this._totalClassifications - 1) + result.confidence;
+    const totalConfidence =
+      this._averageConfidence * (this._totalClassifications - 1) + result.confidence;
     this._averageConfidence = totalConfidence / this._totalClassifications;
-    
+
     // Update average processing time
-    const totalTime = this._averageProcessingTime * (this._totalClassifications - 1) + processingTime;
+    const totalTime =
+      this._averageProcessingTime * (this._totalClassifications - 1) + processingTime;
     this._averageProcessingTime = totalTime / this._totalClassifications;
-    
+
     // Update type distribution
     const currentCount = this._typeDistribution.get(result.type) || 0;
     this._typeDistribution.set(result.type, currentCount + 1);
-    
+
     // Update method usage
     const currentMethodCount = this._methodUsage.get(result.method) || 0;
     this._methodUsage.set(result.method, currentMethodCount + 1);

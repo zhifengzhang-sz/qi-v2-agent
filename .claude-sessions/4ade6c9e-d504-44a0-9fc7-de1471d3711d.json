@@ -1,0 +1,19 @@
+{
+  "id": "4ade6c9e-d504-44a0-9fc7-de1471d3711d",
+  "title": "Qi Prompt CLI v-0.5.x Session",
+  "startTime": "2025-08-10T17:34:58.684Z",
+  "lastActivity": "2025-08-10T17:34:58.684Z",
+  "messages": [],
+  "projectPath": "/home/zzhang/dev/qi/github/qi-v2-agent",
+  "fileReferences": [],
+  "contextWindow": {
+    "maxTokens": 8000,
+    "currentTokens": 0,
+    "truncated": false
+  },
+  "configuration": {},
+  "metadata": {
+    "createdAt": "2025-08-10T17:34:58.684Z",
+    "version": "1.0"
+  }
+}

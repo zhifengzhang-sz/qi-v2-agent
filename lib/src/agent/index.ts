@@ -25,7 +25,7 @@ import type { IWorkflowEngine, IWorkflowExtractor } from '../workflow/index.js';
 import type { AgentConfig } from './abstractions/index.js';
 // Export factory functions (not implementation classes)
 import { QiCodeAgent } from './impl/QiCodeAgent.js';
-import { PromptAppOrchestrator, parseInput } from './PromptAppOrchestrator.js';
+import { PromptAppOrchestrator } from './PromptAppOrchestrator.js';
 
 /**
  * Agent factory configuration following prompt module pattern

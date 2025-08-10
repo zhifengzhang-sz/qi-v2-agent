@@ -4,7 +4,6 @@
  * Simplified workflow engine adapted for app layer without LangGraph dependency
  */
 
-import { fromAsyncTryCatch, match } from '@qi/base';
 import type {
   ExecutableWorkflow,
   IWorkflowEngine,
@@ -19,8 +18,8 @@ import type {
 } from '../interfaces/index.js';
 
 export class QiWorkflowEngine implements IWorkflowEngine {
-  private compiledWorkflows = new Map<string, ExecutableWorkflow>();
   private config: IWorkflowEngineConfig;
+  private compiledWorkflows = new Map<string, ExecutableWorkflow>();
 
   constructor(config: IWorkflowEngineConfig = {}) {
     this.config = config;

@@ -1,6 +1,6 @@
 /**
  * CLI Framework Interfaces
- * 
+ *
  * Defines the contracts for event-driven CLI components
  */
 
@@ -9,19 +9,19 @@ export interface CLIEvents {
   userInput: { input: string; mode: CLIMode };
   cancelRequested: { reason: string };
   modeChanged: { previousMode: CLIMode; newMode: CLIMode };
-  
+
   // System events
   ready: { startTime: Date };
   shutdown: { reason: string };
   error: { error: Error; context?: string };
-  
+
   // UI events
   progressUpdate: { phase: string; progress: number; details?: string };
   messageReceived: { content: string; type: MessageType };
-  streamingStarted: void;
+  streamingStarted: undefined;
   streamingChunk: { content: string };
   streamingComplete: { totalTime: number };
-  streamingCancelled: void;
+  streamingCancelled: undefined;
 }
 
 export type CLIMode = 'interactive' | 'command' | 'streaming';
@@ -33,20 +33,20 @@ export interface CLIConfig {
   enableModeIndicator: boolean;
   enableProgressDisplay: boolean;
   enableStreaming: boolean;
-  
+
   // Appearance
   prompt: string;
   colors: boolean;
   animations: boolean;
-  
+
   // Input handling
   historySize: number;
   autoComplete: boolean;
-  
+
   // Performance
   streamingThrottle: number; // ms between characters
   maxBufferSize: number;
-  
+
   // Debugging
   debug: boolean;
 }
@@ -69,29 +69,29 @@ export interface ICLIFramework {
   initialize(): Promise<void>;
   start(): Promise<void>;
   shutdown(): Promise<void>;
-  
+
   // State management
   getState(): CLIState;
   setMode(mode: CLIMode): void;
   getMode(): CLIMode;
-  
+
   // Input/Output
   showPrompt(): void;
   handleInput(input: string): void;
   displayMessage(content: string, type?: MessageType): void;
   displayProgress(phase: string, progress: number, details?: string): void;
-  
+
   // Streaming
   startStreaming(): void;
   addStreamingChunk(content: string): void;
   completeStreaming(message?: string): void;
   cancelStreaming(): void;
-  
+
   // Events
   on<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void;
   off<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void;
   emit<K extends keyof CLIEvents>(event: K, data: CLIEvents[K]): void;
-  
+
   // Configuration
   updateConfig(config: Partial<CLIConfig>): void;
   getConfig(): CLIConfig;
@@ -104,14 +104,14 @@ export interface IAgentCLIBridge {
   // Connect CLI to agent
   connectAgent(agent: any): void;
   disconnectAgent(): void;
-  
+
   // Agent event handlers
   onAgentProgress(progress: { phase: string; progress: number; details?: string }): void;
   onAgentMessage(message: { content: string; type: string }): void;
   onAgentComplete(result: any): void;
   onAgentError(error: any): void;
   onAgentCancelled(reason: string): void;
-  
+
   // CLI to agent communication
   sendToAgent(input: string): void;
   cancelAgent(): void;
@@ -124,10 +124,10 @@ export interface IKeyboardManager {
   enable(): void;
   disable(): void;
   isEnabled(): boolean;
-  
+
   on(event: 'shiftTab' | 'escape' | 'ctrlC' | 'keypress', listener: (...args: any[]) => void): void;
   off(event: string, listener: (...args: any[]) => void): void;
-  
+
   updateConfig(config: any): void;
   destroy(): void;
 }

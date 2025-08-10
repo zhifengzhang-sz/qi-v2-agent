@@ -1,6 +1,6 @@
 /**
  * CLI Configuration Loader
- * 
+ *
  * Loads CLI configuration from multiple sources with proper priority:
  * 1. Command line arguments (highest priority)
  * 2. Environment variables
@@ -8,8 +8,7 @@
  * 4. Default values (lowest priority)
  */
 
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import YAML from 'js-yaml';
 import type { CLIConfig } from '../abstractions/ICLIFramework.js';
 
@@ -85,23 +84,26 @@ const argMappings = {
  */
 export function loadCLIConfig(options: ConfigLoaderOptions = {}): CLIConfigWithFramework {
   let config = { ...defaultConfig };
-  
+
   // 1. Load from configuration file (lowest priority)
   config = mergeConfigFromFile(config, options.configPath);
-  
+
   // 2. Load from environment variables
   config = mergeConfigFromEnv(config, options.env || process.env);
-  
+
   // 3. Load from command line arguments (highest priority)
   config = mergeConfigFromArgs(config, options.args || process.argv.slice(2));
-  
+
   return validateConfig(config);
 }
 
 /**
  * Load configuration from file
  */
-function mergeConfigFromFile(config: CLIConfigWithFramework, configPath?: string): CLIConfigWithFramework {
+function mergeConfigFromFile(
+  config: CLIConfigWithFramework,
+  configPath?: string
+): CLIConfigWithFramework {
   const possiblePaths = [
     configPath,
     'config/cli.yaml',
@@ -109,20 +111,20 @@ function mergeConfigFromFile(config: CLIConfigWithFramework, configPath?: string
     '.qi-cli.yaml',
     '.qi-cli.yml',
   ].filter(Boolean);
-  
+
   for (const path of possiblePaths) {
     if (path && existsSync(path)) {
       try {
         const fileContent = readFileSync(path, 'utf8');
         const fileConfig = YAML.load(fileContent) as Partial<CLIConfigWithFramework>;
-        
+
         return { ...config, ...fileConfig };
       } catch (error) {
         console.warn(`Warning: Failed to load config from ${path}:`, error);
       }
     }
   }
-  
+
   return config;
 }
 
@@ -130,31 +132,34 @@ function mergeConfigFromFile(config: CLIConfigWithFramework, configPath?: string
  * Load configuration from environment variables
  */
 function mergeConfigFromEnv(
-  config: CLIConfigWithFramework, 
+  config: CLIConfigWithFramework,
   env: Record<string, string | undefined>
 ): CLIConfigWithFramework {
   const envConfig: Partial<CLIConfigWithFramework> = {};
-  
+
   for (const [envVar, configKey] of Object.entries(envMappings)) {
     const envValue = env[envVar];
     if (envValue !== undefined) {
       (envConfig as any)[configKey] = parseEnvValue(envValue, configKey);
     }
   }
-  
+
   return { ...config, ...envConfig };
 }
 
 /**
  * Load configuration from command line arguments
  */
-function mergeConfigFromArgs(config: CLIConfigWithFramework, args: string[]): CLIConfigWithFramework {
+function mergeConfigFromArgs(
+  config: CLIConfigWithFramework,
+  args: string[]
+): CLIConfigWithFramework {
   const argConfig: Partial<CLIConfigWithFramework> = {};
-  
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     const mapping = argMappings[arg as keyof typeof argMappings];
-    
+
     if (mapping) {
       if (typeof mapping === 'string') {
         // Argument expects a value
@@ -168,13 +173,13 @@ function mergeConfigFromArgs(config: CLIConfigWithFramework, args: string[]): CL
         (argConfig as any)[mapping.key] = mapping.value;
       }
     }
-    
+
     // Handle boolean flags
     if (arg === '--debug' || arg === '-d') {
       argConfig.debug = true;
     }
   }
-  
+
   return { ...config, ...argConfig };
 }
 
@@ -185,7 +190,7 @@ function parseEnvValue(value: string, key: string): any {
   switch (key) {
     case 'framework':
       return value as CLIFramework;
-    
+
     case 'debug':
     case 'enableHotkeys':
     case 'enableModeIndicator':
@@ -195,16 +200,17 @@ function parseEnvValue(value: string, key: string): any {
     case 'animations':
     case 'autoComplete':
       return value.toLowerCase() === 'true' || value === '1';
-    
+
     case 'historySize':
     case 'streamingThrottle':
-    case 'maxBufferSize':
+    case 'maxBufferSize': {
       const num = parseInt(value, 10);
-      return isNaN(num) ? undefined : num;
-    
+      return Number.isNaN(num) ? undefined : num;
+    }
+
     case 'prompt':
       return value;
-    
+
     default:
       return value;
   }
@@ -217,13 +223,14 @@ function parseArgValue(value: string, key: string): any {
   switch (key) {
     case 'framework':
       return value as CLIFramework;
-    
+
     case 'historySize':
     case 'streamingThrottle':
-    case 'maxBufferSize':
+    case 'maxBufferSize': {
       const num = parseInt(value, 10);
-      return isNaN(num) ? undefined : num;
-    
+      return Number.isNaN(num) ? undefined : num;
+    }
+
     default:
       return value;
   }
@@ -239,20 +246,20 @@ function validateConfig(config: CLIConfigWithFramework): CLIConfigWithFramework 
     console.warn(`Warning: Invalid framework '${config.framework}', using 'readline'`);
     config.framework = 'readline';
   }
-  
+
   // Validate numeric values
   if (config.historySize < 1) {
     config.historySize = 100;
   }
-  
+
   if (config.streamingThrottle < 0) {
     config.streamingThrottle = 10;
   }
-  
+
   if (config.maxBufferSize < 1000) {
     config.maxBufferSize = 1000000;
   }
-  
+
   return config;
 }
 
@@ -261,7 +268,7 @@ function validateConfig(config: CLIConfigWithFramework): CLIConfigWithFramework 
  */
 export function getAvailableFrameworks(): CLIFramework[] {
   const frameworks: CLIFramework[] = ['readline']; // Always available
-  
+
   // Check if Ink is available
   try {
     require('ink');
@@ -270,8 +277,7 @@ export function getAvailableFrameworks(): CLIFramework[] {
   } catch {
     // Ink not available
   }
-  
-  
+
   return frameworks;
 }
 
@@ -280,13 +286,12 @@ export function getAvailableFrameworks(): CLIFramework[] {
  */
 export function autoDetectFramework(): CLIFramework {
   const available = getAvailableFrameworks();
-  
+
   // Prefer Ink if available and terminal supports colors
   if (available.includes('ink') && process.stdout.isTTY) {
     return 'ink';
   }
-  
-  
+
   // Default to readline
   return 'readline';
 }

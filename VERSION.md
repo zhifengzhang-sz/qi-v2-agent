@@ -1,4 +1,64 @@
-# qi-v2-agent Version History
+# Qi V2 Agent - Version History
+
+## v-0.5.x - Toolbox Preview (Current)
+
+### 📅 **Release Date**: 2025-01-10
+
+### 🎯 **Overview**
+Preview implementation of v-0.8.x agent functionality with toolbox architecture. This version serves as a stepping stone to full agent capabilities while providing useful file reference and workflow features.
+
+### ✨ **New Features**
+
+#### 🧰 **Toolbox Architecture**
+- **Tool Registry**: Composable tool system with 4 tools across 3 categories
+- **File Tools**: FileContentResolver, ProjectStructureScanner  
+- **Parsing Tools**: FileReferenceParser for @file pattern detection
+- **Context Tools**: SessionManager for conversation persistence
+- **Tool Management**: `/tools` command to list registered tools
+
+#### 📁 **File Reference System**
+- **@file Patterns**: Use `@path/to/file.txt` to include file content in prompts
+- **Multiple Files**: Support for `@file1.js @file2.ts explain both files`  
+- **Content Inclusion**: Automatic file content loading and prompt enhancement
+- **FileReferenceClassifier**: Intelligent detection of file reference patterns
+
+#### 🔄 **Simple Workflow System**
+- **FILE_REFERENCE Workflow**: Processes @file + prompt patterns
+- **Workflow Manager**: Tracks execution statistics and performance
+- **Classification Routing**: Automatic routing between prompts and workflows
+- **Workflow Commands**: `/workflows` to show execution stats
+
+#### 🏗️ **Architecture Improvements**
+- **Single File Strategy**: Consolidated qi-prompt.ts (no file proliferation)
+- **Version Control Approach**: Use git versioning instead of separate files
+- **Event-Driven Design**: Enhanced PromptAppOrchestrator with processInput events
+- **Context Management**: ToolbasedContextManager replacing basic implementation
+
+### 🔧 **Known Issues**
+- **File Workflow**: File reference workflow partially functional (needs debugging)
+- **Event Flow**: processInput events working, content inclusion needs fixes
+
+### 📋 **Key Commands**
+```bash
+# Toolbox Commands (v-0.5.x)
+/tools                  # List registered tools
+/workflows              # Show workflow statistics  
+/files                  # List session file references
+/project                # Show project context
+
+# File Reference Usage
+@package.json what dependencies?
+@src/file.ts explain this code
+```
+
+### 🛣️ **Versioning Roadmap**
+- **v-0.4.x**: Pure prompt app ✅
+- **v-0.5.x**: Current - toolbox preview ← HERE
+- **v-0.6.x**: Full toolbox (100+ tools, MCP integration)
+- **v-0.7.x**: Advanced workflows
+- **v-0.8.x**: Full agent capabilities
+
+---
 
 ## v0.3.2 - Classifier Performance Study Framework
 

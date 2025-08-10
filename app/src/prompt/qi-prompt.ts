@@ -4,29 +4,60 @@
  * Load environment variables from config/.env
  */
 import { config } from 'dotenv';
-config({ path: 'config/.env' });
-
-/**
- * Qi Prompt CLI Application
- *
- * Modern event-driven CLI with hotkey support, progress indicators, and real-time streaming.
- * 
- * Features:
- * - Shift+Tab: Cycle between Interactive/Command/Streaming modes
- * - Esc: Cancel current operations
- * - Real-time progress bars during LLM processing
- * - Character-by-character streaming responses
- * - Responsive UI that doesn't block during long operations
- */
-
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createContextManager, createDefaultAppContext } from '@qi/agent/context';
+
+// Get the correct path to config/.env relative to this file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const configPath = join(__dirname, '..', '..', '..', 'config', '.env');
+
+config({ path: configPath });
+
+/**
+ * Qi Prompt CLI Application - v-0.5.x Preview
+ *
+ * Preview of v-0.8.x agent functionality with toolbox architecture:
+ * - v-0.4.x: Pure prompt app
+ * - v-0.5.x: Current - toolbox preview with file references and workflows  
+ * - v-0.6.x: Full toolbox (100+ tools, MCP integration)
+ * - v-0.7.x: Advanced workflows
+ * - v-0.8.x: Full agent capabilities
+ * 
+ * Current Features (v-0.5.x):
+ * - File reference processing (@file.txt patterns)
+ * - Simple workflow architecture (FILE_REFERENCE)
+ * - Tool registry with composable tools
+ * - Session persistence and project awareness
+ * - Context-aware prompting
+ * - Shift+Tab: Cycle between Interactive/Command/Streaming modes
+ * - Real-time progress bars and streaming responses
+ */
+
+import { createDefaultAppContext } from '@qi/agent/context';
 import { createStateManager } from '@qi/agent/state';
 import { createPromptHandler } from '@qi/agent/prompt';
 import { createCommandHandler } from '@qi/agent/command';
 import { createPromptApp } from '@qi/agent';
 import { setupQuickCLI } from '@qi/agent/cli';
+
+// Import toolbox components (v0.5.x preview)
+import { 
+  ToolRegistry,
+  FileContentResolver,
+  ProjectStructureScanner,
+  FileReferenceParser,
+  SessionManager,
+} from '../../../lib/src/tools/index.js';
+
+import { 
+  WorkflowManager,
+  SimpleWorkflowClass,
+  type WorkflowInput,
+} from '../../../lib/src/workflows/index.js';
+
+import { FileReferenceClassifier } from '../../../lib/src/classifier/impl/FileReferenceClassifier.js';
+import { ToolbasedContextManager } from '../../../lib/src/context/impl/ToolbasedContextManager.js';
 
 // Import app-specific event types
 import type {
@@ -43,20 +74,24 @@ import { createProviderCommand } from './commands/ProviderCommand.js';
 import { createStatusCommand } from './commands/StatusCommand.js';
 
 /**
- * Modern Event-Driven Prompt CLI
+ * Qi Prompt CLI - v-0.5.x Toolbox Preview
  * 
- * Uses the new EventDrivenCLI framework with hotkey support and real-time feedback.
+ * Preview implementation of v-0.8.x agent with toolbox architecture.
  */
 class QiPromptCLI {
   private orchestrator: any;
   private cli: any;
   private stateManager: any;
-  private contextManager: any;
+  private contextManager: ToolbasedContextManager;
   private promptHandler: any;
   private commandHandler: any;
+  private toolRegistry!: ToolRegistry;
+  private workflowManager!: WorkflowManager;
+  private classifier: FileReferenceClassifier;
   private debugMode: boolean;
   private framework?: 'readline' | 'ink';
   private autoDetect: boolean;
+  private currentSession?: string;
 
   constructor(options: { 
     debug?: boolean; 
@@ -67,33 +102,129 @@ class QiPromptCLI {
     this.framework = options.framework;
     this.autoDetect = options.autoDetect ?? false;
     
-    // Remove debug logging for cleaner output
-    // if (this.debugMode) {
-    //   console.log('🔧 QiPromptCLI constructor - framework:', this.framework);
-    //   console.log('🔧 QiPromptCLI constructor - options:', options);
-    // }
+    // Initialize toolbox architecture (v-0.5.x preview)
+    this.initializeToolbox();
     
-    // Create agent components (same as before)
+    // Create agent components
     this.stateManager = createStateManager();
+    
+    // Create tool-based context manager (v-0.5.x)
     const appContext = createDefaultAppContext();
-    this.contextManager = createContextManager(appContext);
+    this.contextManager = new ToolbasedContextManager(appContext, this.toolRegistry, {
+      enableFileReferences: true,
+      enableProjectDiscovery: true,
+      enableSessionPersistence: true,
+      enableContextAwarePrompting: true,
+      maxContextWindow: 8000,
+      maxFilesPerSession: 20,
+      maxFileSize: 1024 * 1024,
+      sessionStoragePath: '.claude-sessions',
+      projectMemoryFileName: 'CLAUDE.md',
+    });
+
+    // Create file reference classifier (v-0.5.x)
+    this.classifier = new FileReferenceClassifier({
+      enableFileAwareness: true,
+      enableExtendedThinking: true,
+      enableContextContinuation: true,
+      confidenceThresholds: new Map([
+        ['command', 1.0],
+        ['prompt', 0.8],
+        ['simple-workflow', 0.7],
+      ]),
+    });
+    
     this.promptHandler = createPromptHandler();
     this.commandHandler = createCommandHandler({
       enableBuiltInCommands: true,
     });
     
-    // Register app-specific commands that integrate with StateManager
+    // Register app-specific commands
     this.registerAppCommands();
   }
 
+  /**
+   * Initialize the toolbox with all required tools (v-0.5.x preview)
+   */
+  private initializeToolbox(): void {
+    this.toolRegistry = new ToolRegistry();
+    
+    // Register file tools
+    const fileResolver = new FileContentResolver({
+      maxFileSize: 1024 * 1024,
+      enableCache: true,
+      cacheTimeout: 30 * 1000,
+    });
+    
+    const projectScanner = new ProjectStructureScanner({
+      maxDepth: 5,
+      includeHidden: false,
+      maxFiles: 1000,
+    });
+    
+    this.toolRegistry.register(fileResolver, {
+      name: 'file-content-resolver',
+      description: 'Resolves file references and provides content',
+      version: '1.0.0',
+      category: 'files',
+      dependencies: [],
+      tags: ['file', 'content', 'resolver'],
+    });
+    
+    this.toolRegistry.register(projectScanner, {
+      name: 'project-structure-scanner',
+      description: 'Scans and analyzes project structure',
+      version: '1.0.0',
+      category: 'files',
+      dependencies: [],
+      tags: ['project', 'structure', 'scanner'],
+    });
+    
+    // Register parsing tools
+    const fileParser = new FileReferenceParser();
+    
+    this.toolRegistry.register(fileParser, {
+      name: 'file-reference-parser',
+      description: 'Parses file references from text input',
+      version: '1.0.0',
+      category: 'parsing',
+      dependencies: [],
+      tags: ['parser', 'file-reference', 'text'],
+    });
+    
+    // Register context tools
+    const sessionManager = new SessionManager({
+      storagePath: '.claude-sessions',
+      maxSessions: 100,
+      maxContextWindow: 8000,
+      enablePersistence: true,
+      autoSave: true,
+    });
+    
+    this.toolRegistry.register(sessionManager, {
+      name: 'session-manager',
+      description: 'Manages conversation sessions with persistence',
+      version: '1.0.0',
+      category: 'context',
+      dependencies: [],
+      tags: ['session', 'persistence', 'conversation'],
+    });
+    
+    // Initialize workflow manager with tool registry
+    this.workflowManager = new WorkflowManager(this.toolRegistry);
+  }
+
   async initialize(): Promise<void> {
-    console.log('🚀 Initializing Event-Driven Qi Prompt CLI...');
+    console.log('🚀 Initializing Qi Prompt CLI v-0.5.x (Toolbox Preview)...');
 
     try {
+      // Initialize tool-based context manager (v-0.5.x)
+      console.log('🧰 Initializing toolbox and context manager...');
+      await this.contextManager.initialize();
+      console.log('✅ Toolbox and context manager initialized');
+
       // Load LLM configuration through StateManager
       console.log('📝 Loading LLM configuration...');
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = dirname(__filename);
       const configPath = join(__dirname, '..', '..', '..', 'config');
       await this.stateManager.loadLLMConfig(configPath);
       console.log('✅ Configuration loaded successfully');
@@ -108,15 +239,21 @@ class QiPromptCLI {
       }
       console.log('✅ Prompt handler initialized');
 
-      // Create orchestrator (EventEmitter-enabled)
+      // Start a new conversation session (v-0.5.x)
+      console.log('📚 Starting conversation session...');
+      const session = await this.contextManager.startNewConversation('Qi Prompt CLI v-0.5.x Session');
+      this.currentSession = session.id;
+      console.log(`✅ Session started: ${session.title}`);
+
+      // Create orchestrator with toolbox context manager
       this.orchestrator = createPromptApp(
         this.stateManager,
         this.contextManager,
         {
-          domain: 'prompt-app',
+          domain: 'prompt-app-v0-5-x',
           enableCommands: true,
           enablePrompts: true,
-          sessionPersistence: false,
+          sessionPersistence: true,
           commandHandler: this.commandHandler,
           promptHandler: this.promptHandler,
         }
@@ -143,11 +280,11 @@ class QiPromptCLI {
       await this.cli.initialize();
       console.log('✅ Event-driven CLI initialized');
 
-      // Setup bidirectional event communication (Phase 5: App Assembly)
-      this.setupEventCommunication();
-      console.log('✅ Event-driven communication wired');
+      // Setup toolbox-enhanced event communication (v-0.5.x)
+      this.setupToolboxEventCommunication();
+      console.log('✅ Toolbox event communication wired');
       
-      console.log('🎉 Initialization complete!\n');
+      console.log('🎉 v-0.5.x toolbox initialization complete!\n');
     } catch (error) {
       console.error('❌ Initialization failed:', error);
       throw error;
@@ -157,44 +294,62 @@ class QiPromptCLI {
   async start(): Promise<void> {
     await this.initialize();
 
+    // Display welcome message with v-0.5.x features
+    console.log('🧰 v-0.5.x Toolbox Preview Features:');
+    console.log('  - File references: Use @path/to/file to reference files');
+    console.log('  - Simple workflows: FILE_REFERENCE workflow for @file + prompt patterns');
+    console.log('  - Tool registry: Composable, reusable tools');
+    console.log('  - Session persistence: Conversations saved automatically');
+    console.log('  - Project awareness: Automatic project context detection');
+    
+    // Show registered tools
+    const toolStats = this.toolRegistry.getStats();
+    console.log(`  - Registered tools: ${toolStats.totalTools} tools across ${Object.keys(toolStats.categories).length} categories`);
+    console.log('');
+
     // Start the event-driven CLI
     await this.cli.start();
   }
 
   /**
-   * Shutdown the CLI and cleanup resources
+   * Enhanced shutdown with toolbox cleanup (v-0.5.x)
    */
   async shutdown(): Promise<void> {
-    console.log('\n🛑 Shutting down...');
+    console.log('\n🛑 Shutting down v-0.5.x toolbox CLI...');
     
     try {
-      // Shutdown CLI first
+      // Shutdown toolbox context manager
+      if (this.contextManager) {
+        await this.contextManager.shutdown();
+        console.log('✅ Toolbox context manager shut down');
+      }
+
+      // Cleanup tool registry
+      if (this.toolRegistry) {
+        await this.toolRegistry.clear();
+        console.log('✅ Tool registry cleaned up');
+      }
+
+      // Shutdown CLI and orchestrator
       if (this.cli) {
         await this.cli.shutdown();
       }
       
-      // Then shutdown orchestrator
       if (this.orchestrator) {
         await this.orchestrator.shutdown();
       }
       
-      console.log('✅ Shutdown complete');
+      console.log('✅ v-0.5.x shutdown complete');
     } catch (error) {
-      console.error('Error during shutdown:', error);
+      console.error('Error during toolbox shutdown:', error);
     }
   }
 
   /**
-   * Setup bidirectional event communication between CLI and Agent
-   * This is Phase 5: App Assembly - where the app layer wires CLI and Agent with app-specific events
+   * Setup toolbox-enhanced event communication (v-0.5.x)
    */
-  private setupEventCommunication(): void {
-    // ===========================================
-    // CLI Events → Agent (CLI emits, Agent handles)
-    // ===========================================
-    
-    // Wire CLI model change requests to Agent
-    // When CLI detects /model command, emit modelChangeRequested event to Agent
+  private setupToolboxEventCommunication(): void {
+    // CLI Events → Agent
     this.cli.on('modelChangeRequest', (modelName: string) => {
       const event: ModelChangeRequestedEvent = {
         type: 'modelChangeRequested',
@@ -204,11 +359,6 @@ class QiPromptCLI {
       this.orchestrator.emit('modelChangeRequested', event);
     });
     
-    // Wire CLI mode change requests to Agent  
-    // TODO: Define proper CLI mode vs App mode separation
-    // Reason: CLI modes (interactive/command/streaming) are UI behavior modes,
-    // while App modes (ready/planning/editing/executing/error) are workflow states.
-    // Need to decide if CLI modes should affect app workflow or remain independent.
     this.cli.on('modeChangeRequest', (mode: 'interactive' | 'command' | 'streaming') => {
       const event: ModeChangeRequestedEvent = {
         type: 'modeChangeRequested', 
@@ -218,49 +368,105 @@ class QiPromptCLI {
       this.orchestrator.emit('modeChangeRequested', event);
     });
     
-    // ===========================================
-    // Agent Events → CLI (Agent emits, CLI handles) 
-    // ===========================================
+    // Enhanced: File reference detection (v-0.5.x)
+    this.cli.on('fileReferenceDetected', (filePath: string) => {
+      if (this.currentSession) {
+        this.contextManager.addFileReference(filePath);
+      }
+    });
     
-    // Wire Agent model change confirmations back to CLI
+    // Agent Events → CLI
     this.orchestrator.on('modelChanged', (event: ModelChangedEvent) => {
       if (event.success) {
         this.cli.displayMessage(`✅ Model changed: ${event.oldModel} → ${event.newModel}`);
-        // Update CLI prompt display to show new model
-        this.cli.updatePrompt(`${event.newModel} [💬] > `);
+        this.cli.updatePrompt(`${event.newModel} [🧰] > `);
       } else {
         this.cli.displayMessage(`❌ Model change failed: ${event.error}`);
       }
     });
     
-    // Wire Agent mode change confirmations back to CLI
-    // TODO: Implement proper mode change feedback to CLI
-    // Reason: Currently CLI and Agent have different mode systems that need reconciliation
     this.orchestrator.on('modeChanged', (event: ModeChangedEvent) => {
       if (event.success) {
         this.cli.displayMessage(`✅ Mode changed: ${event.oldMode} → ${event.newMode}`);
-        // TODO: Update CLI mode indicator properly
-        // Reason: CLI modes and Agent modes are different - need proper mapping
       } else {
         this.cli.displayMessage(`❌ Mode change failed`);
       }
     });
     
-    // Wire Agent status responses back to CLI
+    // Enhanced status with toolbox information (v-0.5.x)
     this.orchestrator.on('statusResponse', (event: StatusResponseEvent) => {
       const { model, mode, uptime, provider, memoryUsage } = event.status;
-      const content = `📊 System Status:\n\n` +
+      const session = this.contextManager.getCurrentSession();
+      const projectContext = this.contextManager.getCurrentProjectContext();
+      const toolStats = this.toolRegistry.getStats();
+      const workflowStats = this.workflowManager.getStats();
+      
+      const content = `📊 v-0.5.x System Status:\n\n` +
         `  Mode: ${mode}\n` +
         `  Provider: ${provider}\n` +
         `  Model: ${model}\n` +
         `  Uptime: ${uptime}s\n` +
-        `  Memory: ${memoryUsage}MB`;
+        `  Memory: ${memoryUsage}MB\n\n` +
+        `🧰 Toolbox Architecture:\n` +
+        `  Tools: ${toolStats.totalTools} (${Object.keys(toolStats.categories).length} categories)\n` +
+        `  Workflows: ${workflowStats.totalExecutions} executions (${workflowStats.successfulExecutions} successful)\n` +
+        `  Project: ${projectContext ? projectContext.root : 'Not detected'}\n` +
+        `  Session: ${session ? session.title : 'None'}`;
+        
       this.cli.displayMessage(content);
     });
     
-    // Wire Agent completion responses back to CLI - THIS WAS MISSING!
-    this.orchestrator.on('complete', (event: { result: any }) => {
+    // Enhanced: Workflow processing with classifier and workflow manager (v-0.5.x)
+    this.orchestrator.on('processInput', async (input: string) => {
+      if (this.currentSession) {
+        // Classify input using file reference classifier
+        const classificationResult = await this.classifier.classify(input);
+        
+        if (classificationResult.type === 'simple-workflow' &&
+            classificationResult.extractedData.get('workflowClass')) {
+          
+          // Execute workflow
+          const workflowInput: WorkflowInput = {
+            originalInput: input,
+            classification: classificationResult.extractedData.get('workflowClass') as SimpleWorkflowClass,
+            sessionId: this.currentSession,
+            projectPath: this.contextManager.getCurrentProjectContext()?.root,
+            metadata: classificationResult.metadata,
+          };
+          
+          const workflowResult = await this.workflowManager.executeWorkflow(workflowInput);
+          
+          if (workflowResult.success) {
+            // Use workflow output instead of original input
+            this.orchestrator.emit('workflowOutput', {
+              original: input,
+              enhanced: workflowResult.output,
+              classification: classificationResult,
+              sessionId: this.currentSession,
+              workflow: classificationResult.extractedData.get('workflowClass'),
+            });
+          }
+        } else if (classificationResult.type === 'prompt') {
+          // Use context-aware prompting for regular prompts
+          const enhancedPrompt = await this.contextManager.getContextAwarePrompt(
+            this.currentSession, 
+            input
+          );
+          
+          this.orchestrator.emit('enhancedPrompt', {
+            original: input,
+            enhanced: enhancedPrompt,
+            classification: classificationResult,
+            sessionId: this.currentSession
+          });
+        }
+      }
+    });
+    
+    // Enhanced completion with workflow metadata (v-0.5.x)
+    this.orchestrator.on('complete', async (event: { result: any; input?: string }) => {
       let responseContent = 'Task completed successfully';
+      
       if (event.result) {
         if (typeof event.result === 'string') {
           responseContent = event.result;
@@ -270,25 +476,126 @@ class QiPromptCLI {
           responseContent = event.result.data;
         }
       }
+
+      // Add toolbox context information (v-0.5.x)
+      if (this.currentSession) {
+        const session = this.contextManager.getCurrentSession();
+        if (session && session.fileReferences.length > 0) {
+          const recentFiles = session.fileReferences.slice(-3);
+          responseContent += `\n\n📁 Recent files: ${recentFiles.join(', ')}`;
+        }
+        
+        const workflowStats = this.workflowManager.getStats();
+        if (workflowStats.totalExecutions > 0) {
+          responseContent += `\n🧰 Workflows executed: ${workflowStats.totalExecutions}`;
+        }
+      }
+      
       this.cli.displayMessage(responseContent, 'complete');
     });
   }
 
   /**
-   * Register application-specific commands that use StateManager properly
+   * Register application-specific commands with toolbox enhancements (v-0.5.x)
    */
   private registerAppCommands(): void {
-    // Register model command with real StateManager integration
+    // Standard app commands
     const modelCommand = createModelCommand(this.stateManager);
     this.commandHandler.registerCommand(modelCommand.definition, modelCommand.handler);
 
-    // Register provider command with real StateManager integration
     const providerCommand = createProviderCommand(this.stateManager);
     this.commandHandler.registerCommand(providerCommand.definition, providerCommand.handler);
 
-    // Register status command with real StateManager integration  
     const statusCommand = createStatusCommand(this.stateManager);
     this.commandHandler.registerCommand(statusCommand.definition, statusCommand.handler);
+
+    // Toolbox-specific commands (v-0.5.x preview)
+    this.commandHandler.registerCommand(
+      {
+        name: 'tools',
+        description: 'List registered tools in the toolbox',
+        category: 'toolbox',
+      },
+      async () => {
+        const tools = this.toolRegistry.listTools();
+        const toolList = tools.map(tool => 
+          `${tool.name} (${tool.category}): ${tool.description}`
+        ).join('\n');
+
+        return { 
+          success: true, 
+          message: `🧰 Registered Tools:\n${toolList}` 
+        };
+      }
+    );
+
+    this.commandHandler.registerCommand(
+      {
+        name: 'workflows',
+        description: 'Show workflow execution statistics',
+        category: 'toolbox',
+      },
+      async () => {
+        const stats = this.workflowManager.getStats();
+        const workflows = this.workflowManager.getSupportedWorkflows();
+        const descriptions = this.workflowManager.getWorkflowDescriptions();
+        
+        let content = `🔄 Workflow Statistics:\n`;
+        content += `  Total Executions: ${stats.totalExecutions}\n`;
+        content += `  Successful: ${stats.successfulExecutions}\n`;
+        content += `  Failed: ${stats.failedExecutions}\n`;
+        content += `  Average Time: ${stats.averageExecutionTime.toFixed(2)}ms\n\n`;
+        
+        content += `Supported Workflows:\n`;
+        for (const workflow of workflows) {
+          const desc = descriptions.get(workflow) || 'No description';
+          content += `  ${workflow}: ${desc}\n`;
+        }
+
+        return { success: true, message: content };
+      }
+    );
+
+    this.commandHandler.registerCommand(
+      {
+        name: 'files',
+        description: 'List current file references',
+        category: 'context',
+      },
+      async () => {
+        const session = this.contextManager.getCurrentSession();
+        if (!session || session.fileReferences.length === 0) {
+          return { success: true, message: 'No file references in current session' };
+        }
+
+        return { 
+          success: true, 
+          message: `📁 Current file references:\n${session.fileReferences.join('\n')}` 
+        };
+      }
+    );
+
+    this.commandHandler.registerCommand(
+      {
+        name: 'project',
+        description: 'Show current project context',
+        category: 'context',
+      },
+      async () => {
+        const projectContext = this.contextManager.getCurrentProjectContext();
+        if (!projectContext) {
+          return { success: true, message: 'No project context detected' };
+        }
+
+        const info = `📂 Project Context:\n` +
+          `  Root: ${projectContext.root}\n` +
+          `  Memory Files: ${projectContext.memoryFiles.join(', ') || 'None'}\n` +
+          `  Config Files: ${projectContext.configFiles.join(', ')}\n` +
+          `  Structure: ${projectContext.structure.length} items`;
+
+        return { success: true, message: info };
+      }
+    );
   }
 }
 
@@ -339,7 +646,24 @@ function displayHelp() {
   const recommended = autoDetectFramework();
   
   console.log(`
-Qi Prompt CLI - AI Assistant with configurable UI frameworks
+
+🧰 Qi Prompt CLI v-0.5.x - Toolbox Preview
+AI Assistant with advanced file references, workflows, and session management
+
+VERSIONING ROADMAP:
+  v-0.4.x: Pure prompt app ✓
+  v-0.5.x: Current - toolbox preview with file references and workflows  ← YOU ARE HERE
+  v-0.6.x: Full toolbox (100+ tools, MCP integration)
+  v-0.7.x: Advanced workflows  
+  v-0.8.x: Full agent capabilities
+
+TOOLBOX FEATURES (v-0.5.x):
+  📁 File References    - Use @path/to/file to include file content in prompts
+  🔄 Simple Workflows   - FILE_REFERENCE workflow for @file + prompt patterns  
+  🧰 Tool Registry      - Composable tools: file resolver, project scanner, parser
+  💾 Session Persistence - Automatic conversation and context saving
+  📂 Project Awareness  - Auto-detection of project structure and memory files
+  🎯 Context-Aware      - Enhanced prompting with project and session context
 
 Usage: bun run qi-prompt [options]
 
@@ -367,14 +691,30 @@ Framework Information:
   • readline  - Zero dependencies, always available, basic terminal UI
   • ink       - Rich React-based UI with animations and colors ${available.includes('ink') ? '✓' : '✗ (run: bun add ink @inkjs/ui)'}
 
+TOOLBOX COMMANDS (v-0.5.x):
+  /tools        - List all registered tools in the toolbox
+  /workflows    - Show workflow execution statistics
+  /files        - List current file references in session
+  /project      - Show detected project context and memory files
+
+HOTKEYS:
+  Shift+Tab     - Cycle through Interactive/Command/Streaming modes
+  Ctrl+C        - Clear current input (Ink framework only)
+
 Examples:
-  bun run qi-prompt                    # Use default configuration
-  bun run qi-prompt --framework ink   # Use Ink framework (React-based UI)
-  bun run qi-prompt --framework readline  # Use basic terminal UI
-  bun run qi-prompt --auto-detect     # Use recommended framework (${recommended})
-  bun run qi-prompt --debug           # Enable debug mode
+  bun run qi-prompt                           # Use default configuration
+  bun run qi-prompt --framework ink          # Use Ink framework (React-based UI)  
+  bun run qi-prompt --framework readline     # Use basic terminal UI
+  bun run qi-prompt --auto-detect            # Use recommended framework (${recommended})
+  bun run qi-prompt --debug                  # Enable debug mode
   
-  QI_CLI_FRAMEWORK=ink bun run qi-prompt  # Use environment variable
+  QI_CLI_FRAMEWORK=ink bun run qi-prompt     # Use environment variable
+
+TOOLBOX USAGE EXAMPLES (v-0.5.x):
+  @src/index.ts explain this file          # File reference workflow
+  @package.json @src/main.ts help me       # Multiple file references
+  /tools                                   # List available tools
+  /project                                 # Show project context
 `);
 }
 

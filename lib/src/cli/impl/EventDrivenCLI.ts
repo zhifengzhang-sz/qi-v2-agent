@@ -1,48 +1,47 @@
 /**
  * Refactored Event-Driven CLI Framework
- * 
+ *
  * Pure orchestration layer using dependency injection.
  * Delegates all operations to injected components while maintaining
  * the same public API for backward compatibility.
- * 
+ *
  * Key changes from original:
- * - Reduced from 750+ lines to ~200 lines 
+ * - Reduced from 750+ lines to ~200 lines
  * - Uses dependency injection for all components
  * - All business logic extracted to services
  * - Framework-agnostic (works with readline/ink/blessed)
  */
 
+import type { ICommandHandler } from '../../command/abstractions/index.js';
 import type {
-  ICLIFramework,
-  IAgentCLIBridge,
-  CLIEvents,
   CLIConfig,
-  CLIState,
+  CLIEvents,
   CLIMode,
+  CLIState,
+  IAgentCLIBridge,
+  ICLIFramework,
   MessageType,
 } from '../abstractions/ICLIFramework.js';
-
+import type {
+  IAgentConnector,
+  ICommandRouter,
+  IEventManager,
+} from '../abstractions/ICLIServices.js';
+import type { IInputManager } from '../abstractions/IInputManager.js';
 // Injected dependencies interfaces
 import type { ITerminal } from '../abstractions/ITerminal.js';
-import type { IInputManager } from '../abstractions/IInputManager.js';
-import type { 
-  IProgressRenderer, 
-  IModeRenderer, 
-  IStreamRenderer 
-} from '../abstractions/IUIComponent.js';
 import type {
-  IEventManager,
-  ICommandRouter,
-  IAgentConnector,
-} from '../abstractions/ICLIServices.js';
-import type { ICommandHandler } from '../../command/abstractions/index.js';
+  IModeRenderer,
+  IProgressRenderer,
+  IStreamRenderer,
+} from '../abstractions/IUIComponent.js';
 
 /**
  * Refactored EventDrivenCLI - Pure orchestration with dependency injection
- * 
+ *
  * This implementation delegates all operations to injected components:
  * - Terminal operations → ITerminal implementation
- * - Input handling → IInputManager implementation  
+ * - Input handling → IInputManager implementation
  * - Progress display → IProgressRenderer implementation
  * - Mode management → IModeRenderer implementation
  * - Streaming → IStreamRenderer implementation
@@ -145,7 +144,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     // Update prompt with current model/mode info
     this.updatePrompt();
     this.showPrompt();
-    
+
     this.isStarted = true;
   }
 
@@ -180,10 +179,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   setMode(mode: CLIMode): void {
     const previousMode = this.state.mode;
     this.state.mode = mode;
-    
+
     this.modeRenderer.setMode(mode);
     this.updatePrompt();
-    
+
     this.eventManager.emit('modeChanged', { previousMode, newMode: mode });
   }
 
@@ -213,10 +212,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
     // Handle CLI commands first
     const parseResult = this.commandRouter.parseInput(input);
-    
+
     if (parseResult.tag === 'success') {
       const parsed = parseResult.value;
-      
+
       if (parsed.type === 'command') {
         this.handleCommand(parsed.command!, parsed.args || [], parsed.flags || {});
         return;
@@ -239,7 +238,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
     const icon = icons[type] || 'ℹ️';
     const message = `${icon} ${content}`;
-    
+
     // Check if TUI mode is enabled
     if (this.isTUIMode()) {
       const tuiLayout = this.getTUILayout();
@@ -254,13 +253,13 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       // Regular mode: use terminal.writeLine()
       this.terminal.writeLine(message);
     }
-    
+
     this.eventManager.emit('messageReceived', { content, type });
   }
 
   displayProgress(phase: string, progress: number, details?: string): void {
     if (!this.config.enableProgressDisplay) return;
-    
+
     this.progressRenderer.updateProgress(progress, phase, details);
     this.eventManager.emit('progressUpdate', { phase, progress, details });
   }
@@ -269,7 +268,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   startStreaming(): void {
     if (!this.config.enableStreaming) return;
-    
+
     this.state.isStreamingActive = true;
     this.streamRenderer.startStreaming();
     this.eventManager.emit('streamingStarted');
@@ -277,23 +276,25 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   addStreamingChunk(content: string): void {
     if (!this.state.isStreamingActive) return;
-    
+
     this.streamRenderer.addChunk(content);
     this.eventManager.emit('streamingChunk', { content });
   }
 
   completeStreaming(message?: string): void {
     if (!this.state.isStreamingActive) return;
-    
+
     this.streamRenderer.complete(message);
     this.state.isStreamingActive = false;
-    this.eventManager.emit('streamingComplete', { totalTime: Date.now() - this.state.lastActivity.getTime() });
+    this.eventManager.emit('streamingComplete', {
+      totalTime: Date.now() - this.state.lastActivity.getTime(),
+    });
     this.showPrompt();
   }
 
   cancelStreaming(): void {
     if (!this.state.isStreamingActive) return;
-    
+
     this.streamRenderer.cancel();
     this.state.isStreamingActive = false;
     this.eventManager.emit('streamingCancelled');
@@ -318,7 +319,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   updateConfig(newConfig: Partial<CLIConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     // Update component configurations
     this.progressRenderer.updateConfig({ animated: this.config.animations });
     this.streamRenderer.updateConfig({ throttleMs: this.config.streamingThrottle });
@@ -336,7 +337,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   connectAgent(agent: any): void {
     const connectResult = this.agentConnector.connectAgent(agent);
-    
+
     if (connectResult.tag === 'success') {
       this.setupAgentEventHandlers();
       this.updatePromptWithAgentInfo();
@@ -365,18 +366,18 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   onAgentComplete(result: any): void {
     this.state.isProcessing = false;
-    
+
     const wasStreaming = this.state.isStreamingActive;
-    
+
     if (this.state.isStreamingActive) {
       this.completeStreaming('Response completed');
     }
-    
-    // Extract and display result - but only if we weren't streaming 
+
+    // Extract and display result - but only if we weren't streaming
     // (streaming already sent the content)
     const content = this.extractResultContent(result);
     this.progressRenderer.hideAndReplace();
-    
+
     if (content && !wasStreaming) {
       // Only display content if it wasn't already streamed
       if (this.isTUIMode()) {
@@ -384,32 +385,34 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
         if (tuiLayout) {
           // Route response content to TUI main panel
           tuiLayout.addToMain(content);
-          
+
           // Add AI response to conversation history for non-streaming
           const timestamp = new Date().toLocaleTimeString();
           const responsePreview = content.substring(0, 100) + (content.length > 100 ? '...' : '');
-          tuiLayout.addToContext(`{bold}{green-fg}[${timestamp}] AI:{/green-fg}{/bold} ${responsePreview}`);
+          tuiLayout.addToContext(
+            `{bold}{green-fg}[${timestamp}] AI:{/green-fg}{/bold} ${responsePreview}`
+          );
         } else {
           // Fallback to terminal if TUI layout not available
-          this.terminal.writeLine(content + '\n');
+          this.terminal.writeLine(`${content}\n`);
         }
       } else {
         // Regular mode: use terminal.writeLine()
-        this.terminal.writeLine(content + '\n');
+        this.terminal.writeLine(`${content}\n`);
       }
     }
-    
+
     this.showPrompt();
   }
 
   onAgentError(error: any): void {
     this.state.isProcessing = false;
     this.progressRenderer.hide();
-    
+
     if (this.state.isStreamingActive) {
       this.cancelStreaming();
     }
-    
+
     const errorMessage = error.message || error.error?.message || String(error);
     this.displayMessage(`Error: ${errorMessage}`, 'error');
     this.eventManager.emit('error', { error: new Error(errorMessage), context: 'agent' });
@@ -419,11 +422,11 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   onAgentCancelled(reason: string): void {
     this.state.isProcessing = false;
     this.progressRenderer.hide();
-    
+
     if (this.state.isStreamingActive) {
       this.cancelStreaming();
     }
-    
+
     this.displayMessage(`Request cancelled: ${reason}`, 'warning');
     this.showPrompt();
   }
@@ -434,18 +437,18 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       this.showPrompt();
       return;
     }
-    
+
     this.state.isProcessing = true;
     this.progressRenderer.start({ phase: 'starting', progress: 0, details: 'Initializing...' });
-    
+
     const context = {
       sessionId: 'cli-session',
       timestamp: new Date(),
       source: 'event-driven-cli',
       mode: this.state.mode,
     };
-    
-    this.agentConnector.sendToAgent(input, context).catch(error => {
+
+    this.agentConnector.sendToAgent(input, context).catch((error) => {
       this.onAgentError(error);
     });
   }
@@ -458,7 +461,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   private setupEventHandlers(): void {
     // Setup streaming renderer event handlers
-    this.streamRenderer.onStreamingComplete((content) => {
+    this.streamRenderer.onStreamingComplete((_content) => {
       this.state.isStreamingActive = false;
       this.showPrompt();
     });
@@ -471,11 +474,11 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   private setupInputHandlers(): void {
     // User input handler
-    this.inputManager.onInput(input => {
+    this.inputManager.onInput((input) => {
       this.handleInput(input);
     });
 
-    // Special key handlers  
+    // Special key handlers
     this.inputManager.onShiftTab(() => {
       if (!this.state.isProcessing) {
         this.cycleMode();
@@ -505,35 +508,39 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     this.agentConnector.onAgentCancelled(this.onAgentCancelled.bind(this));
   }
 
-  private async handleCommand(command: string, args: string[], flags: Record<string, string | boolean>): Promise<void> {
+  private async handleCommand(
+    command: string,
+    args: string[],
+    flags: Record<string, string | boolean>
+  ): Promise<void> {
     // Use commandHandler directly if available (preferred approach)
     if (this.commandHandler) {
       const parameters = new Map<string, unknown>();
-      
+
       // Map args to parameters
       args.forEach((arg, index) => {
         parameters.set(`arg${index}`, arg);
       });
-      
+
       // Add flags to parameters
       Object.entries(flags).forEach(([key, value]) => {
         parameters.set(key, value);
       });
-      
+
       const request = {
         commandName: command,
         parameters,
         rawInput: `/${command} ${args.join(' ')}`.trim(),
-        context: new Map<string, unknown>()
+        context: new Map<string, unknown>(),
       };
-      
+
       try {
         const result = await this.commandHandler.executeCommand(request);
-        
+
         if (result.success) {
           this.displayMessage(result.content, 'info');
-          
-          // Check if this was a model command and update prompt  
+
+          // Check if this was a model command and update prompt
           if (command === 'model') {
             this.updatePrompt(); // Refresh prompt to show current model
           }
@@ -542,19 +549,22 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
         }
       } catch (error) {
         // CommandHandler should not throw, but handle gracefully if it does
-        this.displayMessage(`Command execution error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        this.displayMessage(
+          `Command execution error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'error'
+        );
       }
     } else {
       // Fallback to commandRouter (existing behavior)
       const result = await this.commandRouter.handleCommand(command, args, flags);
-      
+
       if (result.tag === 'success') {
         this.displayMessage(result.value, 'info');
       } else {
         this.displayMessage(result.error.message, 'error');
       }
     }
-    
+
     this.showPrompt();
   }
 
@@ -562,13 +572,13 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     const newMode = this.modeRenderer.cycleMode(true);
     this.state.mode = newMode;
     this.updatePrompt();
-    
+
     // Force immediate visual refresh of the prompt to show mode change
     this.showPrompt();
-    
-    this.eventManager.emit('modeChanged', { 
-      previousMode: this.state.mode, 
-      newMode 
+
+    this.eventManager.emit('modeChanged', {
+      previousMode: this.state.mode,
+      newMode,
     });
   }
 
@@ -594,12 +604,12 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   private handleGracefulExit(): void {
     this.terminal.writeLine('\n👋 Goodbye!');
-    
+
     // Ensure we exit even if shutdown hangs
     setTimeout(() => {
       process.exit(0);
     }, 100);
-    
+
     this.shutdown().finally(() => {
       process.exit(0);
     });
@@ -609,7 +619,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     const provider = this.getAgentProvider();
     const model = this.getAgentModel();
     const modePrefix = this.modeRenderer.getPromptPrefix();
-    
+
     // Show both provider and current model name in prompt
     const prompt = `${provider}:${model} ${modePrefix}${this.config.prompt}`;
     this.inputManager.setPrompt(prompt);
@@ -622,7 +632,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   private getAgentProvider(): string {
     try {
       const agent = (this.agentConnector as any).currentAgent;
-      
+
       // Try to get provider from state manager's prompt config
       if (agent?.stateManager?.getPromptConfig) {
         const promptConfig = agent.stateManager.getPromptConfig();
@@ -630,7 +640,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
           return promptConfig.provider;
         }
       }
-      
+
       // Fallback to default
       return 'ollama';
     } catch {
@@ -641,9 +651,9 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   private getAgentModel(): string {
     // Try to get model from agent's prompt handler or state manager
     try {
-      const agentInfo = this.agentConnector.getAgentInfo();
+      const _agentInfo = this.agentConnector.getAgentInfo();
       const agent = (this.agentConnector as any).currentAgent;
-      
+
       // Try to get current model from state manager's prompt config (most accurate)
       if (agent?.stateManager?.getPromptConfig) {
         const promptConfig = agent.stateManager.getPromptConfig();
@@ -651,22 +661,22 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
           return promptConfig.model;
         }
       }
-      
+
       // Try to get model from agent's prompt handler
       if (agent?.promptHandler?.getCurrentModel) {
         return agent.promptHandler.getCurrentModel();
       }
-      
+
       // Try to get model from state manager (general)
       if (agent?.stateManager?.getCurrentModel) {
         return agent.stateManager.getCurrentModel();
       }
-      
+
       // Try to get from prompt handler config
       if (agent?.promptHandler?.config?.defaultModel) {
         return agent.promptHandler.config.defaultModel;
       }
-      
+
       // Fallback to match what the status command shows
       return 'qwen3:8b';
     } catch {
@@ -676,13 +686,13 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   private extractResultContent(result: any): string {
     if (result && typeof result === 'object') {
-      if (result.result && result.result.content) return result.result.content;
+      if (result.result?.content) return result.result.content;
       if (result.content) return result.content;
       if (result.response) return result.response;
       if (result.message) return result.message;
       if (result.text) return result.text;
     }
-    
+
     return result ? String(result) : '';
   }
 
@@ -716,7 +726,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 /**
  * Backward compatibility factory function
  */
-export function createEventDrivenCLI(config?: Partial<CLIConfig>): EventDrivenCLI {
+export function createEventDrivenCLI(_config?: Partial<CLIConfig>): EventDrivenCLI {
   // This creates a CLI with the original interface but now uses dependency injection internally
   // The actual implementation will be handled by the factory functions
   throw new Error('Use createCLI() or createReadlineCLI() from factories instead');

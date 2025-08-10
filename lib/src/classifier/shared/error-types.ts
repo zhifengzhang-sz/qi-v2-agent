@@ -1,6 +1,6 @@
 /**
  * Standardized Error Context Types for Classifier Module
- * 
+ *
  * This module defines unified error context structures across all classification methods
  * to ensure consistent error reporting and debugging capabilities.
  */
@@ -15,23 +15,23 @@ export interface BaseClassificationErrorContext {
   input?: string;
   operation: string;
   method: string;
-  
+
   // Model and provider information
   model?: string;
   provider?: string;
-  
+
   // Error details
   error?: string;
-  
+
   // Input characteristics
   length?: number;
-  
+
   // Performance metrics
   latency_ms?: number;
-  
+
   // Session tracking (for conversational methods)
   session_id?: string;
-  
+
   // Index signature for QiCore compatibility
   [key: string]: unknown;
 }
@@ -106,7 +106,7 @@ export function createClassificationError(
   return create(code, message, category, {
     operation: 'classification',
     method,
-    ...context
+    ...context,
   });
 }
 

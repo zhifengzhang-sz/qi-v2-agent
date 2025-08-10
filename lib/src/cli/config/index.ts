@@ -3,10 +3,10 @@
  */
 
 export {
-  loadCLIConfig,
-  getAvailableFrameworks,
   autoDetectFramework,
-  displayConfigHelp,
   type CLIConfigWithFramework,
   type CLIFramework,
+  displayConfigHelp,
+  getAvailableFrameworks,
+  loadCLIConfig,
 } from './CLIConfigLoader.js';

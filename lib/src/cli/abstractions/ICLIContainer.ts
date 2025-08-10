@@ -1,17 +1,17 @@
 /**
  * CLI Dependency Injection Container interface
- * 
+ *
  * Provides a framework-agnostic container for managing CLI dependencies.
  * Supports service registration and resolution with proper lifecycle management.
  */
 
-import type { Result, QiError } from '@qi/base';
-import type { ICLIFramework, CLIConfig } from './ICLIFramework.js';
+import type { QiError, Result } from '@qi/base';
+import type { CLIConfig, ICLIFramework } from './ICLIFramework.js';
 
 /**
  * Service factory function type
  */
-export type ServiceFactory<T = any> = () => T | Promise<T>;
+export type ServiceFactory<T = unknown> = () => T | Promise<T>;
 
 /**
  * Service lifecycle management
@@ -19,14 +19,14 @@ export type ServiceFactory<T = any> = () => T | Promise<T>;
 export interface ServiceLifecycle {
   singleton?: boolean;
   lazy?: boolean;
-  initializer?: (instance: any) => void | Promise<void>;
-  destroyer?: (instance: any) => void | Promise<void>;
+  initializer?: (instance: unknown) => void | Promise<void>;
+  destroyer?: (instance: unknown) => void | Promise<void>;
 }
 
 /**
  * Service registration configuration
  */
-export interface ServiceRegistration<T = any> extends ServiceLifecycle {
+export interface ServiceRegistration<T = unknown> extends ServiceLifecycle {
   factory: ServiceFactory<T>;
   dependencies?: string[];
 }
@@ -47,7 +47,11 @@ export interface ICLIContainer {
   /**
    * Register a service with the container
    */
-  register<T>(key: string, factory: ServiceFactory<T>, lifecycle?: ServiceLifecycle): Result<void, QiError>;
+  register<T>(
+    key: string,
+    factory: ServiceFactory<T>,
+    lifecycle?: ServiceLifecycle
+  ): Result<void, QiError>;
 
   /**
    * Register a service with full configuration
@@ -132,7 +136,11 @@ export interface ICLIContainerBuilder {
   /**
    * Register a service
    */
-  registerService<T>(key: string, factory: ServiceFactory<T>, lifecycle?: ServiceLifecycle): ICLIContainerBuilder;
+  registerService<T>(
+    key: string,
+    factory: ServiceFactory<T>,
+    lifecycle?: ServiceLifecycle
+  ): ICLIContainerBuilder;
 
   /**
    * Register multiple services at once
@@ -154,7 +162,9 @@ export interface ICLIContainerBuilder {
  * Factory function types for framework creation
  */
 export type CLIFactory = (config: CLIConfig) => Result<ICLIFramework, QiError>;
-export type ContainerFactory = (config?: Partial<ContainerConfig>) => Result<ICLIContainer, QiError>;
+export type ContainerFactory = (
+  config?: Partial<ContainerConfig>
+) => Result<ICLIContainer, QiError>;
 
 /**
  * Framework registration information

@@ -1,6 +1,6 @@
 /**
  * Performance Tracking Utilities for Classification Methods
- * 
+ *
  * Shared utilities for tracking real performance metrics across all classification methods.
  * Replaces hardcoded fake metrics with actual measurement and schema registry integration.
  */
@@ -40,10 +40,15 @@ export function trackClassificationPerformance(
 /**
  * Get expected accuracy from schema using measured performance if available, baseline otherwise
  */
-export function getEffectiveAccuracy(selectedSchema: SchemaEntry | null, defaultAccuracy: number = 0.85): number {
+export function getEffectiveAccuracy(
+  selectedSchema: SchemaEntry | null,
+  defaultAccuracy: number = 0.85
+): number {
   if (selectedSchema) {
-    return selectedSchema.metadata.performance_profile.measured_accuracy ?? 
-           selectedSchema.metadata.performance_profile.baseline_accuracy_estimate;
+    return (
+      selectedSchema.metadata.performance_profile.measured_accuracy ??
+      selectedSchema.metadata.performance_profile.baseline_accuracy_estimate
+    );
   }
   return defaultAccuracy;
 }
@@ -51,10 +56,15 @@ export function getEffectiveAccuracy(selectedSchema: SchemaEntry | null, default
 /**
  * Get average latency from schema using measured performance if available, baseline otherwise
  */
-export function getEffectiveLatency(selectedSchema: SchemaEntry | null, defaultLatency: number = 300): number {
+export function getEffectiveLatency(
+  selectedSchema: SchemaEntry | null,
+  defaultLatency: number = 300
+): number {
   if (selectedSchema) {
-    return selectedSchema.metadata.performance_profile.measured_latency_ms ?? 
-           selectedSchema.metadata.performance_profile.baseline_latency_estimate_ms;
+    return (
+      selectedSchema.metadata.performance_profile.measured_latency_ms ??
+      selectedSchema.metadata.performance_profile.baseline_latency_estimate_ms
+    );
   }
   return defaultLatency;
 }
@@ -62,13 +72,13 @@ export function getEffectiveLatency(selectedSchema: SchemaEntry | null, defaultL
 /**
  * Create a higher-order function that adds performance tracking to classification methods
  */
-export function withPerformanceTracking<T extends (...args: any[]) => Promise<any>>(
+export function withPerformanceTracking<T extends (...args: unknown[]) => Promise<unknown>>(
   originalMethod: T,
   selectedSchema: SchemaEntry | null
 ): T {
   return (async (...args: Parameters<T>) => {
     const startTime = Date.now();
-    
+
     try {
       const result = await originalMethod(...args);
       // Track successful classification
