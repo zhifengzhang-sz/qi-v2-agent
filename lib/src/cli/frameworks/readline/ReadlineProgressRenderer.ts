@@ -1,6 +1,6 @@
 /**
  * Readline Progress Renderer implementation
- * 
+ *
  * Implements IProgressRenderer interface using ASCII art progress bars
  * and ANSI escape sequences for animations.
  */
@@ -61,7 +61,7 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.visible = true;
   }
 
@@ -72,7 +72,7 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.stopAnimation();
     this.clearCurrentLine();
     this.visible = false;
@@ -94,9 +94,9 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.config = { ...this.config, ...config };
-    
+
     // Re-render if visible
     if (this.visible && this.currentState) {
       this.render();
@@ -110,7 +110,7 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.hide();
     this.isDestroyed = true;
   }
@@ -122,20 +122,20 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.currentState = {
       ...this.config,
       ...config,
     };
-    
+
     this.startTime = new Date();
     this.visible = true;
-    
+
     // Start animation if enabled
     if (this.config.animated) {
       this.startAnimation();
     }
-    
+
     this.render();
   }
 
@@ -146,14 +146,14 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed || !this.currentState) {
       return;
     }
-    
+
     this.currentState = {
       ...this.currentState,
       progress: Math.max(0, Math.min(1, progress)),
       phase: phase || this.currentState.phase,
       details: details || this.currentState.details,
     };
-    
+
     this.render();
   }
 
@@ -164,9 +164,9 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.updateProgress(1, 'complete', message);
-    
+
     // Show completed state briefly
     setTimeout(() => {
       this.hide();
@@ -180,18 +180,18 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.stopAnimation();
-    
+
     // Clear current line and move up to clear interfering content
     this.clearCurrentLine();
-    
+
     // Try to clear previous lines that might contain debug output
     for (let i = 0; i < 3; i++) {
       process.stdout.write('\x1b[1A'); // Move up 1 line
       this.clearCurrentLine();
     }
-    
+
     this.visible = false;
     this.currentState = null;
   }
@@ -216,42 +216,42 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (!this.visible || !this.currentState || this.isDestroyed) {
       return;
     }
-    
+
     const parts: string[] = [];
-    
+
     // Progress bar
     const bar = this.renderProgressBar(this.currentState.progress || 0);
     parts.push(bar);
-    
+
     // Percentage
     if (this.config.showPercentage) {
       const percentage = `${Math.round((this.currentState.progress || 0) * 100)}%`;
       parts.push(this.colorize(percentage, 36)); // Cyan
     }
-    
+
     // Spinner and phase
     if (this.currentState.phase) {
       let phaseText = this.currentState.phase;
-      
+
       if (this.config.animated && this.currentState.progress !== 1) {
         const spinner = this.getCurrentSpinner();
         phaseText = `${spinner} ${phaseText}`;
       }
-      
+
       parts.push(this.colorize(phaseText, 33)); // Yellow
     }
-    
+
     // Details
     if (this.currentState.details) {
       parts.push(`- ${this.currentState.details}`);
     }
-    
+
     // Elapsed time
     if (this.config.showElapsed && this.startTime) {
       const elapsed = this.formatElapsed(Date.now() - this.startTime.getTime());
       parts.push(this.colorize(`(${elapsed})`, 34)); // Blue
     }
-    
+
     // Clear line and render
     this.clearCurrentLine();
     process.stdout.write(parts.join(' '));
@@ -260,12 +260,12 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
   private renderProgressBar(progress: number): string {
     const filled = Math.round(this.config.barLength * Math.min(1, Math.max(0, progress)));
     const empty = this.config.barLength - filled;
-    
+
     const filledBar = this.config.barFilled.repeat(filled);
     const emptyBar = this.config.barEmpty.repeat(empty);
-    
+
     const bar = `[${filledBar}${emptyBar}]`;
-    
+
     return this.colorize(bar, this.config.colorCode);
   }
 
@@ -278,7 +278,7 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
     if (this.animationTimer || this.isDestroyed) {
       return;
     }
-    
+
     this.animationTimer = setInterval(() => {
       this.animationFrame++;
       this.render();
@@ -307,35 +307,35 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
   private supportsColor(): boolean {
     // Simple color detection
     const { env } = process;
-    
+
     if (env.FORCE_COLOR && env.FORCE_COLOR !== '0') {
       return true;
     }
-    
+
     if (env.NO_COLOR || env.NODE_DISABLE_COLORS) {
       return false;
     }
-    
+
     return process.stdout.isTTY;
   }
 
   private formatElapsed(ms: number): string {
     const seconds = Math.floor(ms / 1000);
-    
+
     if (seconds < 60) {
       return `${seconds}s`;
     }
-    
+
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    
+
     if (minutes < 60) {
       return `${minutes}m ${remainingSeconds}s`;
     }
-    
+
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    
+
     return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
   }
 
@@ -343,14 +343,14 @@ export class ReadlineProgressRenderer implements IProgressRenderer {
    * Create a simple progress bar utility
    */
   static createSimpleBar(
-    progress: number, 
+    progress: number,
     length: number = 20,
     filled: string = '█',
     empty: string = '░'
   ): string {
     const filledLength = Math.round(length * Math.min(1, Math.max(0, progress)));
     const emptyLength = length - filledLength;
-    
+
     return `[${filled.repeat(filledLength)}${empty.repeat(emptyLength)}]`;
   }
 

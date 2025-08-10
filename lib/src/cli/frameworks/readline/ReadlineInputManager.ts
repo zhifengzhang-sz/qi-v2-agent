@@ -1,21 +1,17 @@
 /**
  * Readline Input Manager implementation
- * 
+ *
  * Implements IInputManager interface using Node.js readline module.
  * Provides input handling, history management, and keyboard shortcuts.
  */
 
 import * as readline from 'node:readline';
-import type {
-  IInputManager,
-  InputConfig,
-  KeypressData,
-} from '../../abstractions/IInputManager.js';
+import type { IInputManager, InputConfig, KeypressData } from '../../abstractions/IInputManager.js';
 
 /**
  * Key sequence detection for special key combinations
  */
-const KEY_SEQUENCES = {
+const _KEY_SEQUENCES = {
   SHIFT_TAB: Buffer.from([0x1b, 0x5b, 0x5a]),
   ESCAPE: Buffer.from([0x1b]),
   CTRL_C: Buffer.from([0x03]),
@@ -86,7 +82,7 @@ export class ReadlineInputManager implements IInputManager {
     // Enable keypress events on stdin (required for Shift+Tab, Escape, etc.)
     if (process.stdin.isTTY) {
       // Enable keypress events
-      const emitKeypressEvents = require('readline').emitKeypressEvents;
+      const emitKeypressEvents = require('node:readline').emitKeypressEvents;
       emitKeypressEvents(process.stdin);
       if (process.stdin.setRawMode) {
         process.stdin.setRawMode(true);
@@ -118,7 +114,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.inputCallbacks.push(callback);
   }
 
@@ -129,7 +125,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.keypressCallbacks.push(callback);
   }
 
@@ -140,7 +136,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.shiftTabCallbacks.push(callback);
   }
 
@@ -148,7 +144,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.escapeCallbacks.push(callback);
   }
 
@@ -156,7 +152,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.ctrlCCallbacks.push(callback);
   }
 
@@ -164,7 +160,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.ctrlDCallbacks.push(callback);
   }
 
@@ -175,7 +171,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !this.rl) {
       return;
     }
-    
+
     this.currentPrompt = prompt;
     this.rl.setPrompt(prompt);
   }
@@ -187,7 +183,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !this.rl || !this.enabled) {
       return;
     }
-    
+
     this.rl.prompt();
   }
 
@@ -198,7 +194,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !this.rl) {
       return;
     }
-    
+
     // Clear current line
     process.stdout.write('\r\x1b[K');
   }
@@ -217,7 +213,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !this.rl) {
       return;
     }
-    
+
     // Use the proper readline method to simulate Ctrl+U which clears the input line
     this.rl.write(null, { ctrl: true, name: 'u' });
   }
@@ -229,10 +225,10 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !this.rl) {
       return;
     }
-    
+
     (this.rl as any).line = text;
     (this.rl as any).cursor = text.length;
-    
+
     // Refresh display
     this.hidePrompt();
     process.stdout.write(this.currentPrompt + text);
@@ -245,7 +241,7 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !this.rl) {
       return '';
     }
-    
+
     return this.rl.line;
   }
 
@@ -256,26 +252,26 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed || !input.trim()) {
       return;
     }
-    
+
     // Remove duplicates
     const existingIndex = this.history.indexOf(input);
     if (existingIndex !== -1) {
       this.history.splice(existingIndex, 1);
     }
-    
+
     // Add to end
     this.history.push(input);
-    
+
     // Trim to max size
     if (this.history.length > this.config.historySize!) {
       this.history = this.history.slice(-this.config.historySize!);
     }
-    
+
     // Add to readline history as well
     if (this.rl) {
       // Clear readline history to prevent duplicates
       (this.rl as any).history = [];
-      
+
       // Add our history to readline
       for (const item of this.history.slice().reverse()) {
         (this.rl as any).history.push(item);
@@ -297,9 +293,9 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.enabled = enabled;
-    
+
     if (this.rl) {
       if (enabled) {
         this.rl.resume();
@@ -323,9 +319,9 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.config = { ...this.config, ...config };
-    
+
     // Reinitialize if needed
     if (this.rl && config.historySize !== undefined) {
       // Trim current history
@@ -342,13 +338,13 @@ export class ReadlineInputManager implements IInputManager {
     if (this.isDestroyed) {
       return;
     }
-    
+
     // Close readline interface
     if (this.rl) {
       this.rl.close();
       this.rl = null;
     }
-    
+
     // Clear callbacks
     this.inputCallbacks = [];
     this.keypressCallbacks = [];
@@ -356,7 +352,7 @@ export class ReadlineInputManager implements IInputManager {
     this.escapeCallbacks = [];
     this.ctrlCCallbacks = [];
     this.ctrlDCallbacks = [];
-    
+
     this.isDestroyed = true;
   }
 
@@ -393,14 +389,14 @@ export class ReadlineInputManager implements IInputManager {
     // Line input handler
     this.rl.on('line', (input: string) => {
       const trimmedInput = input.trim();
-      
+
       // Add to history if not empty
       if (trimmedInput) {
         this.addToHistory(trimmedInput);
       }
-      
+
       // Notify callbacks
-      this.inputCallbacks.forEach(callback => {
+      this.inputCallbacks.forEach((callback) => {
         try {
           callback(trimmedInput);
         } catch (error) {
@@ -421,7 +417,7 @@ export class ReadlineInputManager implements IInputManager {
 
     // SIGINT handler (Ctrl+C) - Keep as backup for some environments
     this.rl.on('SIGINT', () => {
-      this.ctrlCCallbacks.forEach(callback => {
+      this.ctrlCCallbacks.forEach((callback) => {
         try {
           callback();
         } catch (error) {
@@ -457,7 +453,7 @@ export class ReadlineInputManager implements IInputManager {
       this.handleSpecialKey(str, key);
     } else {
       // Regular keypress
-      this.keypressCallbacks.forEach(callback => {
+      this.keypressCallbacks.forEach((callback) => {
         try {
           callback(str, keypressData);
         } catch (error) {
@@ -467,34 +463,34 @@ export class ReadlineInputManager implements IInputManager {
     }
   }
 
-  private isSpecialKey(str: string, key: any): boolean {
+  private isSpecialKey(_str: string, key: any): boolean {
     // Shift+Tab
     if (key?.name === 'tab' && key?.shift) {
       return true;
     }
-    
+
     // Escape
     if (key?.name === 'escape') {
       return true;
     }
-    
+
     // Ctrl+C
     if (key?.name === 'c' && key?.ctrl) {
       return true;
     }
-    
+
     // Ctrl+D
     if (key?.name === 'd' && key?.ctrl) {
       return true;
     }
-    
+
     return false;
   }
 
-  private handleSpecialKey(str: string, key: any): void {
+  private handleSpecialKey(_str: string, key: any): void {
     // Shift+Tab
     if (key?.name === 'tab' && key?.shift) {
-      this.shiftTabCallbacks.forEach(callback => {
+      this.shiftTabCallbacks.forEach((callback) => {
         try {
           callback();
         } catch (error) {
@@ -503,10 +499,10 @@ export class ReadlineInputManager implements IInputManager {
       });
       return;
     }
-    
+
     // Escape
     if (key?.name === 'escape') {
-      this.escapeCallbacks.forEach(callback => {
+      this.escapeCallbacks.forEach((callback) => {
         try {
           callback();
         } catch (error) {
@@ -515,10 +511,10 @@ export class ReadlineInputManager implements IInputManager {
       });
       return;
     }
-    
+
     // Ctrl+D
     if (key?.name === 'd' && key?.ctrl) {
-      this.ctrlDCallbacks.forEach(callback => {
+      this.ctrlDCallbacks.forEach((callback) => {
         try {
           callback();
         } catch (error) {
@@ -527,10 +523,10 @@ export class ReadlineInputManager implements IInputManager {
       });
       return;
     }
-    
+
     // Ctrl+C
     if (key?.name === 'c' && key?.ctrl) {
-      this.ctrlCCallbacks.forEach(callback => {
+      this.ctrlCCallbacks.forEach((callback) => {
         try {
           callback();
         } catch (error) {
@@ -539,19 +535,5 @@ export class ReadlineInputManager implements IInputManager {
       });
       return;
     }
-  }
-
-  private matchesSequence(chunk: Buffer, sequence: Buffer): boolean {
-    if (chunk.length !== sequence.length) {
-      return false;
-    }
-    
-    for (let i = 0; i < chunk.length; i++) {
-      if (chunk[i] !== sequence[i]) {
-        return false;
-      }
-    }
-    
-    return true;
   }
 }

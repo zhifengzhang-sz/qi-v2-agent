@@ -1,13 +1,13 @@
 /**
  * Mode Indicator Component
- * 
+ *
  * Shows the current CLI mode and provides visual feedback for mode switching:
  * - Interactive mode: Normal conversational interaction
  * - Command mode: Command-focused with enhanced command completion
  * - Streaming mode: Real-time streaming responses
  */
 
-import { Terminal, Colors } from '../keyboard/KeyboardUtils.js';
+import { Colors, Terminal } from '../keyboard/KeyboardUtils.js';
 
 export type CLIMode = 'interactive' | 'command' | 'streaming';
 
@@ -42,13 +42,13 @@ const ModeDefinitions: Record<CLIMode, ModeInfo> = {
     description: 'Interactive conversation mode',
     capabilities: [
       'Natural language prompts',
-      'Context-aware responses', 
+      'Context-aware responses',
       'Conversation history',
-      'Basic commands'
+      'Basic commands',
     ],
     hotkey: 'Shift+Tab',
   },
-  
+
   command: {
     mode: 'command',
     description: 'Command-focused mode',
@@ -56,11 +56,11 @@ const ModeDefinitions: Record<CLIMode, ModeInfo> = {
       'Enhanced command completion',
       'Command history',
       'Built-in help system',
-      'Faster command execution'
+      'Faster command execution',
     ],
     hotkey: 'Shift+Tab',
   },
-  
+
   streaming: {
     mode: 'streaming',
     description: 'Real-time streaming mode',
@@ -68,7 +68,7 @@ const ModeDefinitions: Record<CLIMode, ModeInfo> = {
       'Character-by-character responses',
       'Live progress indicators',
       'Real-time cancellation',
-      'Streaming telemetry'
+      'Streaming telemetry',
     ],
     hotkey: 'Shift+Tab',
   },
@@ -118,10 +118,10 @@ export class ModeIndicator {
   setMode(mode: CLIMode, silent: boolean = false): void {
     const previousMode = this.currentMode;
     this.currentMode = mode;
-    
+
     if (this.isVisible) {
       this.render();
-      
+
       // Show brief transition message only if not silent
       if (previousMode !== mode && !silent) {
         this.showTransition(previousMode, mode);
@@ -144,7 +144,7 @@ export class ModeIndicator {
     const currentIndex = modes.indexOf(this.currentMode);
     const nextIndex = (currentIndex + 1) % modes.length;
     const nextMode = modes[nextIndex];
-    
+
     this.setMode(nextMode, silent);
     return nextMode;
   }
@@ -162,7 +162,7 @@ export class ModeIndicator {
    */
   hide(): void {
     if (!this.isVisible) return;
-    
+
     this.isVisible = false;
     // Clear the mode indicator area if needed
   }
@@ -172,39 +172,39 @@ export class ModeIndicator {
    */
   private render(): void {
     if (!this.isVisible) return;
-    
+
     const modeInfo = ModeDefinitions[this.currentMode];
     const colorConfig = this.config.colors[this.currentMode];
     const parts: string[] = [];
-    
+
     // Set background and foreground colors
     Terminal.color(colorConfig.background);
     Terminal.color(colorConfig.foreground);
-    
+
     // Add icon
     if (this.config.showIcon) {
       parts.push(colorConfig.icon);
     }
-    
+
     // Add label
     if (this.config.showLabel) {
       parts.push(colorConfig.label);
     }
-    
+
     // Add hotkey hint
     if (this.config.showHotkey) {
       parts.push(`(${modeInfo.hotkey})`);
     }
-    
+
     const indicator = parts.length > 0 ? ` ${parts.join(' ')} ` : '';
-    
+
     // Render based on position
     if (this.config.position === 'left') {
       this.renderLeft(indicator);
     } else {
       this.renderRight(indicator);
     }
-    
+
     Terminal.reset();
   }
 
@@ -225,7 +225,7 @@ export class ModeIndicator {
     const terminalWidth = Terminal.getDimensions().width;
     const indicatorWidth = indicator.length;
     const position = Math.max(0, terminalWidth - indicatorWidth);
-    
+
     Terminal.saveCursor();
     Terminal.cursorToStart();
     process.stdout.write(' '.repeat(position) + indicator);
@@ -236,19 +236,19 @@ export class ModeIndicator {
    * Show mode transition message
    */
   private showTransition(fromMode: CLIMode, toMode: CLIMode): void {
-    const fromInfo = ModeDefinitions[fromMode];
-    const toInfo = ModeDefinitions[toMode];
+    const _fromInfo = ModeDefinitions[fromMode];
+    const _toInfo = ModeDefinitions[toMode];
     const toColorConfig = this.config.colors[toMode];
-    
+
     // Brief notification
     Terminal.color(toColorConfig.background);
     Terminal.color(toColorConfig.foreground);
-    
+
     const message = `${toColorConfig.icon} Switched to ${toColorConfig.label} mode`;
     console.log(`\n${message}`);
-    
+
     Terminal.reset();
-    
+
     // Clear after a short delay
     setTimeout(() => {
       Terminal.cursorUp(1);
@@ -276,15 +276,15 @@ export class ModeIndicator {
   showModeHelp(): void {
     const modeInfo = this.getModeInfo();
     const colorConfig = this.config.colors[this.currentMode];
-    
+
     console.log(`\n${colorConfig.icon} ${colorConfig.label} Mode`);
     console.log(`${modeInfo.description}\n`);
-    
+
     console.log('Capabilities:');
     for (const capability of modeInfo.capabilities) {
       console.log(`  • ${capability}`);
     }
-    
+
     console.log(`\nPress ${modeInfo.hotkey} to cycle modes\n`);
   }
 
@@ -293,12 +293,12 @@ export class ModeIndicator {
    */
   getPromptPrefix(): string {
     const colorConfig = this.config.colors[this.currentMode];
-    
+
     let prefix = '';
     if (this.config.showIcon) {
-      prefix += colorConfig.icon + ' ';
+      prefix += `${colorConfig.icon} `;
     }
-    
+
     return prefix;
   }
 
@@ -314,7 +314,7 @@ export class ModeIndicator {
    */
   updateConfig(newConfig: Partial<ModeConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    
+
     if (this.isVisible) {
       this.render();
     }
@@ -346,17 +346,17 @@ export function createModeIndicator(config?: Partial<ModeConfig>): ModeIndicator
  * Utility function to get mode emoji
  */
 export function getModeEmoji(mode: CLIMode): string {
-  const modeInfo = ModeDefinitions[mode];
-  return mode === 'interactive' ? '💬' : 
-         mode === 'command' ? '⚡' : 
-         '🌊';
+  const _modeInfo = ModeDefinitions[mode];
+  return mode === 'interactive' ? '💬' : mode === 'command' ? '⚡' : '🌊';
 }
 
 /**
  * Utility function to get mode color
  */
 export function getModeColor(mode: CLIMode): { bg: number; fg: number } {
-  return mode === 'interactive' ? { bg: Colors.BG_BLUE, fg: Colors.FG_WHITE } :
-         mode === 'command' ? { bg: Colors.BG_YELLOW, fg: Colors.FG_BLACK } :
-         { bg: Colors.BG_GREEN, fg: Colors.FG_WHITE };
+  return mode === 'interactive'
+    ? { bg: Colors.BG_BLUE, fg: Colors.FG_WHITE }
+    : mode === 'command'
+      ? { bg: Colors.BG_YELLOW, fg: Colors.FG_BLACK }
+      : { bg: Colors.BG_GREEN, fg: Colors.FG_WHITE };
 }

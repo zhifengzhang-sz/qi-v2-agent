@@ -274,24 +274,193 @@ cli.on('modelChanged', (event) => {
 - App handles event bridging/translation
 - App becomes pure wiring layer
 
+## Toolbox Architecture
+
+### Tool Organization
+```
+lib/src/
+├── tools/                               🧰 The Toolbox
+│   ├── files/
+│   │   ├── file-content-resolver.ts    📁 Read files
+│   │   ├── project-structure-scanner.ts 📁 Scan project
+│   │   └── index.ts
+│   ├── context/
+│   │   ├── session-manager.ts          💾 Session persistence  
+│   │   ├── memory-loader.ts            🧠 Load CLAUDE.md files
+│   │   └── index.ts
+│   ├── parsing/
+│   │   ├── file-reference-parser.ts    📝 Extract @file.txt patterns
+│   │   ├── pattern-detector.ts         📝 Detect thinking patterns
+│   │   └── index.ts
+│   └── index.ts                        🧰 Tool registry
+```
+
+### Tool Registry Pattern
+```typescript
+// Centralized tool management
+export class ToolRegistry {
+  private tools = new Map<string, Tool>();
+  
+  register(name: string, tool: Tool): void {
+    this.tools.set(name, tool);
+  }
+  
+  get(name: string): Tool | null {
+    return this.tools.get(name);
+  }
+}
+
+// Tools are self-contained units
+interface Tool {
+  name: string;
+  description: string;
+  execute(input: unknown): Promise<unknown>;
+}
+```
+
+## Simple Workflow Extension
+
+### Extending qi-prompt with Bounded Workflow Capability
+qi-prompt can handle **simple workflows** while maintaining architectural integrity:
+
+**Classification Categories:**
+```typescript
+enum ClassificationType {
+  COMMAND = 'command',           // /status, /model
+  PROMPT = 'prompt',             // Direct text to LLM
+  SIMPLE_WORKFLOW = 'simple-workflow'  // @file.txt + prompt
+}
+```
+
+### Simple Workflow Classes
+```typescript
+// Well-defined, limited workflow types
+enum SimpleWorkflowClass {
+  FILE_REFERENCE = "file-reference",     // @file.txt + prompt
+  // Future: MULTI_FILE = "multi-file",   // @file1 @file2 + prompt
+  // Future: PROJECT_CONTEXT = "project", // Implicit project context
+}
+
+interface SimpleWorkflow {
+  class: SimpleWorkflowClass;
+  maxNodes: number;              // Complexity limit (e.g., 3 nodes max)
+  handler: SimpleWorkflowHandler;
+}
+```
+
+### Workflow Execution Flow
+```
+Input: "@package.json explain this project"
+  ↓
+Classifier: "simple-workflow" + class: "file-reference"
+  ↓
+Simple Workflow Handler:
+  [1] FileContentResolver.resolve("package.json") 
+  [2] ContextManager.enhance(prompt, fileContent)
+  [3] PromptHandler.send(enhancedPrompt) → LLM
+  ↓
+Response: Enhanced with file context
+```
+
+### Architectural Boundaries
+**qi-prompt CAN handle:**
+- File reference workflows (1-3 files max)
+- Simple context enhancement
+- Bounded, predictable operations
+
+**qi-prompt CANNOT handle:**
+- Complex multi-step business logic
+- External API calls or long-running processes
+- Decision trees or branching workflows
+- File modification operations
+
+### Tool-Workflow Integration
+```typescript
+class FileReferenceWorkflow {
+  constructor(
+    private toolRegistry: ToolRegistry,
+    private contextManager: IContextManager
+  ) {}
+  
+  async execute(input: string): Promise<string> {
+    // Use tools from registry
+    const parser = this.toolRegistry.get('file-reference-parser');
+    const resolver = this.toolRegistry.get('file-content-resolver');
+    
+    // Parse file references
+    const fileRefs = await parser.execute(input);
+    
+    // Resolve file content
+    const content = await Promise.all(
+      fileRefs.map(ref => resolver.execute(ref))
+    );
+    
+    // Enhance prompt with context
+    return this.contextManager.enhancePrompt(input, content);
+  }
+}
+```
+
+## Updated Processing Pipeline
+
+### Enhanced qi-prompt Flow
+```
+1. Input Reception (CLI)
+   ↓
+2. Classification (Enhanced Classifier)
+   • command → CommandHandler
+   • prompt → PromptHandler  
+   • simple-workflow → SimpleWorkflowHandler
+   ↓
+3. Tool Orchestration (if workflow)
+   • ToolRegistry provides required tools
+   • Workflow executes bounded operations
+   ↓
+4. Context Enhancement (ContextManager)
+   • Add conversation history
+   • Include file content (if applicable)
+   • Apply project context
+   ↓
+5. LLM Processing (PromptHandler)
+   ↓
+6. Response (CLI Display)
+```
+
 ## Benefits of This Architecture
 
 ### Separation of Concerns
 - **Frameworks are reusable** across different apps
+- **Tools are composable** and single-purpose
+- **Workflows are bounded** and well-defined
 - **Business logic is centralized** in app layer
 - **No circular dependencies** between layers
+
+### Extensibility
+- **Tool Registry** allows easy addition of new capabilities
+- **Simple Workflow Classes** can be added without changing core architecture
+- **Bounded complexity** prevents feature creep
 
 ### Type Safety
 - **Generic frameworks** maintain type safety with concrete event types
 - **App-specific events** are strongly typed
+- **Tool interfaces** ensure consistent behavior
 - **Compile-time verification** of event handling
 
 ### Testability
+- **Tools can be unit tested** independently
+- **Workflows can be tested** with mock tools
 - **Frameworks can be unit tested** with mock events
 - **App logic can be tested** independently of frameworks
 - **Event flow can be traced** and verified
 
 ### Maintainability
 - **Clear ownership** of responsibilities at each layer
+- **Tools are self-contained** and replaceable
+- **Workflow complexity is bounded** and predictable
 - **Easy to extend** with new apps using same frameworks
 - **Consistent patterns** across the entire system
+
+### Performance
+- **Tool caching** prevents redundant operations
+- **Lazy loading** of tools and workflows
+- **Bounded execution** prevents runaway processes

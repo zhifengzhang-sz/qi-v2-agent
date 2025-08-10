@@ -1,20 +1,11 @@
 /**
  * QiCore-based Agent Connector implementation
- * 
+ *
  * Provides robust agent integration with qicore Result<T> patterns
  * and functional composition for connection management and communication.
  */
 
-import {
-  Ok,
-  Err,
-  match,
-  flatMap,
-  fromAsyncTryCatch,
-  create,
-  type Result,
-  type QiError,
-} from '@qi/base';
+import { create, Err, fromAsyncTryCatch, match, Ok, type QiError, type Result } from '@qi/base';
 import type { IAgentConnector } from '../abstractions/ICLIServices.js';
 
 /**
@@ -96,23 +87,23 @@ export class QiCoreAgentConnector implements IAgentConnector {
    */
   connectAgent(agent: any): Result<void, QiError> {
     if (this.isDisposed) {
-      return Err(agentError(
-        'CONNECTOR_DISPOSED',
-        'Agent connector has been disposed',
-        { operation: 'connect' }
-      ));
+      return Err(
+        agentError('CONNECTOR_DISPOSED', 'Agent connector has been disposed', {
+          operation: 'connect',
+        })
+      );
     }
 
     const validationResult = this.validateAgent(agent);
-    
+
     return match(
       (validatedAgent) => {
         this.connectionState = 'connecting';
-        
+
         try {
           // Store agent reference
           this.currentAgent = validatedAgent;
-          
+
           // Create agent info
           this.agentInfo = {
             id: this.generateAgentId(validatedAgent),
@@ -122,19 +113,21 @@ export class QiCoreAgentConnector implements IAgentConnector {
             lastActivity: new Date(),
             capabilities: this.extractCapabilities(validatedAgent),
           };
-          
+
           // Setup event listeners
           this.setupAgentEventListeners(validatedAgent);
-          
+
           this.connectionState = 'connected';
           return Ok(void 0);
         } catch (error) {
           this.connectionState = 'error';
-          return Err(agentError(
-            'CONNECTION_FAILED',
-            `Failed to connect to agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            { operation: 'connect', error: String(error) }
-          ));
+          return Err(
+            agentError(
+              'CONNECTION_FAILED',
+              `Failed to connect to agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              { operation: 'connect', error: String(error) }
+            )
+          );
         }
       },
       (error) => Err(error),
@@ -149,23 +142,25 @@ export class QiCoreAgentConnector implements IAgentConnector {
     if (this.connectionState === 'disconnected') {
       return Ok(void 0);
     }
-    
+
     try {
       // Remove event listeners
       this.removeAgentEventListeners();
-      
+
       // Clear agent reference
       this.currentAgent = null;
       this.agentInfo = null;
       this.connectionState = 'disconnected';
-      
+
       return Ok(void 0);
     } catch (error) {
-      return Err(agentError(
-        'DISCONNECTION_FAILED',
-        `Failed to disconnect from agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { operation: 'disconnect', error: String(error) }
-      ));
+      return Err(
+        agentError(
+          'DISCONNECTION_FAILED',
+          `Failed to disconnect from agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          { operation: 'disconnect', error: String(error) }
+        )
+      );
     }
   }
 
@@ -174,11 +169,11 @@ export class QiCoreAgentConnector implements IAgentConnector {
    */
   async sendToAgent(input: string, context?: any): Promise<Result<void, QiError>> {
     const connectionCheck = this.checkConnection();
-    
+
     return await match(
       async () => {
         const inputValidation = this.validateInput(input);
-        
+
         return await match(
           async (validInput) => {
             return await fromAsyncTryCatch(
@@ -186,7 +181,7 @@ export class QiCoreAgentConnector implements IAgentConnector {
                 if (!this.currentAgent.process) {
                   throw new Error('Agent does not support processing');
                 }
-                
+
                 const request = {
                   input: validInput,
                   context: {
@@ -195,28 +190,29 @@ export class QiCoreAgentConnector implements IAgentConnector {
                     ...context,
                   },
                 };
-                
+
                 // Update last activity
                 if (this.agentInfo) {
                   this.agentInfo.lastActivity = new Date();
                 }
-                
+
                 // Send to agent (fire and forget - results come via events)
                 this.currentAgent.process(request).catch((error: Error) => {
                   this.handleAgentError(error);
                 });
-                
+
                 return void 0;
               },
-              (error: unknown) => agentError(
-                'SEND_FAILED',
-                `Failed to send input to agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                {
-                  operation: 'send',
-                  input: input.slice(0, 100), // Truncate for logging
-                  error: String(error),
-                }
-              )
+              (error: unknown) =>
+                agentError(
+                  'SEND_FAILED',
+                  `Failed to send input to agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                  {
+                    operation: 'send',
+                    input: input.slice(0, 100), // Truncate for logging
+                    error: String(error),
+                  }
+                )
             );
           },
           async (error: QiError) => Err(error),
@@ -233,7 +229,7 @@ export class QiCoreAgentConnector implements IAgentConnector {
    */
   cancelAgent(): Result<void, QiError> {
     const connectionCheck = this.checkConnection();
-    
+
     return match(
       () => {
         try {
@@ -241,7 +237,7 @@ export class QiCoreAgentConnector implements IAgentConnector {
             this.currentAgent.cancel();
           } else {
             // Emit manual cancellation if agent doesn't support it
-            this.eventHandlers.cancelled.forEach(handler => {
+            this.eventHandlers.cancelled.forEach((handler) => {
               try {
                 handler('manual_cancellation');
               } catch (error) {
@@ -249,14 +245,16 @@ export class QiCoreAgentConnector implements IAgentConnector {
               }
             });
           }
-          
+
           return Ok(void 0);
         } catch (error) {
-          return Err(agentError(
-            'CANCEL_FAILED',
-            `Failed to cancel agent operation: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            { operation: 'cancel', error: String(error) }
-          ));
+          return Err(
+            agentError(
+              'CANCEL_FAILED',
+              `Failed to cancel agent operation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              { operation: 'cancel', error: String(error) }
+            )
+          );
         }
       },
       (error) => Err(error),
@@ -356,20 +354,22 @@ export class QiCoreAgentConnector implements IAgentConnector {
     try {
       // Disconnect from agent
       this.disconnectAgent();
-      
+
       // Remove all handlers
       this.removeAgentHandlers();
-      
+
       // Mark as disposed
       this.isDisposed = true;
-      
+
       return Ok(void 0);
     } catch (error) {
-      return Err(agentError(
-        'DISPOSAL_FAILED',
-        `Failed to dispose connector: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        { operation: 'dispose', error: String(error) }
-      ));
+      return Err(
+        agentError(
+          'DISPOSAL_FAILED',
+          `Failed to dispose connector: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          { operation: 'dispose', error: String(error) }
+        )
+      );
     }
   }
 
@@ -377,79 +377,76 @@ export class QiCoreAgentConnector implements IAgentConnector {
 
   private validateAgent(agent: any): Result<any, QiError> {
     if (!agent) {
-      return Err(agentError(
-        'INVALID_AGENT',
-        'Agent cannot be null or undefined',
-        { operation: 'validate' }
-      ));
+      return Err(
+        agentError('INVALID_AGENT', 'Agent cannot be null or undefined', { operation: 'validate' })
+      );
     }
-    
+
     if (typeof agent !== 'object') {
-      return Err(agentError(
-        'INVALID_AGENT_TYPE',
-        'Agent must be an object',
-        { operation: 'validate' }
-      ));
+      return Err(
+        agentError('INVALID_AGENT_TYPE', 'Agent must be an object', { operation: 'validate' })
+      );
     }
-    
+
     // Check for required methods
     if (!agent.process || typeof agent.process !== 'function') {
-      return Err(agentError(
-        'MISSING_PROCESS_METHOD',
-        'Agent must have a process method',
-        { operation: 'validate' }
-      ));
+      return Err(
+        agentError('MISSING_PROCESS_METHOD', 'Agent must have a process method', {
+          operation: 'validate',
+        })
+      );
     }
-    
+
     return Ok(agent);
   }
 
   private validateInput(input: string): Result<string, QiError> {
     if (!input || typeof input !== 'string') {
-      return Err(agentError(
-        'INVALID_INPUT',
-        'Input must be a non-empty string',
-        { operation: 'validateInput', input: String(input) }
-      ));
+      return Err(
+        agentError('INVALID_INPUT', 'Input must be a non-empty string', {
+          operation: 'validateInput',
+          input: String(input),
+        })
+      );
     }
-    
+
     const trimmed = input.trim();
     if (trimmed.length === 0) {
-      return Err(agentError(
-        'EMPTY_INPUT',
-        'Input cannot be empty',
-        { operation: 'validateInput' }
-      ));
+      return Err(
+        agentError('EMPTY_INPUT', 'Input cannot be empty', { operation: 'validateInput' })
+      );
     }
-    
+
     return Ok(trimmed);
   }
 
   private checkConnection(): Result<void, QiError> {
     if (this.isDisposed) {
-      return Err(agentError(
-        'CONNECTOR_DISPOSED',
-        'Agent connector has been disposed',
-        { connectionState: this.connectionState }
-      ));
+      return Err(
+        agentError('CONNECTOR_DISPOSED', 'Agent connector has been disposed', {
+          connectionState: this.connectionState,
+        })
+      );
     }
-    
+
     if (this.connectionState !== 'connected') {
-      return Err(agentError(
-        'NOT_CONNECTED',
-        'No agent connected',
-        { connectionState: this.connectionState, operation: 'checkConnection' }
-      ));
+      return Err(
+        agentError('NOT_CONNECTED', 'No agent connected', {
+          connectionState: this.connectionState,
+          operation: 'checkConnection',
+        })
+      );
     }
-    
+
     if (!this.currentAgent) {
-      return Err(agentError(
-        'INVALID_AGENT_REFERENCE',
-        'Agent reference is invalid',
-        { connectionState: this.connectionState, operation: 'checkConnection' }
-      ));
+      return Err(
+        agentError('INVALID_AGENT_REFERENCE', 'Agent reference is invalid', {
+          connectionState: this.connectionState,
+          operation: 'checkConnection',
+        })
+      );
     }
-    
+
     return Ok(void 0);
   }
 
@@ -462,12 +459,12 @@ export class QiCoreAgentConnector implements IAgentConnector {
 
   private extractCapabilities(agent: any): string[] {
     const capabilities: string[] = [];
-    
+
     if (agent.process) capabilities.push('process');
     if (agent.cancel) capabilities.push('cancel');
     if (agent.getCurrentModel) capabilities.push('model-info');
     if (agent.stateManager) capabilities.push('state-management');
-    
+
     return capabilities;
   }
 
@@ -482,7 +479,7 @@ export class QiCoreAgentConnector implements IAgentConnector {
   }
 
   private removeAgentEventListeners(): void {
-    if (this.currentAgent && this.currentAgent.removeAllListeners) {
+    if (this.currentAgent?.removeAllListeners) {
       this.currentAgent.removeAllListeners('progress');
       this.currentAgent.removeAllListeners('message');
       this.currentAgent.removeAllListeners('complete');
@@ -495,8 +492,8 @@ export class QiCoreAgentConnector implements IAgentConnector {
     if (this.agentInfo) {
       this.agentInfo.lastActivity = new Date();
     }
-    
-    this.eventHandlers.progress.forEach(handler => {
+
+    this.eventHandlers.progress.forEach((handler) => {
       try {
         handler(progress);
       } catch (error) {
@@ -509,8 +506,8 @@ export class QiCoreAgentConnector implements IAgentConnector {
     if (this.agentInfo) {
       this.agentInfo.lastActivity = new Date();
     }
-    
-    this.eventHandlers.message.forEach(handler => {
+
+    this.eventHandlers.message.forEach((handler) => {
       try {
         handler(message);
       } catch (error) {
@@ -523,8 +520,8 @@ export class QiCoreAgentConnector implements IAgentConnector {
     if (this.agentInfo) {
       this.agentInfo.lastActivity = new Date();
     }
-    
-    this.eventHandlers.complete.forEach(handler => {
+
+    this.eventHandlers.complete.forEach((handler) => {
       try {
         handler(result);
       } catch (error) {
@@ -537,8 +534,8 @@ export class QiCoreAgentConnector implements IAgentConnector {
     if (this.agentInfo) {
       this.agentInfo.lastActivity = new Date();
     }
-    
-    this.eventHandlers.error.forEach(handler => {
+
+    this.eventHandlers.error.forEach((handler) => {
       try {
         handler(error);
       } catch (error) {
@@ -551,8 +548,8 @@ export class QiCoreAgentConnector implements IAgentConnector {
     if (this.agentInfo) {
       this.agentInfo.lastActivity = new Date();
     }
-    
-    this.eventHandlers.cancelled.forEach(handler => {
+
+    this.eventHandlers.cancelled.forEach((handler) => {
       try {
         handler(reason);
       } catch (error) {

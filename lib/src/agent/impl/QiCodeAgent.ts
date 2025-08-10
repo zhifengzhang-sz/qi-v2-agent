@@ -5,7 +5,7 @@
  * Internal to agent module - other modules cannot access this directly.
  */
 
-import { create, fromAsyncTryCatch, match, success, failure, type ErrorCategory, type QiError, type Result } from '@qi/base';
+import { create, type ErrorCategory, type QiError } from '@qi/base';
 import type { ClassificationResult, IClassifier } from '../../classifier/index.js';
 import type { CommandRequest, ICommandHandler } from '../../command/index.js';
 import type { IContextManager } from '../../context/index.js';
@@ -26,7 +26,7 @@ import type {
 /**
  * QiCode Agent error factory using QiCore patterns
  */
-const createQiCodeAgentError = (
+const _createQiCodeAgentError = (
   code: string,
   message: string,
   category: ErrorCategory,

@@ -1,6 +1,6 @@
 /**
  * Streaming Renderer Component
- * 
+ *
  * Handles real-time rendering of streaming content:
  * - Character-by-character text streaming
  * - Word wrapping and terminal formatting
@@ -8,7 +8,7 @@
  * - Cancellation visual feedback
  */
 
-import { Terminal, Colors } from '../keyboard/KeyboardUtils.js';
+import { Colors, Terminal } from '../keyboard/KeyboardUtils.js';
 
 export interface StreamingConfig {
   wordWrap: boolean;
@@ -60,15 +60,15 @@ export class StreamingRenderer {
    */
   startStreaming(): void {
     if (this.isStreaming) return;
-    
+
     this.isStreaming = true;
     this.currentContent = '';
     this.currentLine = '';
-    
+
     if (this.config.showCursor) {
       this.startCursor();
     }
-    
+
     this.emit('streamingStarted');
   }
 
@@ -79,7 +79,7 @@ export class StreamingRenderer {
     if (!this.isStreaming) {
       this.startStreaming();
     }
-    
+
     switch (chunk.type) {
       case 'text':
         this.addTextContent(chunk.content);
@@ -119,10 +119,10 @@ export class StreamingRenderer {
     if (this.streamBuffer.length === 0 || this.streamingTimeout) {
       return;
     }
-    
+
     const char = this.streamBuffer.shift()!;
     this.renderText(char);
-    
+
     if (this.streamBuffer.length > 0) {
       const delay = 1000 / this.config.streamingSpeed;
       this.streamingTimeout = setTimeout(() => {
@@ -137,7 +137,7 @@ export class StreamingRenderer {
    */
   private renderText(content: string): void {
     Terminal.color(this.config.colors.text);
-    
+
     for (const char of content) {
       if (char === '\n') {
         this.newLine();
@@ -145,7 +145,7 @@ export class StreamingRenderer {
         this.addCharacter(char);
       }
     }
-    
+
     Terminal.reset();
     this.updateCursor();
   }
@@ -155,7 +155,7 @@ export class StreamingRenderer {
    */
   private addCharacter(char: string): void {
     const terminalWidth = this.getMaxWidth();
-    
+
     // Check if we need to wrap
     if (this.config.wordWrap && this.currentLine.length >= terminalWidth) {
       // Try to wrap at word boundary
@@ -171,7 +171,7 @@ export class StreamingRenderer {
         this.newLine();
       }
     }
-    
+
     this.currentLine += char;
     process.stdout.write(char);
     this.currentContent += char;
@@ -197,36 +197,18 @@ export class StreamingRenderer {
   }
 
   /**
-   * Complete streaming
-   */
-  private completeStreaming(finalMessage?: string): void {
-    if (!this.isStreaming) return;
-    
-    this.stopCursor();
-    
-    if (finalMessage) {
-      this.addMetadata(`Complete: ${finalMessage}`);
-    }
-    
-    this.isStreaming = false;
-    this.clearStreamBuffer();
-    
-    this.emit('streamingComplete', this.currentContent);
-  }
-
-  /**
    * Show error during streaming
    */
   private showError(error: string): void {
     this.stopCursor();
-    
+
     Terminal.color(Colors.FG_RED);
     process.stdout.write(`\n❌ Error: ${error}\n`);
     Terminal.reset();
-    
+
     this.isStreaming = false;
     this.clearStreamBuffer();
-    
+
     this.emit('streamingError', error);
   }
 
@@ -235,16 +217,16 @@ export class StreamingRenderer {
    */
   complete(finalMessage?: string): void {
     if (!this.isStreaming) return;
-    
+
     this.stopCursor();
-    
+
     if (finalMessage) {
       this.addMetadata(`Complete: ${finalMessage}`);
     }
-    
+
     this.isStreaming = false;
     this.clearStreamBuffer();
-    
+
     this.emit('streamingComplete', this.currentContent);
   }
 
@@ -253,16 +235,16 @@ export class StreamingRenderer {
    */
   cancel(): void {
     if (!this.isStreaming) return;
-    
+
     this.stopCursor();
     this.clearStreamBuffer();
-    
+
     Terminal.color(Colors.FG_YELLOW);
     process.stdout.write('\n⚠️  Streaming cancelled\n');
     Terminal.reset();
-    
+
     this.isStreaming = false;
-    
+
     this.emit('streamingCancelled');
   }
 
@@ -271,10 +253,10 @@ export class StreamingRenderer {
    */
   private startCursor(): void {
     if (this.cursorInterval) return;
-    
+
     this.cursorVisible = true;
     this.renderCursor();
-    
+
     this.cursorInterval = setInterval(() => {
       this.cursorVisible = !this.cursorVisible;
       this.renderCursor();
@@ -289,7 +271,7 @@ export class StreamingRenderer {
       clearInterval(this.cursorInterval);
       this.cursorInterval = null;
     }
-    
+
     // Hide cursor
     if (this.cursorVisible) {
       this.eraseCursor();
@@ -302,7 +284,7 @@ export class StreamingRenderer {
    */
   private renderCursor(): void {
     Terminal.saveCursor();
-    
+
     if (this.cursorVisible) {
       Terminal.color(this.config.colors.cursor);
       process.stdout.write('▋');
@@ -310,7 +292,7 @@ export class StreamingRenderer {
     } else {
       process.stdout.write(' ');
     }
-    
+
     Terminal.restoreCursor();
   }
 
@@ -397,7 +379,7 @@ export class StreamingRenderer {
 
   off(event: string, listener: Function): void {
     if (!this.listeners[event]) return;
-    
+
     const index = this.listeners[event].indexOf(listener);
     if (index > -1) {
       this.listeners[event].splice(index, 1);
@@ -428,7 +410,7 @@ export function wrapText(text: string, maxWidth: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
   let currentLine = '';
-  
+
   for (const word of words) {
     if (currentLine.length + word.length + 1 <= maxWidth) {
       currentLine += (currentLine ? ' ' : '') + word;
@@ -437,8 +419,8 @@ export function wrapText(text: string, maxWidth: number): string[] {
       currentLine = word;
     }
   }
-  
+
   if (currentLine) lines.push(currentLine);
-  
+
   return lines;
 }

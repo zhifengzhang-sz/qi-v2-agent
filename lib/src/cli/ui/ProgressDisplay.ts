@@ -1,14 +1,14 @@
 /**
  * Progress Display Component
- * 
+ *
  * Provides visual progress indicators for CLI operations:
  * - Progress bars with percentage
- * - Phase indicators 
+ * - Phase indicators
  * - Animated spinners
  * - Time tracking
  */
 
-import { Terminal, Colors } from '../keyboard/KeyboardUtils.js';
+import { Colors, Terminal } from '../keyboard/KeyboardUtils.js';
 
 export interface ProgressState {
   phase: string;
@@ -43,7 +43,7 @@ export class ProgressDisplay {
   private isVisible = false;
   private animationFrame: NodeJS.Timeout | null = null;
   private animationIndex = 0;
-  
+
   private readonly spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   private readonly barFilled = '█';
   private readonly barEmpty = '░';
@@ -77,10 +77,10 @@ export class ProgressDisplay {
       startTime: Date.now(),
       ...initialState,
     };
-    
+
     this.isVisible = true;
     this.render();
-    
+
     if (this.config.animated) {
       this.startAnimation();
     }
@@ -94,12 +94,12 @@ export class ProgressDisplay {
       this.start(state);
       return;
     }
-    
+
     this.currentState = {
       ...this.currentState,
       ...state,
     };
-    
+
     this.render();
   }
 
@@ -108,14 +108,14 @@ export class ProgressDisplay {
    */
   complete(message?: string): void {
     if (!this.isVisible) return;
-    
+
     // Show final state briefly
-    this.update({ 
-      progress: 1.0, 
+    this.update({
+      progress: 1.0,
       phase: 'complete',
       message: message || 'Complete',
     });
-    
+
     setTimeout(() => {
       this.hide();
     }, 1000);
@@ -126,14 +126,14 @@ export class ProgressDisplay {
    */
   hide(): void {
     if (!this.isVisible) return;
-    
+
     this.stopAnimation();
-    
+
     // Clear the current line completely and position cursor at start
     Terminal.clearLine();
     Terminal.cursorToStart();
     process.stdout.write('\r'); // Ensure carriage return
-    
+
     this.isVisible = false;
     this.currentState = null;
   }
@@ -144,19 +144,19 @@ export class ProgressDisplay {
    */
   hideAndReplace(): void {
     if (!this.isVisible) return;
-    
+
     this.stopAnimation();
-    
+
     // Clear current line and move up to clear any interfering content
     Terminal.clearLine();
     Terminal.cursorToStart();
-    
+
     // Try to clear the previous few lines to remove debug output
     for (let i = 0; i < 3; i++) {
       process.stdout.write('\x1b[1A'); // Move up 1 line
       Terminal.clearLine();
     }
-    
+
     this.isVisible = false;
     this.currentState = null;
   }
@@ -166,13 +166,13 @@ export class ProgressDisplay {
    */
   private render(): void {
     if (!this.isVisible || !this.currentState) return;
-    
+
     const parts: string[] = [];
-    
+
     // Progress bar
     const bar = this.renderProgressBar(this.currentState.progress);
     parts.push(bar);
-    
+
     // Percentage
     if (this.config.showPercentage) {
       Terminal.color(this.config.colors.percentage);
@@ -180,7 +180,7 @@ export class ProgressDisplay {
       parts.push(percentage);
       Terminal.reset();
     }
-    
+
     // Phase with spinner
     if (this.config.showPhase) {
       Terminal.color(this.config.colors.phase);
@@ -189,14 +189,14 @@ export class ProgressDisplay {
       parts.push(phase);
       Terminal.reset();
     }
-    
+
     // Details
     if (this.config.showDetails && this.currentState.details) {
       Terminal.color(this.config.colors.details);
       parts.push(`- ${this.currentState.details}`);
       Terminal.reset();
     }
-    
+
     // Elapsed time
     if (this.config.showElapsed && this.currentState.startTime) {
       Terminal.color(this.config.colors.elapsed);
@@ -204,7 +204,7 @@ export class ProgressDisplay {
       parts.push(`(${elapsed})`);
       Terminal.reset();
     }
-    
+
     // Clear line and render
     Terminal.clearLine();
     Terminal.cursorToStart();
@@ -217,11 +217,11 @@ export class ProgressDisplay {
   private renderProgressBar(progress: number): string {
     const filled = Math.round(this.config.barLength * Math.min(1, Math.max(0, progress)));
     const empty = this.config.barLength - filled;
-    
+
     Terminal.color(this.config.colors.bar);
     const bar = `[${this.barFilled.repeat(filled)}${this.barEmpty.repeat(empty)}]`;
     Terminal.reset();
-    
+
     return bar;
   }
 
@@ -239,7 +239,7 @@ export class ProgressDisplay {
     if (this.animationFrame) {
       clearInterval(this.animationFrame);
     }
-    
+
     this.animationFrame = setInterval(() => {
       this.animationIndex++;
       this.render();
@@ -261,14 +261,14 @@ export class ProgressDisplay {
    */
   private formatElapsed(ms: number): string {
     const seconds = Math.floor(ms / 1000);
-    
+
     if (seconds < 60) {
       return `${seconds}s`;
     }
-    
+
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    
+
     return `${minutes}m ${remainingSeconds}s`;
   }
 
@@ -306,14 +306,14 @@ export class ProgressDisplay {
  * Simple progress bar utility function
  */
 export function createProgressBar(
-  progress: number, 
+  progress: number,
   length: number = 20,
   filled: string = '█',
   empty: string = '░'
 ): string {
   const filledLength = Math.round(length * Math.min(1, Math.max(0, progress)));
   const emptyLength = length - filledLength;
-  
+
   return `[${filled.repeat(filledLength)}${empty.repeat(emptyLength)}]`;
 }
 

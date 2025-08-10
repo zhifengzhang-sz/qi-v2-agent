@@ -8,12 +8,18 @@
 /**
  * Classification method types
  */
-export type ClassificationMethod = 'rule-based' | 'ollama-native' | 'langchain-function-calling' | 'hybrid' | 'ensemble';
+export type ClassificationMethod =
+  | 'rule-based'
+  | 'ollama-native'
+  | 'langchain-function-calling'
+  | 'file-reference'
+  | 'hybrid'
+  | 'ensemble';
 
 /**
  * Three input types for classification
  */
-export type ClassificationType = 'command' | 'prompt' | 'workflow';
+export type ClassificationType = 'command' | 'prompt' | 'workflow' | 'simple-workflow';
 
 /**
  * Processing context for classification

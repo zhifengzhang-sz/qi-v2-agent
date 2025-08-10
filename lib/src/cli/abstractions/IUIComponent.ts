@@ -1,6 +1,6 @@
 /**
  * UI Component abstraction interfaces
- * 
+ *
  * Provides framework-agnostic interfaces for UI components.
  * Implemented differently by each terminal framework.
  */

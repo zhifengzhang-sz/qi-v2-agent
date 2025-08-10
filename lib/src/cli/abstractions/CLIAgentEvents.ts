@@ -1,6 +1,6 @@
 /**
  * CLI ↔ Agent Event Interface
- * 
+ *
  * Defines the complete event-driven communication interface between
  * CLI and Agent for consistent, bidirectional interaction.
  */
@@ -52,7 +52,7 @@ export interface CancelRequestedEvent extends BaseEvent {
 /**
  * Union type for all CLI → Agent events
  */
-export type CLIToAgentEvent = 
+export type CLIToAgentEvent =
   | ModelChangeRequestedEvent
   | ModeChangeRequestedEvent
   | ConfigChangeRequestedEvent
@@ -61,7 +61,7 @@ export type CLIToAgentEvent =
   | CancelRequestedEvent;
 
 // ===========================================
-// Agent → CLI Events  
+// Agent → CLI Events
 // ===========================================
 
 /**
@@ -191,9 +191,7 @@ export interface IAgentEventEmitter {
 /**
  * Create a CLI → Agent event with timestamp
  */
-export function createCLIEvent<T extends CLIToAgentEvent>(
-  event: Omit<T, 'timestamp'>
-): T {
+export function createCLIEvent<T extends CLIToAgentEvent>(event: Omit<T, 'timestamp'>): T {
   return {
     ...event,
     timestamp: new Date(),
@@ -203,9 +201,7 @@ export function createCLIEvent<T extends CLIToAgentEvent>(
 /**
  * Create an Agent → CLI event with timestamp
  */
-export function createAgentEvent<T extends AgentToCLIEvent>(
-  event: Omit<T, 'timestamp'>
-): T {
+export function createAgentEvent<T extends AgentToCLIEvent>(event: Omit<T, 'timestamp'>): T {
   return {
     ...event,
     timestamp: new Date(),

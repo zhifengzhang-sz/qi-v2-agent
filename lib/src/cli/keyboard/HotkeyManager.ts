@@ -1,20 +1,20 @@
 /**
  * Hotkey Manager for CLI
- * 
+ *
  * Handles keyboard input detection including special key combinations:
  * - Shift+Tab: Mode cycling
  * - Esc: Cancel current operation
  * - Ctrl+C: Graceful exit (SIGINT)
- * 
+ *
  * Uses raw mode for precise key detection while preserving normal readline functionality.
  */
 
 import { EventEmitter } from 'node:events';
 
 export interface HotkeyEvents {
-  shiftTab: void;
-  escape: void;
-  ctrlC: void;
+  shiftTab: undefined;
+  escape: undefined;
+  ctrlC: undefined;
   keypress: { key: string; raw: Buffer };
 }
 
@@ -35,7 +35,7 @@ export class HotkeyManager extends EventEmitter {
 
   constructor(config: Partial<HotkeyConfig> = {}) {
     super();
-    
+
     this.config = {
       enableShiftTab: true,
       enableEscape: true,
@@ -54,19 +54,21 @@ export class HotkeyManager extends EventEmitter {
     }
 
     // Store existing listeners to restore later
-    this.originalStdinListeners = process.stdin.listeners('data') as Array<(...args: any[]) => void>;
-    
+    this.originalStdinListeners = process.stdin.listeners('data') as Array<
+      (...args: any[]) => void
+    >;
+
     // Remove existing listeners to avoid conflicts
     process.stdin.removeAllListeners('data');
-    
+
     // Enable raw mode for precise key detection
     if (process.stdin.setRawMode) {
       process.stdin.setRawMode(true);
     }
-    
+
     process.stdin.resume();
     process.stdin.on('data', this.handleKeypress.bind(this));
-    
+
     this.isRawMode = true;
     this.emit('enabled');
   }
@@ -81,17 +83,17 @@ export class HotkeyManager extends EventEmitter {
 
     // Remove our listener
     process.stdin.removeListener('data', this.handleKeypress.bind(this));
-    
+
     // Disable raw mode
     if (process.stdin.setRawMode) {
       process.stdin.setRawMode(false);
     }
-    
+
     // Restore original listeners
     for (const listener of this.originalStdinListeners) {
       process.stdin.on('data', listener);
     }
-    
+
     this.isRawMode = false;
     this.emit('disabled');
   }
@@ -139,10 +141,7 @@ export class HotkeyManager extends EventEmitter {
    * Shift+Tab sends: ESC[Z (0x1b, 0x5b, 0x5a)
    */
   private detectShiftTab(chunk: Buffer): boolean {
-    return chunk.length === 3 && 
-           chunk[0] === 0x1b && 
-           chunk[1] === 0x5b && 
-           chunk[2] === 0x5a;
+    return chunk.length === 3 && chunk[0] === 0x1b && chunk[1] === 0x5b && chunk[2] === 0x5a;
   }
 
   /**
@@ -214,14 +213,20 @@ export function createHotkeyManager(config?: Partial<HotkeyConfig>): HotkeyManag
  * Debug utility to display key codes
  */
 export function debugKeypress(chunk: Buffer): string {
-  const bytes = Array.from(chunk).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
-  const chars = chunk.toString().split('').map(c => {
-    const code = c.charCodeAt(0);
-    if (code < 32) {
-      return `^${String.fromCharCode(code + 64)}`;
-    }
-    return c;
-  }).join('');
-  
+  const bytes = Array.from(chunk)
+    .map((b) => `0x${b.toString(16).padStart(2, '0')}`)
+    .join(' ');
+  const chars = chunk
+    .toString()
+    .split('')
+    .map((c) => {
+      const code = c.charCodeAt(0);
+      if (code < 32) {
+        return `^${String.fromCharCode(code + 64)}`;
+      }
+      return c;
+    })
+    .join('');
+
   return `Bytes: [${bytes}] Chars: "${chars}"`;
 }

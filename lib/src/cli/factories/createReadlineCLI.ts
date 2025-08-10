@@ -1,47 +1,43 @@
 /**
  * Readline CLI Factory
- * 
+ *
  * Creates a complete CLI instance using the readline framework (zero dependencies)
  * with all necessary services and components properly wired up.
  */
 
-import {
-  Ok,
-  Err,
-  match,
-  flatMap,
-  create,
-  type Result,
-  type QiError,
-} from '@qi/base';
-import type { ICLIFramework, CLIConfig } from '../abstractions/ICLIFramework.js';
-import { CLIContainer } from '../container/CLIContainer.js';
-
+import { create, Err, flatMap, match, Ok, type QiError, type Result } from '@qi/base';
+import type { ICommandHandler } from '../../command/abstractions/index.js';
+import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
+import type {
+  IAgentConnector,
+  ICommandRouter,
+  IEventManager,
+} from '../abstractions/ICLIServices.js';
+import type { IInputManager } from '../abstractions/IInputManager.js';
 // Import interface types for dependency resolution
 import type { ITerminal } from '../abstractions/ITerminal.js';
-import type { IInputManager } from '../abstractions/IInputManager.js';
-import type { IProgressRenderer, IModeRenderer, IStreamRenderer } from '../abstractions/IUIComponent.js';
-import type { IEventManager, ICommandRouter, IAgentConnector } from '../abstractions/ICLIServices.js';
-
+import type {
+  IModeRenderer,
+  IProgressRenderer,
+  IStreamRenderer,
+} from '../abstractions/IUIComponent.js';
+import { CLIContainer } from '../container/CLIContainer.js';
 // Readline framework implementations
 import {
-  ReadlineTerminal,
   ReadlineInputManager,
-  ReadlineProgressRenderer,
   ReadlineModeRenderer,
+  ReadlineProgressRenderer,
   ReadlineStreamRenderer,
+  ReadlineTerminal,
 } from '../frameworks/readline/index.js';
-
-// Shared QiCore services
-import {
-  QiCoreEventManager,
-  QiCoreCommandRouter,
-  QiCoreAgentConnector,
-} from '../services/index.js';
-import type { ICommandHandler } from '../../command/abstractions/index.js';
-
 // Will be implemented when we refactor EventDrivenCLI
 import { EventDrivenCLI } from '../impl/EventDrivenCLI.js';
+// Shared QiCore services
+import {
+  QiCoreAgentConnector,
+  QiCoreCommandRouter,
+  QiCoreEventManager,
+} from '../services/index.js';
 
 /**
  * Factory error types
@@ -81,7 +77,7 @@ const DEFAULT_READLINE_CONFIG: CLIConfig = {
 
 /**
  * Create a CLI instance using the readline framework
- * 
+ *
  * This factory assembles all the necessary components:
  * - Readline-based terminal and input management
  * - QiCore services for robust error handling
@@ -94,26 +90,23 @@ export function createReadlineCLI(
   } = {}
 ): Result<ICLIFramework, QiError> {
   const fullConfig: CLIConfig = { ...DEFAULT_READLINE_CONFIG, ...config };
-  
+
   // Create container
   const containerResult = createContainer();
-  
-  return flatMap(
-    (container: CLIContainer) => {
-      // Register all services
-      const registrationResult = registerServices(container, fullConfig, options);
-      
-      return match(
-        () => {
-          // Create CLI instance with commandHandler option
-          return createCLIInstance(container, fullConfig, options.commandHandler);
-        },
-        (error) => Err(error),
-        registrationResult
-      );
-    },
-    containerResult
-  );
+
+  return flatMap((container: CLIContainer) => {
+    // Register all services
+    const registrationResult = registerServices(container, fullConfig, options);
+
+    return match(
+      () => {
+        // Create CLI instance with commandHandler option
+        return createCLIInstance(container, fullConfig, options.commandHandler);
+      },
+      (error) => Err(error),
+      registrationResult
+    );
+  }, containerResult);
 }
 
 /**
@@ -126,14 +119,16 @@ function createContainer(): Result<CLIContainer, QiError> {
       enableValidation: true,
       maxResolutionDepth: 10,
     });
-    
+
     return Ok(container);
   } catch (error) {
-    return Err(factoryError(
-      'CONTAINER_CREATION_FAILED',
-      `Failed to create container: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      { operation: 'createContainer', framework: 'readline' }
-    ));
+    return Err(
+      factoryError(
+        'CONTAINER_CREATION_FAILED',
+        `Failed to create container: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { operation: 'createContainer', framework: 'readline' }
+      )
+    );
   }
 }
 
@@ -141,118 +136,126 @@ function createContainer(): Result<CLIContainer, QiError> {
  * Register all necessary services in the container
  */
 function registerServices(
-  container: CLIContainer, 
-  config: CLIConfig, 
-  options: { commandHandler?: ICommandHandler } = {}
+  container: CLIContainer,
+  config: CLIConfig,
+  _options: { commandHandler?: ICommandHandler } = {}
 ): Result<void, QiError> {
   // Register terminal implementation
-  const terminalResult = container.register(
-    'terminal',
-    () => new ReadlineTerminal(),
-    { singleton: true }
-  );
-  
+  const terminalResult = container.register('terminal', () => new ReadlineTerminal(), {
+    singleton: true,
+  });
+
   if (terminalResult.tag === 'failure') {
     return terminalResult;
   }
-  
+
   // Register input manager
   const inputResult = container.register(
-    'inputManager', 
+    'inputManager',
     () => {
       return new ReadlineInputManager();
     },
-    { singleton: true, destroyer: (instance) => instance.close() }
+    { singleton: true, destroyer: (instance) => (instance as ReadlineInputManager).close() }
   );
-  
+
   if (inputResult.tag === 'failure') {
     return inputResult;
   }
-  
+
   // Register progress renderer
   const progressResult = container.register(
     'progressRenderer',
-    () => new ReadlineProgressRenderer({
-      animated: config.animations,
-      showElapsed: true,
-      showPercentage: true,
-    }),
-    { singleton: true, destroyer: (instance) => instance.destroy() }
+    () =>
+      new ReadlineProgressRenderer({
+        animated: config.animations,
+        showElapsed: true,
+        showPercentage: true,
+      }),
+    { singleton: true, destroyer: (instance) => (instance as ReadlineProgressRenderer).destroy() }
   );
-  
+
   if (progressResult.tag === 'failure') {
     return progressResult;
   }
-  
+
   // Register mode renderer
   const modeResult = container.register(
     'modeRenderer',
-    () => new ReadlineModeRenderer({
-      showIcon: config.colors,
-      showLabel: false,
-      position: 'inline',
-    }),
-    { singleton: true, destroyer: (instance) => instance.destroy() }
+    () =>
+      new ReadlineModeRenderer({
+        showIcon: config.colors,
+        showLabel: false,
+        position: 'inline',
+      }),
+    { singleton: true, destroyer: (instance) => (instance as ReadlineModeRenderer).destroy() }
   );
-  
+
   if (modeResult.tag === 'failure') {
     return modeResult;
   }
-  
+
   // Register stream renderer
   const streamResult = container.register(
     'streamRenderer',
-    () => new ReadlineStreamRenderer({
-      throttleMs: config.streamingThrottle,
-      showCursor: config.animations,
-      bufferSize: config.maxBufferSize,
-    }),
-    { singleton: true, destroyer: (instance) => instance.destroy() }
+    () =>
+      new ReadlineStreamRenderer({
+        throttleMs: config.streamingThrottle,
+        showCursor: config.animations,
+        bufferSize: config.maxBufferSize,
+      }),
+    { singleton: true, destroyer: (instance) => (instance as ReadlineStreamRenderer).destroy() }
   );
-  
+
   if (streamResult.tag === 'failure') {
     return streamResult;
   }
-  
+
   // Register shared QiCore services
   const eventManagerResult = container.register(
     'eventManager',
     () => new QiCoreEventManager({ trackHistory: config.debug }),
-    { singleton: true, destroyer: (instance) => instance.destroy() }
+    { singleton: true, destroyer: (instance) => (instance as QiCoreEventManager).destroy() }
   );
-  
+
   if (eventManagerResult.tag === 'failure') {
     return eventManagerResult;
   }
-  
+
   // Use QiCoreCommandRouter - if commandHandler provided, it will be used directly by CLI
-  const commandRouterResult = container.register(
-    'commandRouter',
-    () => new QiCoreCommandRouter(),
-    { singleton: true }
-  );
-  
+  const commandRouterResult = container.register('commandRouter', () => new QiCoreCommandRouter(), {
+    singleton: true,
+  });
+
   if (commandRouterResult.tag === 'failure') {
     return commandRouterResult;
   }
-  
+
   const agentConnectorResult = container.register(
     'agentConnector',
     () => new QiCoreAgentConnector(),
-    { singleton: true, destroyer: (instance) => instance.dispose() }
+    {
+      singleton: true,
+      destroyer: (instance) => {
+        (instance as QiCoreAgentConnector).dispose();
+      },
+    }
   );
-  
+
   if (agentConnectorResult.tag === 'failure') {
     return agentConnectorResult;
   }
-  
+
   return Ok(void 0);
 }
 
 /**
  * Create the CLI instance with resolved dependencies
  */
-function createCLIInstance(container: CLIContainer, config: CLIConfig, commandHandler?: ICommandHandler): Result<ICLIFramework, QiError> {
+function createCLIInstance(
+  container: CLIContainer,
+  config: CLIConfig,
+  commandHandler?: ICommandHandler
+): Result<ICLIFramework, QiError> {
   try {
     // Resolve all dependencies with explicit types
     const terminal = container.resolve<ITerminal>('terminal');
@@ -263,19 +266,25 @@ function createCLIInstance(container: CLIContainer, config: CLIConfig, commandHa
     const eventManager = container.resolve<IEventManager>('eventManager');
     const commandRouter = container.resolve<ICommandRouter>('commandRouter');
     const agentConnector = container.resolve<IAgentConnector>('agentConnector');
-    
+
     // Check all resolutions succeeded
     const dependencies = [
-      terminal, inputManager, progressRenderer, modeRenderer, 
-      streamRenderer, eventManager, commandRouter, agentConnector
+      terminal,
+      inputManager,
+      progressRenderer,
+      modeRenderer,
+      streamRenderer,
+      eventManager,
+      commandRouter,
+      agentConnector,
     ];
-    
+
     for (const dep of dependencies) {
       if (dep.tag === 'failure') {
         return dep as Result<ICLIFramework, QiError>;
       }
     }
-    
+
     // Create CLI instance with resolved dependencies
     // Type assertion is safe here since we already checked all deps succeeded
     const cli = new EventDrivenCLI(
@@ -290,14 +299,16 @@ function createCLIInstance(container: CLIContainer, config: CLIConfig, commandHa
       config,
       commandHandler // Pass the commandHandler directly
     );
-    
+
     return Ok(cli);
   } catch (error) {
-    return Err(factoryError(
-      'CLI_CREATION_FAILED',
-      `Failed to create CLI instance: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      { operation: 'createCLI', framework: 'readline' }
-    ));
+    return Err(
+      factoryError(
+        'CLI_CREATION_FAILED',
+        `Failed to create CLI instance: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { operation: 'createCLI', framework: 'readline' }
+      )
+    );
   }
 }
 
@@ -306,40 +317,46 @@ function createCLIInstance(container: CLIContainer, config: CLIConfig, commandHa
  */
 function validateReadlineConfig(config: CLIConfig): Result<void, QiError> {
   if (config.historySize < 0 || config.historySize > 10000) {
-    return Err(factoryError(
-      'INVALID_HISTORY_SIZE',
-      'History size must be between 0 and 10000',
-      { operation: 'validateConfig', config: { historySize: config.historySize } }
-    ));
+    return Err(
+      factoryError('INVALID_HISTORY_SIZE', 'History size must be between 0 and 10000', {
+        operation: 'validateConfig',
+        config: { historySize: config.historySize },
+      })
+    );
   }
-  
+
   if (config.streamingThrottle < 0 || config.streamingThrottle > 1000) {
-    return Err(factoryError(
-      'INVALID_STREAMING_THROTTLE',
-      'Streaming throttle must be between 0 and 1000ms',
-      { operation: 'validateConfig', config: { streamingThrottle: config.streamingThrottle } }
-    ));
+    return Err(
+      factoryError(
+        'INVALID_STREAMING_THROTTLE',
+        'Streaming throttle must be between 0 and 1000ms',
+        { operation: 'validateConfig', config: { streamingThrottle: config.streamingThrottle } }
+      )
+    );
   }
-  
+
   if (config.maxBufferSize < 100 || config.maxBufferSize > 100000) {
-    return Err(factoryError(
-      'INVALID_BUFFER_SIZE',
-      'Max buffer size must be between 100 and 100000',
-      { operation: 'validateConfig', config: { maxBufferSize: config.maxBufferSize } }
-    ));
+    return Err(
+      factoryError('INVALID_BUFFER_SIZE', 'Max buffer size must be between 100 and 100000', {
+        operation: 'validateConfig',
+        config: { maxBufferSize: config.maxBufferSize },
+      })
+    );
   }
-  
+
   return Ok(void 0);
 }
 
 /**
  * Create readline CLI with validation
  */
-export function createValidatedReadlineCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
+export function createValidatedReadlineCLI(
+  config: Partial<CLIConfig> = {}
+): Result<ICLIFramework, QiError> {
   const fullConfig: CLIConfig = { ...DEFAULT_READLINE_CONFIG, ...config };
-  
+
   const validationResult = validateReadlineConfig(fullConfig);
-  
+
   return match(
     () => createReadlineCLI(config),
     (error) => Err(error),
@@ -350,20 +367,24 @@ export function createValidatedReadlineCLI(config: Partial<CLIConfig> = {}): Res
 /**
  * Create readline CLI with async initialization
  */
-export async function createReadlineCLIAsync(config: Partial<CLIConfig> = {}): Promise<Result<ICLIFramework, QiError>> {
+export async function createReadlineCLIAsync(
+  config: Partial<CLIConfig> = {}
+): Promise<Result<ICLIFramework, QiError>> {
   const cliResult = createReadlineCLI(config);
-  
+
   return await match(
     async (cli): Promise<Result<ICLIFramework, QiError>> => {
       try {
         await cli.initialize();
         return Ok(cli);
       } catch (error) {
-        return Err(factoryError(
-          'CLI_INITIALIZATION_FAILED',
-          `Failed to initialize CLI: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          { operation: 'initialize', framework: 'readline' }
-        ));
+        return Err(
+          factoryError(
+            'CLI_INITIALIZATION_FAILED',
+            `Failed to initialize CLI: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            { operation: 'initialize', framework: 'readline' }
+          )
+        );
       }
     },
     async (error: QiError): Promise<Result<ICLIFramework, QiError>> => Err(error),
@@ -389,8 +410,9 @@ export function checkReadlineSupport(): {
 } {
   return {
     terminal: process.stdout.isTTY || false,
-    colors: !!(process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') || 
-            (process.stdout.isTTY && !process.env.NO_COLOR && !process.env.NODE_DISABLE_COLORS),
+    colors:
+      !!(process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') ||
+      (process.stdout.isTTY && !process.env.NO_COLOR && !process.env.NODE_DISABLE_COLORS),
     unicode: process.platform !== 'win32',
     hotkeys: process.stdin.isTTY || false,
   };

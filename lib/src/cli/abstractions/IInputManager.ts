@@ -1,6 +1,6 @@
 /**
  * Input Manager abstraction interface
- * 
+ *
  * Provides a framework-agnostic interface for input handling.
  * Implemented by ReadlineInputManager, InkInputManager, and BlessedInputManager.
  */

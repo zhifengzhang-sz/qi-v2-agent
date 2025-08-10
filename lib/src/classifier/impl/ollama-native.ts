@@ -6,20 +6,27 @@
  * Follows qicore Result<T> patterns with explicit error handling.
  */
 
-import { failure, fromAsyncTryCatch, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
-import { createClassificationError, type BaseClassificationErrorContext } from '../shared/error-types.js';
 import { JsonOutputParser } from '@langchain/core/output_parsers';
-import { 
-  globalSchemaRegistry, 
-  type SchemaEntry 
-} from '../schema-registry.js';
-import { detectCommand } from './command-detection-utils.js';
+import {
+  type ErrorCategory,
+  failure,
+  fromAsyncTryCatch,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type {
   ClassificationMethod,
   ClassificationResult,
   IClassificationMethod,
   ProcessingContext,
 } from '../abstractions/index.js';
+import { globalSchemaRegistry, type SchemaEntry } from '../schema-registry.js';
+import {
+  type BaseClassificationErrorContext,
+  createClassificationError,
+} from '../shared/error-types.js';
+import { detectCommand } from './command-detection-utils.js';
 
 /**
  * Custom error factory for Ollama native classification errors
@@ -39,7 +46,7 @@ export interface OllamaNativeClassificationConfig {
   modelId?: string;
   temperature?: number;
   timeout?: number; // Timeout in milliseconds (default: 30000)
-  
+
   // Schema selection options
   schemaName?: string;
   schemaComplexity?: 'minimal' | 'standard' | 'detailed' | 'optimized';
@@ -69,7 +76,7 @@ export class OllamaNativeClassificationMethod implements IClassificationMethod {
   private selectedSchema?: SchemaEntry;
   private jsonParser: JsonOutputParser;
   private promptTemplate: string;
-  
+
   // Performance tracking
   private totalClassifications = 0;
   private totalLatencyMs = 0;
@@ -84,16 +91,16 @@ export class OllamaNativeClassificationMethod implements IClassificationMethod {
       schemaName: config.schemaName || 'minimal',
       schemaComplexity: config.schemaComplexity || 'minimal',
     };
-    
+
     // Initialize JSON parser
     this.jsonParser = new JsonOutputParser();
-    
+
     // Select schema once during construction
     const schemaResult = this.selectSchema();
     if (schemaResult.tag === 'success') {
       this.selectedSchema = schemaResult.value;
     }
-    
+
     // Build prompt template once during construction
     this.promptTemplate = `Classify the following user input into one of two categories:
 
@@ -124,7 +131,12 @@ Respond with valid JSON matching the required schema.`;
 
     try {
       // Pre-filter commands using existing detection logic
-      const commandResult = detectCommand(input, { commandPrefix: '/' });
+      const commandResult = detectCommand(input, {
+        commandPrefix: '/',
+        fileReferencePrefix: '',
+        extendedThinkingTriggers: [],
+        conversationControlFlags: [],
+      });
       if (commandResult !== null) {
         const duration = Date.now() - startTime;
         this.totalLatencyMs += duration;
@@ -144,29 +156,28 @@ Respond with valid JSON matching the required schema.`;
 
       // For non-commands, use Ollama native structured output
       const classificationResult = await this.performOllamaClassification(input, context);
-      
+
       // Handle Result<T> pattern properly
       if (classificationResult.tag === 'failure') {
         const duration = Date.now() - startTime;
         this.totalLatencyMs += duration;
         throw new Error(`Classification failed: ${classificationResult.error.message}`);
       }
-      
+
       // Success case - extract the ClassificationResult
       const duration = Date.now() - startTime;
       this.totalLatencyMs += duration;
       this.successfulClassifications++;
-      
-      // Performance tracking removed to prevent global state contamination
-      
-      return classificationResult.value;
 
+      // Performance tracking removed to prevent global state contamination
+
+      return classificationResult.value;
     } catch (error) {
       const duration = Date.now() - startTime;
       this.totalLatencyMs += duration;
-      
+
       // Performance tracking removed to prevent global state contamination
-      
+
       throw new Error(
         `Ollama native classification failed: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -178,11 +189,11 @@ Respond with valid JSON matching the required schema.`;
   }
 
   getExpectedAccuracy(): number {
-    return 0.90; // Expected 90%+ accuracy based on direct model testing
+    return 0.9; // Expected 90%+ accuracy based on direct model testing
   }
 
   getAverageLatency(): number {
-    return this.totalClassifications > 0 
+    return this.totalClassifications > 0
       ? Math.round(this.totalLatencyMs / this.totalClassifications)
       : 0;
   }
@@ -191,8 +202,8 @@ Respond with valid JSON matching the required schema.`;
     try {
       const response = await fetch(`${this.config.baseUrl}/api/tags`);
       if (!response.ok) return false;
-      
-      const data = await response.json() as { models?: Array<{ name: string }> };
+
+      const data = (await response.json()) as { models?: Array<{ name: string }> };
       return data.models?.some((model) => model.name === this.config.modelId) || false;
     } catch {
       return false;
@@ -202,7 +213,7 @@ Respond with valid JSON matching the required schema.`;
   // Private methods
 
   private async performOllamaClassification(
-    input: string, 
+    input: string,
     context?: ProcessingContext
   ): Promise<Result<ClassificationResult, QiError>> {
     return fromAsyncTryCatch(
@@ -223,16 +234,17 @@ Respond with valid JSON matching the required schema.`;
 
         // Call Ollama native API
         const ollamaResponse = await this.callOllamaNativeAPI(prompt, jsonSchema);
-        
+
         // Parse and validate response
         return await this.processOllamaResponse(ollamaResponse, input);
       },
-      (error: unknown) => createOllamaNativeClassificationError(
-        'CLASSIFICATION_FAILED',
-        `Ollama native classification failed: ${error instanceof Error ? error.message : String(error)}`,
-        'NETWORK',
-        { error: String(error) }
-      )
+      (error: unknown) =>
+        createOllamaNativeClassificationError(
+          'CLASSIFICATION_FAILED',
+          `Ollama native classification failed: ${error instanceof Error ? error.message : String(error)}`,
+          'NETWORK',
+          { error: String(error) }
+        )
     );
   }
 
@@ -242,19 +254,21 @@ Respond with valid JSON matching the required schema.`;
       // Just get the explicitly configured schema by name to ensure deterministic behavior
       return globalSchemaRegistry.getSchema(this.config.schemaName || 'minimal');
     } catch (error) {
-      return failure(createOllamaNativeClassificationError(
-        'SCHEMA_SELECTION_FAILED',
-        `Schema selection failed: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
-        { error: String(error) }
-      ));
+      return failure(
+        createOllamaNativeClassificationError(
+          'SCHEMA_SELECTION_FAILED',
+          `Schema selection failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { error: String(error) }
+        )
+      );
     }
   }
 
   private buildPrompt(input: string, context?: ProcessingContext): Result<string, QiError> {
     try {
       const contextStr = this.formatContext(context);
-      
+
       // Use pre-built template with simple string replacement
       const prompt = this.promptTemplate
         .replace('{{INPUT}}', input)
@@ -262,26 +276,30 @@ Respond with valid JSON matching the required schema.`;
 
       return success(prompt);
     } catch (error) {
-      return failure(createOllamaNativeClassificationError(
-        'PROMPT_BUILD_FAILED',
-        `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
-        { input, error: String(error) }
-      ));
+      return failure(
+        createOllamaNativeClassificationError(
+          'PROMPT_BUILD_FAILED',
+          `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { input, error: String(error) }
+        )
+      );
     }
   }
 
   private createOllamaJsonSchema(): Result<object, QiError> {
     if (!this.selectedSchema) {
-      return failure(createOllamaNativeClassificationError(
-        'NO_SCHEMA_SELECTED',
-        'Schema must be explicitly selected - no default schema available',
-        'SYSTEM'
-      ));
+      return failure(
+        createOllamaNativeClassificationError(
+          'NO_SCHEMA_SELECTED',
+          'Schema must be explicitly selected - no default schema available',
+          'SYSTEM'
+        )
+      );
     }
 
     const schemaName = this.selectedSchema.metadata.name;
-    
+
     if (schemaName === 'minimal') {
       return success({
         type: 'object',
@@ -289,16 +307,16 @@ Respond with valid JSON matching the required schema.`;
           type: {
             type: 'string',
             enum: ['prompt', 'workflow'],
-            description: 'Classification: prompt (single-step) or workflow (multi-step)'
+            description: 'Classification: prompt (single-step) or workflow (multi-step)',
           },
           confidence: {
             type: 'number',
             minimum: 0,
             maximum: 1,
-            description: 'Confidence score from 0.0 to 1.0'
-          }
+            description: 'Confidence score from 0.0 to 1.0',
+          },
         },
-        required: ['type', 'confidence']
+        required: ['type', 'confidence'],
       });
     } else if (schemaName === 'standard') {
       return success({
@@ -307,20 +325,20 @@ Respond with valid JSON matching the required schema.`;
           type: {
             type: 'string',
             enum: ['prompt', 'workflow'],
-            description: 'Classification: prompt (single-step) or workflow (multi-step)'
+            description: 'Classification: prompt (single-step) or workflow (multi-step)',
           },
           confidence: {
             type: 'number',
             minimum: 0,
             maximum: 1,
-            description: 'Confidence score from 0.0 to 1.0'
+            description: 'Confidence score from 0.0 to 1.0',
           },
           reasoning: {
             type: 'string',
-            description: 'Brief explanation of the classification decision'
-          }
+            description: 'Brief explanation of the classification decision',
+          },
         },
-        required: ['type', 'confidence', 'reasoning']
+        required: ['type', 'confidence', 'reasoning'],
       });
     } else if (schemaName === 'context_aware') {
       return success({
@@ -329,49 +347,63 @@ Respond with valid JSON matching the required schema.`;
           type: {
             type: 'string',
             enum: ['prompt', 'workflow'],
-            description: 'prompt: direct question/request, workflow: requires multiple coordinated steps'
+            description:
+              'prompt: direct question/request, workflow: requires multiple coordinated steps',
           },
           confidence: {
             type: 'number',
             minimum: 0,
             maximum: 1,
-            description: 'Confidence score from 0.0 to 1.0'
+            description: 'Confidence score from 0.0 to 1.0',
           },
           reasoning: {
             type: 'string',
-            description: 'Brief explanation of classification decision'
+            description: 'Brief explanation of classification decision',
           },
           conversation_context: {
             type: 'string',
             enum: ['greeting', 'question', 'follow_up', 'task_request', 'multi_step'],
-            description: 'Context type: greeting/question/follow_up always prompt, task_request/multi_step may be workflow'
+            description:
+              'Context type: greeting/question/follow_up always prompt, task_request/multi_step may be workflow',
           },
           step_count: {
             type: 'integer',
             minimum: 1,
-            description: 'Estimated number of steps needed (1=prompt, 2+=workflow)'
+            description: 'Estimated number of steps needed (1=prompt, 2+=workflow)',
           },
           requires_coordination: {
             type: 'boolean',
-            description: 'Does this require coordinating multiple tools/services?'
-          }
+            description: 'Does this require coordinating multiple tools/services?',
+          },
         },
-        required: ['type', 'confidence', 'reasoning', 'conversation_context', 'step_count', 'requires_coordination']
+        required: [
+          'type',
+          'confidence',
+          'reasoning',
+          'conversation_context',
+          'step_count',
+          'requires_coordination',
+        ],
       });
     } else {
-      return failure(createOllamaNativeClassificationError(
-        'UNSUPPORTED_SCHEMA',
-        `Schema '${schemaName}' is not supported by ollama-native method. Supported schemas: minimal, standard, context_aware`,
-        'SYSTEM',
-        { 
-          requested_schema: schemaName,
-          supported_schemas: ['minimal', 'standard', 'context_aware']
-        }
-      ));
+      return failure(
+        createOllamaNativeClassificationError(
+          'UNSUPPORTED_SCHEMA',
+          `Schema '${schemaName}' is not supported by ollama-native method. Supported schemas: minimal, standard, context_aware`,
+          'SYSTEM',
+          {
+            requested_schema: schemaName,
+            supported_schemas: ['minimal', 'standard', 'context_aware'],
+          }
+        )
+      );
     }
   }
 
-  private async callOllamaNativeAPI(prompt: string, jsonSchema: object): Promise<OllamaGenerateResponse> {
+  private async callOllamaNativeAPI(
+    prompt: string,
+    jsonSchema: object
+  ): Promise<OllamaGenerateResponse> {
     // For now, keep direct fetch approach but with better error handling and retry logic
     const requestBody = {
       model: this.config.modelId,
@@ -381,7 +413,7 @@ Respond with valid JSON matching the required schema.`;
       options: {
         temperature: this.config.temperature,
         num_predict: 500, // Limit response length for classification
-      }
+      },
     };
 
     const controller = new AbortController();
@@ -389,7 +421,7 @@ Respond with valid JSON matching the required schema.`;
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     let lastError: Error | null = null;
-    
+
     // Add retry logic for better reliability (like prompt module would provide)
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -406,35 +438,35 @@ Respond with valid JSON matching the required schema.`;
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Unknown error');
-          throw new Error(`Ollama API error: ${response.status} ${response.statusText} - ${errorText}`);
+          throw new Error(
+            `Ollama API error: ${response.status} ${response.statusText} - ${errorText}`
+          );
         }
 
-        const result = await response.json() as OllamaGenerateResponse;
-        
+        const result = (await response.json()) as OllamaGenerateResponse;
+
         // Validate response structure
         if (!result || typeof result.response !== 'string') {
           throw new Error(`Invalid Ollama response structure: missing response field`);
         }
 
         return result;
-        
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         if (error instanceof Error && error.name === 'AbortError') {
           clearTimeout(timeoutId);
           throw new Error(`Ollama API timeout after ${timeoutMs / 1000} seconds`);
         }
-        
+
         // If this isn't the last attempt, wait before retrying
         if (attempt < 3) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
           console.warn(`Ollama API attempt ${attempt} failed, retrying...`, lastError.message);
-          continue;
         }
       }
     }
-    
+
     clearTimeout(timeoutId);
     throw lastError || new Error('All retry attempts failed');
   }
@@ -446,7 +478,7 @@ Respond with valid JSON matching the required schema.`;
     try {
       // Use LangChain JsonOutputParser
       const parsedResult = await this.jsonParser.parse(ollamaResponse.response);
-      
+
       // Validate and sanitize required fields
       if (!parsedResult || typeof parsedResult !== 'object') {
         throw new Error('Response is not a valid object');
@@ -454,12 +486,14 @@ Respond with valid JSON matching the required schema.`;
 
       // Validate type field
       if (!parsedResult.type || !['prompt', 'workflow', 'command'].includes(parsedResult.type)) {
-        throw new Error(`Invalid type field: ${parsedResult.type}. Must be 'prompt', 'workflow', or 'command'`);
+        throw new Error(
+          `Invalid type field: ${parsedResult.type}. Must be 'prompt', 'workflow', or 'command'`
+        );
       }
 
       // Validate and sanitize confidence
       let confidence = parsedResult.confidence;
-      if (typeof confidence !== 'number' || isNaN(confidence)) {
+      if (typeof confidence !== 'number' || Number.isNaN(confidence)) {
         console.warn(`Invalid confidence value: ${confidence}, defaulting to 0.5`);
         confidence = 0.5;
       }
@@ -498,26 +532,26 @@ Respond with valid JSON matching the required schema.`;
       };
 
       return classificationResult;
-
     } catch (error) {
-      throw new Error(`Failed to process Ollama response: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to process Ollama response: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
-
   private formatContext(context?: ProcessingContext): string {
     if (!context) return '';
-    
+
     const contextParts: string[] = [];
-    
+
     if (context.previousInputs && context.previousInputs.length > 0) {
       contextParts.push(`\n**Previous Context:** ${context.previousInputs.slice(-3).join(', ')}`);
     }
-    
+
     if (context.source) {
       contextParts.push(`**Source:** ${context.source}`);
     }
-    
+
     return contextParts.length > 0 ? contextParts.join('\n') : '';
   }
 }

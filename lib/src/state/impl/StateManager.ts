@@ -253,7 +253,7 @@ export class StateManager implements IStateManager {
     this.promptConfig = { ...this.promptConfig, model };
 
     // Also update the current model to keep it in sync
-    const oldCurrentModel = this.currentModel;
+    const _oldCurrentModel = this.currentModel;
     this.currentModel = model;
 
     // Update the underlying config
@@ -335,7 +335,7 @@ export class StateManager implements IStateManager {
     }
     // Return list of enabled providers
     return Object.keys(this.llmConfig.llm.providers).filter(
-      providerId => this.llmConfig?.llm?.providers?.[providerId]?.enabled === true
+      (providerId) => this.llmConfig?.llm?.providers?.[providerId]?.enabled === true
     );
   }
 

@@ -1,38 +1,36 @@
 /**
  * CLI Factories - Framework creation functions
- * 
+ *
  * This module exports factory functions for creating CLI instances
  * with different terminal frameworks and configurations.
  */
 
-// Framework-agnostic factory
-export {
-  createCLI,
-  createValidatedCLI,
-  createCLIAsync,
-  getFrameworkSupport,
-  checkFrameworkSupport,
-  recommendFramework,
-  createEventDrivenCLI,
-  getAvailableFrameworks,
-  type CLIFramework,
-  type CLIConfigWithFramework,
-} from './createCLI.js';
-
-// Readline framework factory
-export {
-  createReadlineCLI,
-  createValidatedReadlineCLI,
-  createReadlineCLIAsync,
-  getDefaultReadlineConfig,
-  checkReadlineSupport,
-} from './createReadlineCLI.js';
-
 // Re-export core interfaces
 export type {
-  ICLIFramework,
   CLIConfig,
-  CLIState,
   CLIMode,
+  CLIState,
+  ICLIFramework,
   MessageType,
 } from '../abstractions/ICLIFramework.js';
+// Framework-agnostic factory
+export {
+  type CLIConfigWithFramework,
+  type CLIFramework,
+  checkFrameworkSupport,
+  createCLI,
+  createCLIAsync,
+  createEventDrivenCLI,
+  createValidatedCLI,
+  getAvailableFrameworks,
+  getFrameworkSupport,
+  recommendFramework,
+} from './createCLI.js';
+// Readline framework factory
+export {
+  checkReadlineSupport,
+  createReadlineCLI,
+  createReadlineCLIAsync,
+  createValidatedReadlineCLI,
+  getDefaultReadlineConfig,
+} from './createReadlineCLI.js';

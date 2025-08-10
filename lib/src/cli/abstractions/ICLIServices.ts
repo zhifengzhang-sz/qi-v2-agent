@@ -1,11 +1,11 @@
 /**
  * CLI Services abstraction interfaces
- * 
+ *
  * Defines interfaces for shared services that use QiCore patterns internally.
  * These services are framework-agnostic and used by all terminal implementations.
  */
 
-import type { Result, QiError } from '@qi/base';
+import type { QiError, Result } from '@qi/base';
 
 /**
  * Event manager interface for CLI event handling
@@ -61,7 +61,10 @@ export interface CommandParseResult {
 /**
  * Command handler function type
  */
-export type CommandHandler = (args: string[], flags: Record<string, string | boolean>) => Promise<Result<string, QiError>>;
+export type CommandHandler = (
+  args: string[],
+  flags: Record<string, string | boolean>
+) => Promise<Result<string, QiError>>;
 
 /**
  * Command router interface for parsing and routing commands
@@ -75,7 +78,11 @@ export interface ICommandRouter {
   /**
    * Handle a parsed command
    */
-  handleCommand(command: string, args: string[], flags: Record<string, string | boolean>): Promise<Result<string, QiError>>;
+  handleCommand(
+    command: string,
+    args: string[],
+    flags: Record<string, string | boolean>
+  ): Promise<Result<string, QiError>>;
 
   /**
    * Register a command handler

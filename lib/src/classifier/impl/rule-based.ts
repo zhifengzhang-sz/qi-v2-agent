@@ -4,15 +4,25 @@
 // Low accuracy (~8-9%) but very fast (~8-180ms) - good for fallback
 // Internal layer implementation - uses proper QiCore Result<T> patterns
 
-import { create, failure, fromAsyncTryCatch, match, success, type ErrorCategory, type QiError, type Result } from '@qi/base';
-import { createRuleBasedError, type RuleBasedClassificationErrorContext } from '../shared/error-types.js';
+import {
+  type ErrorCategory,
+  failure,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type {
   ClassificationMethod,
   ClassificationResult,
   IClassificationMethod,
   ProcessingContext,
 } from '../abstractions/index.js';
-import { detectCommand } from './command-detection-utils.js';
+import {
+  createRuleBasedError,
+  type RuleBasedClassificationErrorContext,
+} from '../shared/error-types.js';
 
 /**
  * Custom error factory for rule-based classification errors using standardized error types
@@ -26,7 +36,7 @@ const createRuleBasedClassificationError = (
 
 export class RuleBasedClassificationMethod implements IClassificationMethod {
   private config: RuleBasedConfig;
-  
+
   // Performance tracking
   private totalClassifications = 0;
   private totalLatencyMs = 0;
@@ -91,28 +101,34 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
       async () => {
         return await this.classifyInternal(input, context);
       },
-      (error: unknown) => createRuleBasedClassificationError(
-        'RULE_CLASSIFICATION_FAILED',
-        `Rule-based classification failed: ${error instanceof Error ? error.message : String(error)}`,
-        'SYSTEM',
-        { error: String(error), method: 'rule-based' }
-      )
+      (error: unknown) =>
+        createRuleBasedClassificationError(
+          'RULE_CLASSIFICATION_FAILED',
+          `Rule-based classification failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { error: String(error), method: 'rule-based' }
+        )
     );
 
     // Convert Result<T> to ClassificationResult for interface layer
     return match(
       (result: ClassificationResult) => result,
-      (error) => { throw new Error("RuleBased classification failed: " + error.message); },
+      (error) => {
+        throw new Error(`RuleBased classification failed: ${error.message}`);
+      },
       classificationResult
     );
   }
 
-  private async classifyInternal(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+  private async classifyInternal(
+    input: string,
+    context?: ProcessingContext
+  ): Promise<ClassificationResult> {
     const startTime = Date.now();
-    
+
     // Use flatMap chains for proper error propagation
     const validationResult = this.validateInputInternal(input);
-    
+
     return match(
       (validatedInput: string) => {
         const trimmedInput = validatedInput.trim();
@@ -132,44 +148,55 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
 
         return this.createWorkflowResult(complexityAnalysis, startTime);
       },
-      (error) => { throw new Error(error.message); },
+      (error) => {
+        throw new Error(error.message);
+      },
       validationResult
     );
   }
 
   private validateInputInternal(input: string): Result<string, QiError> {
     if (!input || typeof input !== 'string') {
-      return failure(createRuleBasedClassificationError(
-        'INVALID_INPUT',
-        'Input must be a non-empty string',
-        'VALIDATION',
-        { input: String(input), operation: 'validation' }
-      ));
+      return failure(
+        createRuleBasedClassificationError(
+          'INVALID_INPUT',
+          'Input must be a non-empty string',
+          'VALIDATION',
+          { input: String(input), operation: 'validation' }
+        )
+      );
     }
 
     const trimmed = input.trim();
     if (trimmed.length === 0) {
-      return failure(createRuleBasedClassificationError(
-        'EMPTY_INPUT',
-        'Input cannot be empty or only whitespace',
-        'VALIDATION',
-        { input, operation: 'validation' }
-      ));
+      return failure(
+        createRuleBasedClassificationError(
+          'EMPTY_INPUT',
+          'Input cannot be empty or only whitespace',
+          'VALIDATION',
+          { input, operation: 'validation' }
+        )
+      );
     }
 
     if (trimmed.length > 10000) {
-      return failure(createRuleBasedClassificationError(
-        'INPUT_TOO_LONG',
-        'Input exceeds maximum length of 10,000 characters',
-        'VALIDATION',
-        { length: trimmed.length, operation: 'validation' }
-      ));
+      return failure(
+        createRuleBasedClassificationError(
+          'INPUT_TOO_LONG',
+          'Input exceeds maximum length of 10,000 characters',
+          'VALIDATION',
+          { length: trimmed.length, operation: 'validation' }
+        )
+      );
     }
 
     return success(trimmed);
   }
 
-  private detectCommandInternal(trimmedInput: string, startTime: number): ClassificationResult | null {
+  private detectCommandInternal(
+    trimmedInput: string,
+    startTime: number
+  ): ClassificationResult | null {
     // TRUE 3-WAY CLASSIFICATION: Check commands as part of classification, not shortcut
     if (trimmedInput.startsWith(this.config.commandPrefix)) {
       return {
@@ -190,9 +217,12 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     return null;
   }
 
-  private createPromptResult(complexityAnalysis: any, startTime: number): ClassificationResult {
+  private createPromptResult(
+    complexityAnalysis: ComplexityAnalysis,
+    startTime: number
+  ): ClassificationResult {
     const latency = this.trackPerformance(startTime, true);
-    
+
     return {
       type: 'prompt',
       confidence: complexityAnalysis.confidence,
@@ -211,9 +241,12 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     };
   }
 
-  private createWorkflowResult(complexityAnalysis: any, startTime: number): ClassificationResult {
+  private createWorkflowResult(
+    complexityAnalysis: ComplexityAnalysis,
+    startTime: number
+  ): ClassificationResult {
     const latency = this.trackPerformance(startTime, true);
-    
+
     return {
       type: 'workflow',
       confidence: complexityAnalysis.confidence,
@@ -232,31 +265,30 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     };
   }
 
-
   /**
    * Track performance metrics for classification
    */
   private trackPerformance(startTime: number, success: boolean): number {
     const latency = Date.now() - startTime;
-    
+
     this.totalClassifications++;
     this.totalLatencyMs += latency;
-    
+
     if (success) {
       this.successfulClassifications++;
     }
-    
+
     // Keep recent history (last 100 classifications)
     this.performanceHistory.push({
       latency,
       success,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-    
+
     if (this.performanceHistory.length > 100) {
       this.performanceHistory.shift();
     }
-    
+
     return latency;
   }
 
@@ -315,8 +347,10 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     // Strong prompt indicators (high confidence)
     const hasStrongPromptSignals = indicators.promptSignals.length >= 2;
     const isShortQuestion = indicators.questionWords.length > 0 && input.length < 30;
-    const isConversational = /^(hi|hello|hey|thanks|thank you|ok|yes|no|sure)\b/i.test(input.trim());
-    
+    const isConversational = /^(hi|hello|hey|thanks|thank you|ok|yes|no|sure)\b/i.test(
+      input.trim()
+    );
+
     if (hasStrongPromptSignals || isShortQuestion || isConversational) {
       return true;
     }
@@ -326,11 +360,20 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
     const hasFileReferences = indicators.fileReferences.length > 0;
     const hasTechnicalTerms = indicators.technicalTerms.length > 0;
     const hasMultiStep = indicators.multiStepIndicators.length > 0;
-    const isTaskOriented = /\b(find|search|book|reserve|get|show|list|add|remove|delete|update|change|set)\b/i.test(input);
+    const isTaskOriented =
+      /\b(find|search|book|reserve|get|show|list|add|remove|delete|update|change|set)\b/i.test(
+        input
+      );
     const isRequest = /\b(please|can you|could you|would you|i want|i need|help me)\b/i.test(input);
-    
+
     // If it has workflow characteristics, it's likely a workflow
-    if (hasWorkflowSignals || hasFileReferences || hasTechnicalTerms || hasMultiStep || (isTaskOriented && isRequest)) {
+    if (
+      hasWorkflowSignals ||
+      hasFileReferences ||
+      hasTechnicalTerms ||
+      hasMultiStep ||
+      (isTaskOriented && isRequest)
+    ) {
       return false; // Not a simple prompt, likely a workflow
     }
 

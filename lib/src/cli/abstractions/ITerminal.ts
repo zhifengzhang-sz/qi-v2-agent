@@ -1,6 +1,6 @@
 /**
  * Terminal abstraction interface
- * 
+ *
  * Provides a framework-agnostic interface for terminal operations.
  * Implemented by ReadlineTerminal, InkTerminal, and BlessedTerminal.
  */

@@ -1,24 +1,22 @@
 /**
  * CLI Frameworks - Two framework implementations
- * 
+ *
  * This module provides access to the two supported CLI frameworks:
  * - readline (custom, zero dependencies)
  * - ink (React-based rich UI)
  */
 
-// Readline framework (complete implementation)
-export * from './readline/index.js';
-
 // Ink framework (complete implementation - requires: bun add ink @inkjs/ui)
 export * from './ink/framework-index.js';
-
+export { checkInkSupport } from './ink/framework-index.js';
+// Readline framework (complete implementation)
+export * from './readline/index.js';
 // Framework support checking
 export { checkReadlineSupport } from './readline/index.js';
-export { checkInkSupport } from './ink/framework-index.js'; 
 
+import { checkInkSupport } from './ink/framework-index.js';
 // Import functions for internal use
 import { checkReadlineSupport } from './readline/index.js';
-import { checkInkSupport } from './ink/framework-index.js';
 
 // Type definitions
 export type CLIFrameworkType = 'readline' | 'ink';
@@ -28,11 +26,11 @@ export type CLIFrameworkType = 'readline' | 'ink';
  */
 export function getAvailableFrameworks(): CLIFrameworkType[] {
   const frameworks: CLIFrameworkType[] = ['readline']; // Always available
-  
+
   if (checkInkSupport().available) {
     frameworks.push('ink');
   }
-  
+
   return frameworks;
 }
 

@@ -4,27 +4,56 @@
  * Implements the same IAgent interface as QiCodeAgent but with simplified 2-category parsing:
  * - Commands (start with /) → route to command handler
  * - Prompts (everything else) → route to prompt handler
- * 
+ *
  * No classifier, no workflow - just command vs prompt routing.
- * 
+ *
  * Now includes EventEmitter for responsive UI with progress tracking and cancellation.
  */
 
 import { EventEmitter } from 'node:events';
-import { create, fromAsyncTryCatch, match, success, failure, type ErrorCategory, type QiError, type Result } from '@qi/base';
+import type { CommandRequest, ICommandHandler } from '@qi/agent/command';
 import type { IContextManager } from '@qi/agent/context';
-import { createContextAwarePromptHandler } from '@qi/agent/context/utils/ContextAwarePrompting';
-import type { IPromptHandler, PromptOptions } from '@qi/agent/prompt';
+import {
+  type ContextAwarePromptHandler,
+  createContextAwarePromptHandler,
+} from '@qi/agent/context/utils/ContextAwarePrompting';
+import type { IPromptHandler, PromptOptions, PromptResponse } from '@qi/agent/prompt';
 import type { IStateManager } from '@qi/agent/state';
-import type { ICommandHandler, CommandRequest } from '@qi/agent/command';
+import { create, type ErrorCategory, type QiError } from '@qi/base';
 import type {
   AgentConfig,
+  AgentContext,
   AgentRequest,
   AgentResponse,
   AgentStatus,
   AgentStreamChunk,
   IAgent,
 } from './abstractions/index.js';
+
+// Event types for CLI interactions
+interface ModelChangeEvent {
+  modelName: string;
+}
+
+interface ModeChangeEvent {
+  mode: string;
+}
+
+interface PromptEvent {
+  prompt: string;
+  context?: AgentContext;
+}
+
+interface StatusEvent {
+  // Status requests don't need specific data
+  [key: string]: unknown;
+}
+
+interface CancelEvent {
+  // Cancel requests don't need specific data
+  [key: string]: unknown;
+}
+
 // Event types will be provided by the app layer when instantiating
 // This follows the generic framework pattern where app provides the content types
 
@@ -69,19 +98,19 @@ export interface ParsedInput {
  */
 export function parseInput(input: string): ParsedInput {
   const trimmed = input.trim();
-  
+
   if (trimmed.startsWith('/')) {
     return {
       type: 'command',
       raw: input,
-      content: trimmed.slice(1) // Remove the leading `/`
+      content: trimmed.slice(1), // Remove the leading `/`
     };
   }
-  
+
   return {
     type: 'prompt',
     raw: input,
-    content: trimmed
+    content: trimmed,
   };
 }
 
@@ -94,7 +123,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   private contextManager: IContextManager;
   private commandHandler?: ICommandHandler;
   private promptHandler?: IPromptHandler;
-  private contextAwarePromptHandler?: any;
+  private contextAwarePromptHandler?: ContextAwarePromptHandler;
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -125,7 +154,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     this.config = config;
     this.commandHandler = dependencies.commandHandler;
     this.promptHandler = dependencies.promptHandler;
-    
+
     // Set up CLI event handlers
     this.setupCLIEventHandlers();
   }
@@ -136,16 +165,16 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   private setupCLIEventHandlers(): void {
     // Handle model change requests from CLI
     this.on('modelChangeRequested', this.handleModelChangeRequest.bind(this));
-    
+
     // Handle mode change requests from CLI
     this.on('modeChangeRequested', this.handleModeChangeRequest.bind(this));
-    
+
     // Handle prompt requests from CLI
     this.on('promptRequested', this.handlePromptRequest.bind(this));
-    
+
     // Handle status requests from CLI
     this.on('statusRequested', this.handleStatusRequest.bind(this));
-    
+
     // Handle cancel requests from CLI
     this.on('cancelRequested', this.handleCancelRequest.bind(this));
   }
@@ -189,6 +218,9 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       this.emit('progress', { phase: 'parsing', progress: 0.1, details: 'Analyzing input...' });
       this.emit('message', { content: 'Processing request...', type: 'status' });
 
+      // Emit processInput event for toolbox workflow processing
+      this.emit('processInput', request.input);
+
       // Parse input: command vs prompt (2-category, no workflow)
       const parsed = parseInput(request.input);
 
@@ -197,17 +229,29 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         throw new Error('Request was cancelled');
       }
 
-      this.emit('progress', { phase: 'routing', progress: 0.2, details: `Routing to ${parsed.type} handler...` });
+      this.emit('progress', {
+        phase: 'routing',
+        progress: 0.2,
+        details: `Routing to ${parsed.type} handler...`,
+      });
 
       let response: AgentResponse;
 
       switch (parsed.type) {
         case 'command':
-          this.emit('progress', { phase: 'command_processing', progress: 0.3, details: 'Executing command...' });
+          this.emit('progress', {
+            phase: 'command_processing',
+            progress: 0.3,
+            details: 'Executing command...',
+          });
           response = await this.handleCommand(request, parsed.content);
           break;
         case 'prompt':
-          this.emit('progress', { phase: 'llm_processing', progress: 0.3, details: 'Sending to LLM...' });
+          this.emit('progress', {
+            phase: 'llm_processing',
+            progress: 0.3,
+            details: 'Sending to LLM...',
+          });
           response = await this.handlePrompt(request, parsed.content);
           break;
         default:
@@ -219,7 +263,11 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         throw new Error('Request was cancelled during processing');
       }
 
-      this.emit('progress', { phase: 'completing', progress: 0.9, details: 'Finalizing response...' });
+      this.emit('progress', {
+        phase: 'completing',
+        progress: 0.9,
+        details: 'Finalizing response...',
+      });
 
       const executionTime = Date.now() - startTime;
       this.totalResponseTime += executionTime;
@@ -231,7 +279,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
           ...Array.from(response.metadata.entries()),
           ['inputType', parsed.type],
           ['parser', '2-category'],
-          ['orchestrator', 'PromptApp']
+          ['orchestrator', 'PromptApp'],
         ]),
       };
 
@@ -245,18 +293,22 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
 
       // Check if it was a cancellation
       const wasCancelled = error instanceof Error && error.message.includes('cancelled');
-      
+
       if (wasCancelled) {
         this.emit('cancelled', { reason: 'user_requested' });
         this.emit('message', { content: 'Request was cancelled', type: 'error' });
       } else {
         // Emit error events
-        const qiError = error instanceof Error 
-          ? createAgentError('PROCESSING_FAILED', error.message, 'SYSTEM')
-          : createAgentError('UNKNOWN_ERROR', String(error), 'SYSTEM');
-        
+        const qiError =
+          error instanceof Error
+            ? createAgentError('PROCESSING_FAILED', error.message, 'SYSTEM')
+            : createAgentError('UNKNOWN_ERROR', String(error), 'SYSTEM');
+
         this.emit('error', { error: qiError, context: 'process' });
-        this.emit('message', { content: `Error: ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
+        this.emit('message', {
+          content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+          type: 'error',
+        });
       }
 
       return {
@@ -267,7 +319,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         metadata: new Map([
           ['error', error instanceof Error ? error.message : String(error)],
           ['cancelled', wasCancelled.toString()],
-          ['orchestrator', 'PromptApp']
+          ['orchestrator', 'PromptApp'],
         ]),
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -298,14 +350,14 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   async *stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk> {
     // Parse and yield classification
     const parsed = parseInput(request.input);
-    
+
     yield {
       type: 'classification',
       content: `Parsed as ${parsed.type}`,
       isComplete: false,
       metadata: new Map([
         ['inputType', parsed.type],
-        ['parser', '2-category']
+        ['parser', '2-category'],
       ]),
     };
 
@@ -375,17 +427,17 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     const parts = commandContent.trim().split(/\s+/);
     const commandName = parts[0];
     const parameters = new Map<string, unknown>();
-    
+
     // Simple parameter parsing (can be enhanced later)
     for (let i = 1; i < parts.length; i++) {
       parameters.set(`arg${i}`, parts[i]);
     }
 
-    // Handle PromptApp-specific commands first  
+    // Handle PromptApp-specific commands first
     if (commandName === 'status' || commandName === 's') {
       return await this.handleStatusCommand();
     }
-    
+
     if (commandName === 'maxTokens' || commandName === 'maxtokens' || commandName === 'tokens') {
       return await this.handleMaxTokensCommand(parts.slice(1));
     }
@@ -415,10 +467,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     };
   }
 
-  private async handlePrompt(
-    request: AgentRequest,
-    promptContent: string
-  ): Promise<AgentResponse> {
+  private async handlePrompt(request: AgentRequest, promptContent: string): Promise<AgentResponse> {
     if (!this.config.enablePrompts) {
       return this.createDisabledResponse('prompt', 'Prompt processing is disabled');
     }
@@ -431,7 +480,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       // Extract prompt options from context if available
       const promptOptions = this.extractPromptOptions(request.context);
 
-      let result: any;
+      let result: PromptResponse;
 
       // Use context-aware prompting if available
       if (this.contextAwarePromptHandler) {
@@ -508,10 +557,13 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
 
   // Helper methods (same as QiCodeAgent)
 
-  private createDisabledResponse(type: string, message: string): AgentResponse {
+  private createDisabledResponse(
+    type: 'command' | 'prompt' | 'workflow',
+    message: string
+  ): AgentResponse {
     return {
       content: message,
-      type: type as any,
+      type: type,
       confidence: 0,
       executionTime: 0,
       metadata: new Map([['status', 'disabled']]),
@@ -520,10 +572,13 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     };
   }
 
-  private createErrorResponse(type: string, message: string): AgentResponse {
+  private createErrorResponse(
+    type: 'command' | 'prompt' | 'workflow',
+    message: string
+  ): AgentResponse {
     return {
       content: `Error: ${message}`,
-      type: type as any,
+      type: type,
       confidence: 0,
       executionTime: 0,
       metadata: new Map([['status', 'error']]),
@@ -532,7 +587,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     };
   }
 
-  private extractPromptOptions(context: any): PromptOptions {
+  private extractPromptOptions(_context: AgentContext): PromptOptions {
     // Extract prompt options from request context
     // This can be enhanced to support model selection, temperature, etc.
     const currentModel = this.stateManager.getCurrentModel();
@@ -545,29 +600,28 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     };
   }
 
-
   private async handleStatusCommand(): Promise<AgentResponse> {
     const promptConfig = this.stateManager.getPromptConfig();
     const currentModel = promptConfig?.model || this.stateManager.getCurrentModel();
     const availableModels = this.stateManager.getAvailablePromptModels();
-    
+
     let statusContent = '📊 Status:\n';
     statusContent += `Provider: ${promptConfig?.provider || 'ollama'}\n`;
     statusContent += `Model: ${currentModel || 'qwen3:0.6b'}\n`;
     statusContent += `Temperature: ${promptConfig?.temperature || 0.1}\n`;
     statusContent += `Max Tokens: ${promptConfig?.maxTokens || 1000}\n`;
-    
+
     if (availableModels.length > 0) {
       statusContent += `\nAvailable Models: ${availableModels.join(', ')}`;
     }
-    
+
     const orchestratorStatus = this.getStatus();
     statusContent += `\n\nSession: ${orchestratorStatus.requestsProcessed} requests processed`;
     if (orchestratorStatus.lastActivity) {
       const timeSince = Math.floor((Date.now() - orchestratorStatus.lastActivity.getTime()) / 1000);
       statusContent += `, last active ${timeSince}s ago`;
     }
-    
+
     return {
       content: statusContent,
       type: 'command',
@@ -576,7 +630,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       metadata: new Map([
         ['commandName', 'status'],
         ['provider', promptConfig?.provider || 'ollama'],
-        ['currentModel', currentModel || 'qwen3:0.6b']
+        ['currentModel', currentModel || 'qwen3:0.6b'],
       ]),
       success: true,
     };
@@ -585,7 +639,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   private async handleMaxTokensCommand(args: string[]): Promise<AgentResponse> {
     const promptConfig = this.stateManager.getPromptConfig();
     const currentMaxTokens = promptConfig?.maxTokens || 1000;
-    
+
     if (args.length === 0) {
       // Show current max tokens
       return {
@@ -596,15 +650,15 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         metadata: new Map([
           ['commandName', 'maxTokens'],
           ['action', 'view'],
-          ['currentMaxTokens', currentMaxTokens.toString()]
+          ['currentMaxTokens', currentMaxTokens.toString()],
         ]),
         success: true,
       };
     }
 
     const newMaxTokens = parseInt(args[0], 10);
-    
-    if (isNaN(newMaxTokens)) {
+
+    if (Number.isNaN(newMaxTokens)) {
       return {
         content: `❌ Invalid number: ${args[0]}\nUse a number between 1 and 32768`,
         type: 'command',
@@ -613,16 +667,16 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         metadata: new Map([
           ['commandName', 'maxTokens'],
           ['action', 'set'],
-          ['error', 'invalid_number']
+          ['error', 'invalid_number'],
         ]),
         success: false,
         error: 'Invalid number',
       };
     }
-    
+
     try {
       this.stateManager.updatePromptMaxTokens(newMaxTokens);
-      
+
       return {
         content: `✅ Max tokens updated: ${newMaxTokens} (was ${currentMaxTokens})`,
         type: 'command',
@@ -632,7 +686,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
           ['commandName', 'maxTokens'],
           ['action', 'set'],
           ['newMaxTokens', newMaxTokens.toString()],
-          ['previousMaxTokens', currentMaxTokens.toString()]
+          ['previousMaxTokens', currentMaxTokens.toString()],
         ]),
         success: true,
       };
@@ -645,7 +699,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         metadata: new Map([
           ['commandName', 'maxTokens'],
           ['action', 'set'],
-          ['error', error instanceof Error ? error.message : String(error)]
+          ['error', error instanceof Error ? error.message : String(error)],
         ]),
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -654,16 +708,16 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   }
 
   // ===========================================
-  // CLI Event Handlers (Event-Driven Communication)  
+  // CLI Event Handlers (Event-Driven Communication)
   // ===========================================
 
   /**
    * Handle model change requests from CLI
    */
-  private async handleModelChangeRequest(event: any): Promise<void> {
+  private async handleModelChangeRequest(event: ModelChangeEvent): Promise<void> {
     const { modelName } = event;
     const currentModel = this.stateManager.getCurrentModel();
-    
+
     try {
       // Validate model is available
       const availableModels = this.stateManager.getAvailablePromptModels();
@@ -674,23 +728,22 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
           newModel: modelName,
           success: false,
           error: `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
         return;
       }
-      
+
       // Update model via StateManager
       this.stateManager.updatePromptModel(modelName);
-      
+
       // Emit success event back to CLI
       this.emit('modelChanged', {
         type: 'modelChanged',
         oldModel: currentModel,
         newModel: modelName,
         success: true,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-      
     } catch (error) {
       this.emit('modelChanged', {
         type: 'modelChanged',
@@ -698,7 +751,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         newModel: modelName,
         success: false,
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
     }
   }
@@ -710,31 +763,30 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
    * while App modes (ready/planning/editing/executing/error) are workflow states.
    * Currently just acknowledging the request without proper state management.
    */
-  private async handleModeChangeRequest(event: any): Promise<void> {
+  private async handleModeChangeRequest(event: ModeChangeEvent): Promise<void> {
     const { mode } = event;
     // TODO: Implement proper mode handling logic
     // For now, just acknowledge the mode change request
-    
+
     try {
       // TODO: Determine if CLI modes should map to App workflow modes
       // Current approach: acknowledge but don't change App mode
-      
+
       // Emit success event back to CLI
       this.emit('modeChanged', {
         type: 'modeChanged',
         oldMode: mode, // TODO: Get actual previous CLI mode
         newMode: mode,
         success: true,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-      
-    } catch (error) {
+    } catch (_error) {
       this.emit('modeChanged', {
         type: 'modeChanged',
         oldMode: mode,
         newMode: mode,
         success: false,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
     }
   }
@@ -742,9 +794,9 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   /**
    * Handle prompt requests from CLI
    */
-  private async handlePromptRequest(event: any): Promise<void> {
+  private async handlePromptRequest(event: PromptEvent): Promise<void> {
     const { prompt, context } = event;
-    
+
     try {
       // Create traditional AgentRequest and process it
       const agentRequest: AgentRequest = {
@@ -752,21 +804,20 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         context: {
           sessionId: context?.sessionId || 'cli-session',
           timestamp: new Date(),
-          source: 'cli'
-        }
+          source: 'cli',
+        },
       };
-      
+
       // Process through traditional flow (will emit progress, complete events)
       await this.process(agentRequest);
-      
     } catch (error) {
       this.emit('error', {
         type: 'error',
         error: {
           code: 'PROMPT_PROCESSING_FAILED',
-          message: error instanceof Error ? error.message : String(error)
+          message: error instanceof Error ? error.message : String(error),
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       });
     }
   }
@@ -774,14 +825,14 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   /**
    * Handle status requests from CLI
    */
-  private async handleStatusRequest(event: any): Promise<void> {
+  private async handleStatusRequest(_event: StatusEvent): Promise<void> {
     try {
       const currentModel = this.stateManager.getCurrentModel();
       const currentMode = this.stateManager.getCurrentMode();
       const promptConfig = this.stateManager.getPromptConfig();
       const uptime = Math.floor(process.uptime());
-      const availableModels = this.stateManager.getAvailablePromptModels();
-      
+      const _availableModels = this.stateManager.getAvailablePromptModels();
+
       this.emit('statusResponse', {
         type: 'statusResponse',
         status: {
@@ -790,19 +841,18 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
           uptime,
           provider: promptConfig?.provider || 'ollama',
           availableCommands: this.commandHandler?.getAvailableCommands().length || 0,
-          memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+          memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-      
     } catch (error) {
       this.emit('error', {
         type: 'error',
         error: {
           code: 'STATUS_REQUEST_FAILED',
-          message: error instanceof Error ? error.message : String(error)
+          message: error instanceof Error ? error.message : String(error),
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       });
     }
   }
@@ -810,7 +860,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   /**
    * Handle cancel requests from CLI
    */
-  private async handleCancelRequest(event: any): Promise<void> {
+  private async handleCancelRequest(_event: CancelEvent): Promise<void> {
     this.cancel();
   }
 }

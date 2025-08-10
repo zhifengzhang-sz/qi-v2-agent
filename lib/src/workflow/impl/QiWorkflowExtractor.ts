@@ -4,7 +4,7 @@
  * LangChain structured output workflow extractor adapted for app layer
  */
 
-import { create, fromAsyncTryCatch, match, success, failure, type ErrorCategory, type QiError, type Result } from '@qi/base';
+import { create, type ErrorCategory, type QiError } from '@qi/base';
 
 // OllamaStructuredWrapper removed - workflow extractor needs reimplementation
 import type {
@@ -19,7 +19,7 @@ import type {
 /**
  * Workflow extractor error factory using QiCore patterns
  */
-const createWorkflowExtractorError = (
+const _createWorkflowExtractorError = (
   code: string,
   message: string,
   category: ErrorCategory,
@@ -27,7 +27,7 @@ const createWorkflowExtractorError = (
 ): QiError => create(code, message, category, context);
 
 // JSON Schema for workflow specification (replacing broken Zod schemas)
-const WorkflowSpecSchema = {
+const _WorkflowSpecSchema = {
   type: 'object',
   properties: {
     id: { type: 'string' },
@@ -94,7 +94,7 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
       // 1. Analyze complexity and determine mode
       const analysis = this.analyzeComplexity(input, context);
       const mode = analysis.detectedMode;
-      const pattern = this.getPatternForMode(mode);
+      const _pattern = this.getPatternForMode(mode);
 
       // 2. Generate workflow - OllamaStructuredWrapper removed, workflow disabled
       // TODO: Reimplement workflow extraction without deleted dependencies
@@ -108,12 +108,12 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
         metadata: new Map([
           ['errorCode', 'WORKFLOW_EXTRACTION_DISABLED'],
           ['dependency', 'OllamaStructuredWrapper'],
-          ['extractionTime', (Date.now() - startTime).toString()]
-        ])
+          ['extractionTime', (Date.now() - startTime).toString()],
+        ]),
       };
 
       // NOTE: The following code is unreachable due to the early return above
-      // 3. Post-process and validate  
+      // 3. Post-process and validate
       // const processedSpec = this.postProcessWorkflowSpec(workflowSpec);
       // const isValid = await this.validateWorkflowSpec(processedSpec);
 
@@ -282,130 +282,6 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
         fileCount,
         complexityCount,
       },
-    };
-  }
-
-  private buildExtractionPrompt(input: string, mode: string, context?: ProcessingContext): string {
-    const contextInfo = context ? this.formatContext(context) : '';
-    const modeInfo = this.supportedModes.find((m) => m.name === mode);
-
-    return `Extract a detailed workflow specification from the user's request.
-
-**User Request:** "${input}"
-
-**Detected Mode:** ${mode}
-${modeInfo ? `**Mode Description:** ${modeInfo.description}` : ''}
-${contextInfo}
-
-**Workflow Requirements:**
-1. Create a unique workflow ID and descriptive name
-2. Break down the request into logical workflow nodes
-3. Each node must have a valid type: input, processing, tool, reasoning, output, decision, or validation
-4. Create edges to define the execution flow between nodes
-5. Include appropriate parameters for each node
-6. Ensure the workflow can accomplish the user's request
-
-**Node Types Guide:**
-- **input**: Receive and process initial user input
-- **processing**: General data processing and transformation
-- **tool**: External tool execution (file operations, API calls, etc.)
-- **reasoning**: Analysis, planning, and decision-making
-- **output**: Generate and format final results
-- **decision**: Conditional branching based on criteria
-- **validation**: Verify results and ensure quality
-
-Generate a complete workflow specification that will effectively accomplish: "${input}"
-
-IMPORTANT: Return ONLY valid JSON data (NOT a schema). Example format:
-{
-  "id": "workflow_123",
-  "name": "Workflow Name", 
-  "description": "What this workflow does",
-  "nodes": [
-    {
-      "id": "node1",
-      "name": "Node Name",
-      "type": "input",
-      "parameters": {}
-    }
-  ],
-  "edges": [
-    {
-      "from": "node1", 
-      "to": "node2"
-    }
-  ],
-  "parameters": {},
-  "steps": []
-}`;
-  }
-
-  private formatContext(context: ProcessingContext): string {
-    if (!context) return '';
-
-    const parts: string[] = [];
-    if (context.sessionId) parts.push(`Session: ${context.sessionId}`);
-    if (context.currentInputType) parts.push(`Input Type: ${context.currentInputType}`);
-    if (context.environmentContext?.size) {
-      parts.push(`Environment: ${Array.from(context.environmentContext.keys()).join(', ')}`);
-    }
-
-    return parts.length > 0 ? `\n**Context:** ${parts.join(' | ')}` : '';
-  }
-
-  private postProcessWorkflowSpec(rawSpec: any): WorkflowSpec {
-    // Convert raw LLM output to proper WorkflowSpec with Maps
-    // Handle cases where LLM returns schema format instead of data
-    const extractValue = (field: any) => {
-      if (typeof field === 'object' && field.value !== undefined) {
-        return field.value; // Schema format: {"type": "string", "value": "actual_value"}
-      }
-      return field; // Direct format: "actual_value"
-    };
-
-    // Extract actual values from potentially schema-formatted response
-    const id = extractValue(rawSpec.id) || `workflow_${Date.now()}`;
-    const name = extractValue(rawSpec.name) || 'Generated Workflow';
-    const description = extractValue(rawSpec.description) || 'Auto-generated workflow';
-    const nodes = rawSpec.nodes || [];
-    const edges = rawSpec.edges || [];
-
-    const processedNodes = nodes.map((node: any) => ({
-      id: node.id,
-      name: node.name,
-      type: node.type,
-      parameters: new Map(Object.entries(node.parameters || {})),
-      requiredTools: node.requiredTools || [],
-      conditions:
-        node.conditions?.map((cond: any) => ({
-          type: cond.type,
-          expression: cond.expression,
-          parameters: new Map(Object.entries(cond.parameters || {})),
-        })) || [],
-      dependencies: node.dependencies || [],
-    }));
-
-    const processedEdges = edges.map((edge: any) => ({
-      from: edge.from,
-      to: edge.to,
-      condition: edge.condition
-        ? {
-            type: edge.condition.type,
-            expression: edge.condition.expression,
-            parameters: new Map(Object.entries(edge.condition.parameters || {})),
-          }
-        : undefined,
-      priority: edge.priority,
-    }));
-
-    return {
-      id,
-      name,
-      description,
-      nodes: processedNodes,
-      edges: processedEdges,
-      parameters: new Map(Object.entries(rawSpec.parameters || {})),
-      steps: processedNodes,
     };
   }
 

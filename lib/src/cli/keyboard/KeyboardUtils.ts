@@ -1,6 +1,6 @@
 /**
  * Keyboard Utilities
- * 
+ *
  * Helper functions for keyboard input handling, key detection, and terminal control.
  */
 
@@ -38,7 +38,7 @@ export const KeyCodes = {
   CTRL_Z: 0x1a,
   ESCAPE: 0x1b,
   DELETE: 0x7f,
-  
+
   // Printable range
   SPACE: 0x20,
   TILDE: 0x7e,
@@ -53,22 +53,22 @@ export const EscapeSequences = {
   DOWN: Buffer.from([0x1b, 0x5b, 0x42]),
   RIGHT: Buffer.from([0x1b, 0x5b, 0x43]),
   LEFT: Buffer.from([0x1b, 0x5b, 0x44]),
-  
+
   // Function keys (F1-F12)
   F1: Buffer.from([0x1b, 0x4f, 0x50]),
   F2: Buffer.from([0x1b, 0x4f, 0x51]),
   F3: Buffer.from([0x1b, 0x4f, 0x52]),
   F4: Buffer.from([0x1b, 0x4f, 0x53]),
-  
+
   // Special combinations
   SHIFT_TAB: Buffer.from([0x1b, 0x5b, 0x5a]),
-  
+
   // Home/End/Page keys
   HOME: Buffer.from([0x1b, 0x5b, 0x48]),
   END: Buffer.from([0x1b, 0x5b, 0x46]),
   PAGE_UP: Buffer.from([0x1b, 0x5b, 0x35, 0x7e]),
   PAGE_DOWN: Buffer.from([0x1b, 0x5b, 0x36, 0x7e]),
-  
+
   // Insert/Delete
   INSERT: Buffer.from([0x1b, 0x5b, 0x32, 0x7e]),
   DELETE_KEY: Buffer.from([0x1b, 0x5b, 0x33, 0x7e]),
@@ -81,13 +81,13 @@ export function matchesEscapeSequence(chunk: Buffer, sequence: Buffer): boolean 
   if (chunk.length !== sequence.length) {
     return false;
   }
-  
+
   for (let i = 0; i < chunk.length; i++) {
     if (chunk[i] !== sequence[i]) {
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -112,7 +112,7 @@ export function controlToString(byte: number): string {
   if (!isControlCharacter(byte)) {
     return String.fromCharCode(byte);
   }
-  
+
   const controlNames: Record<number, string> = {
     [KeyCodes.NULL]: 'NULL',
     [KeyCodes.CTRL_A]: 'CTRL+A',
@@ -144,7 +144,7 @@ export function controlToString(byte: number): string {
     [KeyCodes.ESCAPE]: 'ESC',
     [KeyCodes.DELETE]: 'DELETE',
   };
-  
+
   return controlNames[byte] || `CTRL+${String.fromCharCode(byte + 64)}`;
 }
 
@@ -155,27 +155,29 @@ export function identifyKey(chunk: Buffer): string {
   // Single byte keys
   if (chunk.length === 1) {
     const byte = chunk[0];
-    
+
     if (isControlCharacter(byte)) {
       return controlToString(byte);
     }
-    
+
     if (isPrintable(byte)) {
       return String.fromCharCode(byte);
     }
-    
+
     return `UNKNOWN(0x${byte.toString(16)})`;
   }
-  
+
   // Multi-byte escape sequences
   for (const [name, sequence] of Object.entries(EscapeSequences)) {
     if (matchesEscapeSequence(chunk, sequence)) {
       return name;
     }
   }
-  
+
   // Unknown sequence
-  const bytes = Array.from(chunk).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
+  const bytes = Array.from(chunk)
+    .map((b) => `0x${b.toString(16).padStart(2, '0')}`)
+    .join(' ');
   return `UNKNOWN_SEQ(${bytes})`;
 }
 
@@ -189,14 +191,14 @@ export const Terminal = {
   clearLine(): void {
     process.stdout.write('\r\x1b[K');
   },
-  
+
   /**
    * Move cursor to beginning of line
    */
   cursorToStart(): void {
     process.stdout.write('\r');
   },
-  
+
   /**
    * Move cursor up N lines
    */
@@ -205,7 +207,7 @@ export const Terminal = {
       process.stdout.write(`\x1b[${lines}A`);
     }
   },
-  
+
   /**
    * Move cursor down N lines
    */
@@ -214,49 +216,49 @@ export const Terminal = {
       process.stdout.write(`\x1b[${lines}B`);
     }
   },
-  
+
   /**
    * Hide cursor
    */
   hideCursor(): void {
     process.stdout.write('\x1b[?25l');
   },
-  
+
   /**
    * Show cursor
    */
   showCursor(): void {
     process.stdout.write('\x1b[?25h');
   },
-  
+
   /**
    * Save cursor position
    */
   saveCursor(): void {
     process.stdout.write('\x1b[s');
   },
-  
+
   /**
    * Restore cursor position
    */
   restoreCursor(): void {
     process.stdout.write('\x1b[u');
   },
-  
+
   /**
    * Set text color
    */
   color(colorCode: number): void {
     process.stdout.write(`\x1b[${colorCode}m`);
   },
-  
+
   /**
    * Reset all formatting
    */
   reset(): void {
     process.stdout.write('\x1b[0m');
   },
-  
+
   /**
    * Get terminal dimensions
    */
@@ -279,7 +281,7 @@ export const Colors = {
   BLINK: 5,
   REVERSE: 7,
   HIDDEN: 8,
-  
+
   // Foreground colors
   FG_BLACK: 30,
   FG_RED: 31,
@@ -289,7 +291,7 @@ export const Colors = {
   FG_MAGENTA: 35,
   FG_CYAN: 36,
   FG_WHITE: 37,
-  
+
   // Background colors
   BG_BLACK: 40,
   BG_RED: 41,

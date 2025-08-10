@@ -1,6 +1,6 @@
 /**
  * Readline Stream Renderer implementation
- * 
+ *
  * Implements IStreamRenderer interface using character-by-character output
  * and ANSI escape sequences for streaming animations.
  */
@@ -60,7 +60,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
   private visible = false;
   private isDestroyed = false;
   private streamingTimer: NodeJS.Timeout | null = null;
-  
+
   // Event callbacks
   private onCompleteCallbacks: StreamCompleteCallback[] = [];
   private onCancelCallbacks: StreamCancelCallback[] = [];
@@ -77,7 +77,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.visible = true;
   }
 
@@ -88,7 +88,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.stopStreaming();
     this.visible = false;
   }
@@ -107,7 +107,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.config = { ...this.config, ...config };
   }
 
@@ -118,7 +118,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.cancel();
     this.onCompleteCallbacks = [];
     this.onCancelCallbacks = [];
@@ -132,20 +132,20 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed || this.state.isActive) {
       return;
     }
-    
+
     this.state = {
       ...this.createInitialState(),
       isActive: true,
       startTime: new Date(),
     };
-    
+
     this.visible = true;
-    
+
     // Show cursor if enabled
     if (this.config.showCursor) {
       this.showStreamingCursor();
     }
-    
+
     // Start processing buffer
     this.processBuffer();
   }
@@ -157,15 +157,15 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed || !this.state.isActive || this.state.cancelled) {
       return;
     }
-    
+
     // Add to buffer
     this.state.buffer.push(content);
-    
+
     // Trim buffer if it gets too large
     if (this.state.buffer.length > this.config.bufferSize) {
       this.state.buffer = this.state.buffer.slice(-this.config.bufferSize);
     }
-    
+
     // Process buffer if not already processing
     if (!this.streamingTimer) {
       this.processBuffer();
@@ -179,35 +179,35 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed || !this.state.isActive) {
       return;
     }
-    
+
     // Process any remaining buffer content
     this.flushBuffer();
-    
+
     // Add completion message if provided
     if (message) {
       this.writeContent(`\n${message}\n`);
     } else {
       this.writeContent('\n');
     }
-    
+
     // Hide cursor
     if (this.config.showCursor) {
       this.hideStreamingCursor();
     }
-    
+
     // Update state
     this.state.isActive = false;
     const finalContent = this.state.totalContent;
-    
+
     // Notify completion callbacks
-    this.onCompleteCallbacks.forEach(callback => {
+    this.onCompleteCallbacks.forEach((callback) => {
       try {
         callback(finalContent);
       } catch (error) {
         console.error('Error in stream complete callback:', error);
       }
     });
-    
+
     this.cleanup();
   }
 
@@ -218,30 +218,30 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed || !this.state.isActive) {
       return;
     }
-    
+
     this.state.cancelled = true;
     this.state.isActive = false;
-    
+
     // Stop processing
     this.stopStreaming();
-    
+
     // Add cancellation indicator
     this.writeContent('\n[Streaming cancelled]\n');
-    
+
     // Hide cursor
     if (this.config.showCursor) {
       this.hideStreamingCursor();
     }
-    
+
     // Notify cancellation callbacks
-    this.onCancelCallbacks.forEach(callback => {
+    this.onCancelCallbacks.forEach((callback) => {
       try {
         callback();
       } catch (error) {
         console.error('Error in stream cancel callback:', error);
       }
     });
-    
+
     this.cleanup();
   }
 
@@ -266,7 +266,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.onCompleteCallbacks.push(callback);
   }
 
@@ -274,7 +274,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed) {
       return;
     }
-    
+
     this.onCancelCallbacks.push(callback);
   }
 
@@ -310,15 +310,20 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
   }
 
   private processBuffer(): void {
-    if (this.streamingTimer || !this.state.isActive || this.state.cancelled || this.state.buffer.length === 0) {
+    if (
+      this.streamingTimer ||
+      !this.state.isActive ||
+      this.state.cancelled ||
+      this.state.buffer.length === 0
+    ) {
       return;
     }
-    
+
     const chunk = this.state.buffer.shift();
     if (!chunk) {
       return;
     }
-    
+
     if (this.config.throttleMs > 0) {
       // Character-by-character streaming with throttling
       this.streamChunkSlowly(chunk);
@@ -326,7 +331,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
       // Immediate output
       this.writeContent(chunk);
       this.state.completedChunks++;
-      
+
       // Continue processing buffer
       if (this.state.buffer.length > 0) {
         setImmediate(() => this.processBuffer());
@@ -338,26 +343,26 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.streamingTimer) {
       return;
     }
-    
+
     let position = 0;
-    
+
     this.streamingTimer = setInterval(() => {
       if (this.state.cancelled || !this.state.isActive) {
         this.stopStreaming();
         return;
       }
-      
+
       if (position >= chunk.length) {
         this.stopStreaming();
         this.state.completedChunks++;
-        
+
         // Continue with next chunk
         if (this.state.buffer.length > 0) {
           this.processBuffer();
         }
         return;
       }
-      
+
       const char = chunk[position];
       this.writeContent(char);
       position++;
@@ -378,18 +383,18 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (!this.visible || this.isDestroyed) {
       return;
     }
-    
+
     // Add prefix/suffix if configured
     let output = content;
     if (this.config.prefix && this.state.totalContent === '') {
       output = this.config.prefix + output;
     }
-    
+
     // Apply color if configured
     if (this.config.colorCode && this.supportsColor()) {
       output = this.colorize(output, this.config.colorCode);
     }
-    
+
     // Write to stdout
     try {
       process.stdout.write(output);
@@ -418,7 +423,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
 
   private cleanup(): void {
     this.stopStreaming();
-    
+
     if (this.config.suffix && this.state.totalContent !== '') {
       this.writeContent(this.config.suffix);
     }
@@ -430,15 +435,15 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
 
   private supportsColor(): boolean {
     const { env } = process;
-    
+
     if (env.FORCE_COLOR && env.FORCE_COLOR !== '0') {
       return true;
     }
-    
+
     if (env.NO_COLOR || env.NODE_DISABLE_COLORS) {
       return false;
     }
-    
+
     return process.stdout.isTTY;
   }
 
@@ -465,11 +470,12 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.state.startTime && this.state.isActive) {
       const elapsedMs = Date.now() - this.state.startTime.getTime();
       const elapsedSeconds = elapsedMs / 1000;
-      
+
       return {
         ...stats,
         elapsedTime: elapsedMs,
-        charactersPerSecond: elapsedSeconds > 0 ? this.state.totalContent.length / elapsedSeconds : 0,
+        charactersPerSecond:
+          elapsedSeconds > 0 ? this.state.totalContent.length / elapsedSeconds : 0,
       };
     }
 
@@ -483,7 +489,7 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.config.throttleMs <= 0) {
       return 0;
     }
-    
+
     return content.length * this.config.throttleMs;
   }
 
@@ -494,15 +500,15 @@ export class ReadlineStreamRenderer implements IStreamRenderer {
     if (this.isDestroyed || this.state.isActive) {
       return;
     }
-    
+
     // Move cursor up and clear lines based on content
     const lines = this.state.totalContent.split('\n').length;
-    
+
     for (let i = 0; i < lines; i++) {
       process.stdout.write('\x1b[1A'); // Move up 1 line
       process.stdout.write('\r\x1b[K'); // Clear line
     }
-    
+
     this.state = this.createInitialState();
   }
 }

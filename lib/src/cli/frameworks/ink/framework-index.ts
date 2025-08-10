@@ -1,9 +1,9 @@
 /**
  * Ink Framework (STUB)
- * 
+ *
  * React-based rich UI framework implementation stubs.
  * These will be expanded when Ink framework support is fully implemented.
- * 
+ *
  * Dependencies: bun add ink @inkjs/ui ink-progress-bar ink-spinner
  */
 
@@ -29,12 +29,12 @@ export function checkInkSupport(): { available: boolean; reason: string; package
   try {
     require('ink');
     require('@inkjs/ui');
-    
+
     return {
       available: true,
       reason: 'Ink packages are available',
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       available: false,
       reason: 'Ink packages not found',
