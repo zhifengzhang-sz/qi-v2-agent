@@ -389,6 +389,78 @@ const recommendation = recommendFramework();
 // Will recommend 'hybrid' if both readline TTY and Ink packages available
 ```
 
+## QiCore Integration
+
+### Professional Logging and Error Handling
+
+The hybrid framework leverages QiCore's functional programming patterns for robust error handling and structured logging:
+
+```typescript
+// QiCore logger initialization with Result<T> pattern
+const loggerResult = createLogger({
+  level: 'info',
+  name: 'hybrid-cli-framework',
+  pretty: process.env.NODE_ENV === 'development',
+});
+
+match(
+  (logger) => {
+    this.logger = logger;
+    this.logger.info('Hybrid CLI Framework initialized', {
+      isHybridEnabled: this.isHybridEnabled,
+      framework: 'hybrid',
+      parent: 'ink',
+      configLoaded: this.hybridConfig !== null,
+    });
+  },
+  (error) => {
+    // Graceful degradation - no console.log usage
+    this.logger = null;
+  },
+  loggerResult
+);
+```
+
+### Configuration Management
+
+QiCore configuration patterns with environment variable overrides:
+
+```typescript
+// Configuration with environment overrides
+private getConfigValue<T>(path: string, defaultValue: T): T {
+  if (!this.hybridConfig) return defaultValue;
+  
+  const result = this.hybridConfig.get(path);
+  return match(
+    (value: T) => value,
+    () => defaultValue,
+    result
+  );
+}
+
+// Usage with environment overrides
+const enableTTY = this.getConfigValue('hybrid.enableTTYDetection', true);
+// Can be overridden with HYBRID_ENABLE_TTY_DETECTION=false
+```
+
+### Functional Error Handling
+
+All operations use QiCore's Result<T> patterns instead of try/catch:
+
+```typescript
+// QiCore error creation
+const hybridError = (code: string, message: string, context = {}) =>
+  create(code, message, 'SYSTEM', { framework: 'hybrid', ...context });
+
+// No try/catch blocks - pure functional approach
+const cursorResult = this.getCursorPosition();
+match(
+  (position) => this.logger?.debug('Cursor position', { position }),
+  (error) => this.logger?.error('Failed to get cursor position', { error }),
+  cursorResult
+);
+```
+
 ## Technical Details
 
 ### readline API Essentials
@@ -601,10 +673,14 @@ The Hybrid CLI Framework is now **fully functional** and provides:
 - **History Navigation**: Second press navigates command history  
 - **Multi-line Support**: Natural cursor movement within multi-line input
 - **End Detection**: Smart detection of cursor position and line boundaries
+- **Command Suggestions**: Type `/` to see available commands with arrow key navigation
+- **Tab Completion**: Press Tab to accept highlighted command suggestion
 
 ### ✅ **Enhanced Architecture** 
 - **ReadlineInputManager**: 8 new cursor control methods for precise navigation
 - **HybridCLIFramework**: Refined two-step down arrow implementation
+- **Command Navigation**: Full command suggestion system with smart arrow key routing
+- **QiCore Integration**: Structured logging, configuration management, and functional error handling
 - **Factory Integration**: Full support for `createCLI({ framework: 'hybrid' })`
 - **TypeScript Support**: All implementations fully typed and tested
 

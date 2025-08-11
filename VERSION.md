@@ -1,6 +1,45 @@
 # Qi V2 Agent - Version History
 
-## v-0.5.2 - Hybrid CLI Framework (Current)
+## v-0.5.3 - Command Navigation Enhancement (Current)
+
+### 📅 **Release Date**: 2025-08-11
+
+### 🎯 **Overview**
+Enhanced Hybrid CLI Framework with complete command navigation system. This release adds command suggestion navigation with arrow keys and Tab completion, plus comprehensive QiCore integration for professional error handling and logging.
+
+### ✨ **New Features**
+
+#### 🎯 **Command Navigation System**
+- **Command Suggestions**: Type `/` to see all available commands including the previously missing `/tokens` command
+- **Arrow Key Navigation**: Use ↑/↓ arrows to navigate through command suggestions when visible
+- **Smart Routing**: Arrow keys prioritize command suggestions over cursor/history when suggestions are active
+- **Tab Completion**: Press Tab to accept the currently highlighted command suggestion  
+- **Seamless Integration**: Works in both regular and hybrid modes with proper fallback behavior
+
+#### 🏗️ **QiCore Integration**
+- **Functional Error Handling**: Complete elimination of try/catch blocks in favor of Result<T> patterns
+- **Structured Logging**: Professional logging with createLogger() and match() patterns
+- **Configuration Management**: Environment variable overrides with HYBRID_* prefix
+- **Graceful Degradation**: No console.log usage, proper failure handling throughout
+
+#### 🔧 **Enhanced Components**
+- **useHybridTextInput**: Added Tab key handling for command suggestion acceptance
+- **InputBox Component**: Enhanced command suggestion callbacks for hybrid mode compatibility  
+- **Command Suggestions**: Complete COMMAND_SUGGESTIONS array with all CLI commands
+- **Smart Navigation Logic**: Intelligent routing between command suggestions and cursor navigation
+
+### 📚 **Documentation Updates**
+- **QiCore Integration Guide**: Comprehensive documentation of functional programming patterns
+- **Command Navigation**: Updated hybrid framework docs with navigation features
+- **Configuration Patterns**: Environment variable override documentation
+- **Error Handling**: Examples of Result<T> and match() usage throughout
+
+### 🎯 **Architecture Achievement**
+This release demonstrates the successful integration of QiCore's functional programming principles with sophisticated UI navigation, creating a professional CLI framework that eliminates imperative error handling while providing Claude Code-level user experience.
+
+---
+
+## v-0.5.2 - Hybrid CLI Framework
 
 ### 📅 **Release Date**: 2025-08-11
 

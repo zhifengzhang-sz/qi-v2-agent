@@ -34,6 +34,10 @@ interface UseHybridTextInputProps {
   onSubmit?: (value: string) => void;
   onHistoryUp?: () => void;
   onHistoryDown?: () => void;
+  onCommandSuggestionUp?: () => void;
+  onCommandSuggestionDown?: () => void;
+  onCommandSuggestionAccept?: () => void;
+  hasCommandSuggestions?: boolean;
   columns: number;
   cursorOffset: number;
   onCursorOffsetChange: (offset: number) => void;
@@ -51,6 +55,10 @@ export function useHybridTextInput({
   onSubmit,
   onHistoryUp,
   onHistoryDown,
+  onCommandSuggestionUp,
+  onCommandSuggestionDown,
+  onCommandSuggestionAccept,
+  hasCommandSuggestions = false,
   columns,
   cursorOffset,
   onCursorOffsetChange,
@@ -59,8 +67,14 @@ export function useHybridTextInput({
   // Create cursor from current state (Claude Code pattern)
   const cursor = Cursor.fromText(value, columns, cursorOffset);
 
-  // Claude Code's exact navigation pattern
+  // Enhanced navigation pattern with command suggestions support
   function upOrHistoryUp() {
+    // If command suggestions are visible, navigate through them first
+    if (hasCommandSuggestions) {
+      onCommandSuggestionUp?.();
+      return cursor; // Don't move cursor when navigating suggestions
+    }
+
     // Step 1: Try cursor movement first
     const cursorUp = cursor.up();
 
@@ -75,6 +89,12 @@ export function useHybridTextInput({
   }
 
   function downOrHistoryDown() {
+    // If command suggestions are visible, navigate through them first
+    if (hasCommandSuggestions) {
+      onCommandSuggestionDown?.();
+      return cursor; // Don't move cursor when navigating suggestions
+    }
+
     // Step 1: Try cursor movement first
     const cursorDown = cursor.down();
 
@@ -164,6 +184,16 @@ export function useHybridTextInput({
         return () => cursor.left();
       case key.rightArrow:
         return () => cursor.right();
+      case key.tab:
+        return () => {
+          // If command suggestions are visible, accept current suggestion
+          if (hasCommandSuggestions) {
+            onCommandSuggestionAccept?.();
+            return cursor; // Don't change cursor for tab acceptance
+          }
+          // Otherwise, insert tab character
+          return cursor.insert('\t');
+        };
     }
 
     // Handle regular character input (Claude Code pattern)

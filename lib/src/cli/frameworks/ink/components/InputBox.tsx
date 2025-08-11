@@ -33,7 +33,9 @@ const COMMAND_SUGGESTIONS = [
   { command: '/model', description: 'Switch AI model' },
   { command: '/provider', description: 'Switch AI provider' },
   { command: '/status', description: 'Show system status' },
+  { command: '/tokens', description: 'Set max tokens limit' },
   { command: '/config', description: 'View configuration' },
+  { command: '/exit', description: 'Exit the application' },
   { command: '/permission', description: 'Demo permission dialog' },
 ];
 
@@ -260,6 +262,32 @@ export function InputBox({
     hybridHistory.onHistoryDown();
   };
 
+  // Command suggestion navigation handlers for hybrid mode
+  const handleCommandSuggestionUp = () => {
+    if (suggestions.length === 0) return;
+    setSelectedSuggestionIndex(prev => 
+      prev <= 0 ? suggestions.length - 1 : prev - 1
+    );
+  };
+
+  const handleCommandSuggestionDown = () => {
+    if (suggestions.length === 0) return;
+    setSelectedSuggestionIndex(prev => 
+      prev >= suggestions.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handleCommandSuggestionAccept = () => {
+    if (suggestions.length > 0) {
+      const selectedCommand = suggestions[selectedSuggestionIndex];
+      if (selectedCommand) {
+        setHybridInput(selectedCommand.command + ' ');
+        setHybridCursor(selectedCommand.command.length + 1);
+        setSelectedSuggestionIndex(0);
+      }
+    }
+  };
+
   // In hybrid mode, use proper HybridTextInput following Claude Code architecture
   if (isHybridMode) {
     return (
@@ -273,6 +301,10 @@ export function InputBox({
               onSubmit={handleSubmit}
               onHistoryUp={handleHistoryUp}
               onHistoryDown={handleHistoryDown}
+              onCommandSuggestionUp={handleCommandSuggestionUp}
+              onCommandSuggestionDown={handleCommandSuggestionDown}
+              onCommandSuggestionAccept={handleCommandSuggestionAccept}
+              hasCommandSuggestions={suggestions.length > 0}
               placeholder={placeholder}
               focus={true}
               framework={framework}

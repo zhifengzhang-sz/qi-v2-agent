@@ -43,6 +43,26 @@ export interface HybridTextInputProps {
   onHistoryDown?: () => void;
   
   /**
+   * Called when up arrow is used to navigate command suggestions
+   */
+  onCommandSuggestionUp?: () => void;
+  
+  /**
+   * Called when down arrow is used to navigate command suggestions
+   */
+  onCommandSuggestionDown?: () => void;
+  
+  /**
+   * Called when Tab is pressed to accept current command suggestion
+   */
+  onCommandSuggestionAccept?: () => void;
+  
+  /**
+   * Whether command suggestions are currently visible
+   */
+  hasCommandSuggestions?: boolean;
+  
+  /**
    * Placeholder text when empty
    */
   placeholder?: string;
@@ -88,6 +108,10 @@ export function HybridTextInput({
   onSubmit,
   onHistoryUp,
   onHistoryDown,
+  onCommandSuggestionUp,
+  onCommandSuggestionDown,
+  onCommandSuggestionAccept,
+  hasCommandSuggestions = false,
   placeholder = '',
   focus = true,
   columns = 80,
@@ -103,6 +127,10 @@ export function HybridTextInput({
     onSubmit,
     onHistoryUp,
     onHistoryDown,
+    onCommandSuggestionUp,
+    onCommandSuggestionDown,
+    onCommandSuggestionAccept,
+    hasCommandSuggestions,
     columns,
     cursorOffset,
     onCursorOffsetChange,
