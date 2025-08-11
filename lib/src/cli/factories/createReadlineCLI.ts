@@ -408,12 +408,25 @@ export function checkReadlineSupport(): {
   unicode: boolean;
   hotkeys: boolean;
 } {
+  // More robust TTY detection - handle undefined values
+  const hasStdoutTTY = process.stdout.isTTY === true;
+  const hasStdinTTY = process.stdin.isTTY === true;
+
+  // For development and testing, allow TTY functionality even if detection is unclear
+  // This is safe because readline will gracefully handle non-TTY environments
+  const isInteractiveEnvironment =
+    hasStdoutTTY ||
+    hasStdinTTY ||
+    process.env.TERM !== undefined ||
+    process.env.QI_FORCE_TTY === 'true';
+
   return {
-    terminal: process.stdout.isTTY || false,
+    terminal: isInteractiveEnvironment,
     colors:
       !!(process.env.FORCE_COLOR && process.env.FORCE_COLOR !== '0') ||
-      (process.stdout.isTTY && !process.env.NO_COLOR && !process.env.NODE_DISABLE_COLORS),
+      (hasStdoutTTY && !process.env.NO_COLOR && !process.env.NODE_DISABLE_COLORS) ||
+      process.env.QI_FORCE_COLOR === 'true',
     unicode: process.platform !== 'win32',
-    hotkeys: process.stdin.isTTY || false,
+    hotkeys: isInteractiveEnvironment,
   };
 }

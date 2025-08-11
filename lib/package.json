@@ -30,6 +30,7 @@
     "@langchain/openai": "^0.3.15",
     "@modelcontextprotocol/sdk": "^1.16.0",
     "@qi": "file:../../qi-v2-qicore/typescript",
+    "chalk": "^5.5.0",
     "ink": "^6.1.0",
     "js-yaml": "^4.1.0",
     "ollama": "^0.5.16",

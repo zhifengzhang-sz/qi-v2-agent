@@ -8,6 +8,8 @@
 
 import { create, Err, match, Ok, type QiError, type Result } from '@qi/base';
 import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
+// Import Hybrid framework
+import { HybridCLIFramework } from '../frameworks/hybrid/HybridCLIFramework.js';
 // Import Ink framework
 import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework.js';
 // Framework factories
@@ -21,7 +23,7 @@ import {
 /**
  * Framework types supported by the CLI
  */
-export type CLIFramework = 'readline' | 'ink';
+export type CLIFramework = 'readline' | 'ink' | 'hybrid';
 
 /**
  * Extended CLI configuration with framework selection
@@ -66,12 +68,15 @@ export function createCLI(
     case 'ink':
       return createInkCLI(config);
 
+    case 'hybrid':
+      return createHybridCLI(config);
+
     default:
       return Err(
         cliFactoryError('UNSUPPORTED_FRAMEWORK', `Unsupported framework: ${framework}`, {
           framework,
           operation: 'createCLI',
-          availableFrameworks: ['readline', 'ink'],
+          availableFrameworks: ['readline', 'ink', 'hybrid'],
         })
       );
   }
@@ -99,6 +104,9 @@ export function createValidatedCLI(
 
         case 'ink':
           return createValidatedInkCLI(config);
+
+        case 'hybrid':
+          return createValidatedHybridCLI(config);
 
         default:
           return Err(
@@ -132,6 +140,9 @@ export async function createCLIAsync(
     case 'ink':
       return await createInkCLIAsync(config);
 
+    case 'hybrid':
+      return await createHybridCLIAsync(config);
+
     default:
       return Err(
         cliFactoryError('UNSUPPORTED_FRAMEWORK', `Unsupported framework: ${framework}`, {
@@ -149,6 +160,7 @@ export function getFrameworkSupport(): Record<CLIFramework, any> {
   return {
     readline: checkReadlineSupport(),
     ink: checkInkSupport(),
+    hybrid: checkHybridSupport(),
   };
 }
 
@@ -184,6 +196,19 @@ export function checkFrameworkSupport(framework: CLIFramework): Result<void, QiE
       return Ok(void 0);
     }
 
+    case 'hybrid': {
+      const support = checkHybridSupport();
+      if (!support.available) {
+        return Err(
+          cliFactoryError('HYBRID_NOT_SUPPORTED', support.reason, {
+            framework,
+            supportCheck: support,
+          })
+        );
+      }
+      return Ok(void 0);
+    }
+
     default:
       return Err(
         cliFactoryError('UNKNOWN_FRAMEWORK', `Unknown framework: ${framework}`, { framework })
@@ -200,6 +225,15 @@ export function recommendFramework(): {
   alternatives: CLIFramework[];
 } {
   const support = getFrameworkSupport();
+
+  // Check if Hybrid is available (best of both worlds)
+  if (support.hybrid.available) {
+    return {
+      framework: 'hybrid',
+      reason: 'Combines readline cursor control with Ink rich UI - Claude Code-style navigation',
+      alternatives: ['ink', 'readline'],
+    };
+  }
 
   // Check if Ink is available and terminal supports rich UI
   if (support.ink.available && support.readline.terminal && support.readline.colors) {
@@ -286,6 +320,33 @@ function checkInkSupport(): { available: boolean; reason: string; packages?: str
   }
 }
 
+function checkHybridSupport(): { available: boolean; reason: string; dependencies?: string[] } {
+  const readlineSupport = checkReadlineSupport();
+  const inkSupport = checkInkSupport();
+
+  // Hybrid requires both readline TTY support and Ink packages
+  if (!readlineSupport.terminal) {
+    return {
+      available: false,
+      reason: 'Hybrid framework requires terminal (TTY) support for readline input control',
+      dependencies: ['Terminal/TTY environment'],
+    };
+  }
+
+  if (!inkSupport.available) {
+    return {
+      available: false,
+      reason: `Hybrid framework requires Ink packages for rich UI: ${inkSupport.packages?.join(' ')}`,
+      dependencies: inkSupport.packages,
+    };
+  }
+
+  return {
+    available: true,
+    reason: 'Hybrid framework available - combines readline input control with Ink rich UI',
+  };
+}
+
 // Use the imported function
 
 /**
@@ -309,8 +370,71 @@ export function getAvailableFrameworks(): CLIFramework[] {
     frameworks.push('ink');
   }
 
+  if (checkHybridSupport().available) {
+    frameworks.push('hybrid');
+  }
+
   return frameworks;
 }
 
+// Framework-specific Hybrid factories
+
+function createHybridCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
+  try {
+    // Check if both readline and Ink are available for hybrid mode
+    const readlineSupport = checkReadlineSupport();
+    const inkSupport = checkInkSupport();
+
+    if (!readlineSupport.terminal) {
+      return Err(
+        cliFactoryError(
+          'HYBRID_READLINE_NOT_AVAILABLE',
+          'Hybrid framework requires terminal (TTY) support for readline',
+          { framework: 'hybrid', operation: 'createHybridCLI', supportCheck: readlineSupport }
+        )
+      );
+    }
+
+    if (!inkSupport.available) {
+      return Err(
+        cliFactoryError(
+          'HYBRID_INK_NOT_AVAILABLE',
+          `Hybrid framework requires Ink packages: ${inkSupport.packages?.join(' ')}`,
+          { framework: 'hybrid', operation: 'createHybridCLI', supportCheck: inkSupport }
+        )
+      );
+    }
+
+    // Create hybrid CLI implementation
+    const cli = new HybridCLIFramework(config as CLIConfig);
+
+    return Ok(cli);
+  } catch (error: any) {
+    return Err(
+      cliFactoryError('HYBRID_CREATION_FAILED', `Failed to create Hybrid CLI: ${error.message}`, {
+        framework: 'hybrid',
+        operation: 'createHybridCLI',
+      })
+    );
+  }
+}
+
+function createValidatedHybridCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
+  // Run validation first
+  const validationResult = checkFrameworkSupport('hybrid');
+
+  return match(
+    () => createHybridCLI(config),
+    (error) => Err(error),
+    validationResult
+  );
+}
+
+async function createHybridCLIAsync(
+  config: Partial<CLIConfig> = {}
+): Promise<Result<ICLIFramework, QiError>> {
+  return createHybridCLI(config);
+}
+
 // Export the framework-specific factories for direct use
-export { createInkCLI };
+export { createInkCLI, createHybridCLI };
