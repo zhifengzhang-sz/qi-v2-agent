@@ -24,6 +24,7 @@ Each module has contract specifications and logical structure docs:
 - **[workflow/](workflow/)** - Multi-step task orchestration
 - **[prompt/](prompt/)** - LLM integration and template management
 - **[cli/](cli/)** - Terminal interface implementations
+  - **[cli/frameworks/hybrid/](cli/frameworks/hybrid/)** - Claude Code-style input navigation
 - **[demos/](demos/)** - Working examples and test applications
 - **[architecture/](architecture/)** - System design decisions
 - **[api-reference.md](api-reference.md)** - Quick API reference

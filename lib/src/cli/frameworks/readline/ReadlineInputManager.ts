@@ -379,6 +379,129 @@ export class ReadlineInputManager implements IInputManager {
     };
   }
 
+  /**
+   * Get access to readline interface (for hybrid frameworks)
+   */
+  get readlineInterface(): readline.Interface | null {
+    return this.rl;
+  }
+
+  /**
+   * Get current cursor position (for Claude Code-style navigation)
+   */
+  getCursorPosition(): number {
+    if (this.isDestroyed || !this.rl) {
+      return 0;
+    }
+    return (this.rl as any).cursor || 0;
+  }
+
+  /**
+   * Set cursor position (for Claude Code-style navigation)
+   */
+  setCursorPosition(position: number): void {
+    if (this.isDestroyed || !this.rl) {
+      return;
+    }
+
+    const maxPosition = this.rl.line.length;
+    const clampedPosition = Math.max(0, Math.min(position, maxPosition));
+    (this.rl as any).cursor = clampedPosition;
+
+    // Refresh display
+    this.refreshDisplay();
+  }
+
+  /**
+   * Move cursor to end of input (Claude Code style)
+   */
+  moveToEndOfInput(): void {
+    if (this.isDestroyed || !this.rl) {
+      return;
+    }
+
+    (this.rl as any).cursor = this.rl.line.length;
+    this.refreshDisplay();
+  }
+
+  /**
+   * Get current line index based on cursor position (for multi-line support)
+   */
+  getCurrentLineIndex(): number {
+    if (this.isDestroyed || !this.rl) {
+      return 0;
+    }
+
+    const beforeCursor = this.rl.line.slice(0, (this.rl as any).cursor);
+    return beforeCursor.split('\n').length - 1;
+  }
+
+  /**
+   * Check if cursor is on the last line of multi-line input
+   */
+  isOnLastLine(): boolean {
+    if (this.isDestroyed || !this.rl) {
+      return true;
+    }
+
+    const lines = this.rl.line.split('\n');
+    const currentLineIndex = this.getCurrentLineIndex();
+    return currentLineIndex === lines.length - 1;
+  }
+
+  /**
+   * Check if cursor is at the end of input
+   */
+  isAtEndOfInput(): boolean {
+    if (this.isDestroyed || !this.rl) {
+      return true;
+    }
+
+    return (this.rl as any).cursor === this.rl.line.length;
+  }
+
+  /**
+   * Get total number of lines in current input
+   */
+  getLineCount(): number {
+    if (this.isDestroyed || !this.rl) {
+      return 1;
+    }
+
+    return this.rl.line.split('\n').length;
+  }
+
+  /**
+   * Refresh display after cursor manipulation
+   */
+  private refreshDisplay(): void {
+    if (this.isDestroyed || !this.rl || !this.enabled) {
+      return;
+    }
+
+    // Force readline to redraw the current line with updated cursor position
+    try {
+      // Clear current line and redraw
+      process.stdout.write('\r\x1b[K');
+      process.stdout.write(this.currentPrompt + this.rl.line);
+
+      // Move cursor to correct position
+      const cursorPos = (this.rl as any).cursor;
+      const promptLength = this.currentPrompt.length;
+      const totalPosition = promptLength + cursorPos;
+
+      // Move cursor to beginning and then to correct position
+      process.stdout.write('\r');
+      if (totalPosition > 0) {
+        process.stdout.write(`\x1b[${totalPosition + 1}G`);
+      }
+    } catch (error) {
+      // Fallback to simple redraw
+      this.hidePrompt();
+      this.showPrompt();
+    }
+  }
+
   // Private methods
 
   private setupEventHandlers(): void {

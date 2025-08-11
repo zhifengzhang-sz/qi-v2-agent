@@ -8,6 +8,8 @@ import React, { useState, useTransition, useRef, useEffect, useMemo } from 'reac
 import { Box, Text, useInput, useApp } from 'ink'
 import TextInput, { UncontrolledTextInput } from 'ink-text-input'
 import { LoadingSpinner } from './LoadingIndicator.js'
+import { HybridTextInput } from './HybridTextInput.js'
+import { useHybridHistory } from '../../hybrid/hooks/useHybridHistory.js'
 import type { AppState, AppSubState } from '../../../abstractions/index.js'
 
 interface InputBoxProps {
@@ -20,6 +22,7 @@ interface InputBoxProps {
   onClear?: () => void
   placeholder?: string
   framework?: any // Framework instance for listening to events
+  currentInput?: string // Current input text controlled by framework
   onSuggestions?: (suggestions: Array<{command: string, description: string}>) => void
 }
 
@@ -44,60 +47,75 @@ export function InputBox({
   onClear,
   placeholder = 'Enter command or prompt...',
   framework,
+  currentInput,
   onSuggestions
 }: InputBoxProps) {
-  const [input, setInput] = useState('')
+  // Use currentInput from framework, fallback to local state for backward compatibility
+  const [localInput, setLocalInput] = useState('')
+  const [hybridInput, setHybridInput] = useState('')
+  const [hybridCursor, setHybridCursor] = useState(0)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
-  const [historyIndex, setHistoryIndex] = useState(-1)  // -1 means current input, 0+ are history items
-  const [currentInputBuffer, setCurrentInputBuffer] = useState('') // Store current input when navigating history
-  const [hasNavigatedWithinText, setHasNavigatedWithinText] = useState(false) // Track if user has used arrows to navigate within current text
   const [isPending, startTransition] = useTransition()
   const { exit } = useApp()
   
   const isDisabled = state === 'busy' || isPending
   
-  // Get command history from framework
-  const getHistory = (): string[] => {
-    if (framework && framework.state && framework.state.history) {
-      return [...framework.state.history].reverse(); // Most recent first
-    }
-    return [];
-  };
-  
-  
-  // Reset history navigation when input changes (user typing)
-  const handleInputChange = (newInput: string) => {
-    setInput(newInput);
-    setHistoryIndex(-1); // Reset to current input
-    setHasNavigatedWithinText(false); // Reset navigation tracking
-  };
-  
+  // Check if we're in hybrid mode (enhanced with Claude Code navigation)
+  const isHybridMode = framework && 
+    framework.constructor && 
+    framework.constructor.name === 'HybridCLIFramework' && 
+    framework.isHybridEnabled;
+
+
+  // In hybrid mode, use hybrid input; otherwise use currentInput or localInput
+  const input = isHybridMode ? hybridInput : (currentInput ?? localInput)
   
   // Listen to global framework events for input clearing (avoids useInput conflict)
   useEffect(() => {
     if (!framework) return;
     
     const handleClearInput = () => {
-      setInput('');
-      setHistoryIndex(-1);
-      setCurrentInputBuffer('');
+      setLocalInput('');
+      if (isHybridMode) {
+        setHybridInput('');
+        setHybridCursor(0);
+      }
       if (onClear) {
         onClear();
       }
     };
 
-    // Listen to the clearInput event from the global handler
+    const handleInputUpdate = (data: { text: string; cursorPosition: number }) => {
+      if (isHybridMode) {
+        setHybridInput(data.text);
+        setHybridCursor(data.cursorPosition);
+      }
+    };
+
+    // Listen to framework events
     framework.on('clearInput', handleClearInput);
+    if (isHybridMode) {
+      framework.on('inputUpdate', handleInputUpdate);
+    }
     
     return () => {
       framework.off('clearInput', handleClearInput);
+      if (isHybridMode) {
+        framework.off('inputUpdate', handleInputUpdate);
+      }
     };
-  }, [framework, onClear]);
+  }, [framework, onClear, isHybridMode]);
   
   const handleSubmit = (value: string) => {
     if (value.trim()) {
       startTransition(() => {
         const trimmedValue = value.trim()
+        
+        // Add to history in hybrid mode
+        if (isHybridMode && hybridHistory) {
+          hybridHistory.addToHistory(trimmedValue);
+          hybridHistory.resetHistory(); // Reset history navigation
+        }
         
         // Check if it's a command
         if (trimmedValue.startsWith('/') && onCommand) {
@@ -109,10 +127,12 @@ export function InputBox({
           onSubmit(trimmedValue)
         }
         
-        // Reset input and history navigation state
-        setInput('')
-        setHistoryIndex(-1)
-        setCurrentInputBuffer('')
+        // Clear both local and hybrid input
+        setLocalInput('')
+        if (isHybridMode) {
+          setHybridInput('')
+          setHybridCursor(0)
+        }
       })
     }
   }
@@ -152,99 +172,35 @@ export function InputBox({
     setSelectedSuggestionIndex(0)
   }, [suggestions.length])
   
-  // Handle keyboard navigation for command suggestions and history
-  useInput((inputChar, key) => {
-    const history = getHistory();
+  // Handle keyboard navigation for command suggestions (skip in hybrid mode)
+  useInput((input, key) => {
+    // In hybrid mode, let HybridTextInput handle all input
+    if (isHybridMode) {
+      return;
+    }
     
-    // History navigation takes priority when no suggestions are shown
-    if (suggestions.length === 0) {
-      if (key.upArrow && history.length > 0) {
-        // Navigate up in history (to older commands)
-        if (historyIndex === -1) {
-          // First time entering history - save current input
-          setCurrentInputBuffer(input);
-          setHistoryIndex(0);
-          setInput(history[0]);
-        } else if (historyIndex < history.length - 1) {
-          const newIndex = historyIndex + 1;
-          setHistoryIndex(newIndex);
-          setInput(history[newIndex]);
-        }
-        return;
-      }
-      
-      if (key.downArrow) {
-        if (historyIndex > 0) {
-          // Move to newer history item
-          const newIndex = historyIndex - 1;
-          setHistoryIndex(newIndex);
-          setInput(history[newIndex]);
-          return;
-        } else if (historyIndex === 0) {
-          // At most recent history item, return to current input buffer
-          setHistoryIndex(-1);
-          setInput(currentInputBuffer);
-          return;
-        } else if (historyIndex === -1) {
-          // Claude Code behavior: when on current input (last line of message),
-          // down arrow moves cursor to end of line
-          const lines = input.split('\n');
-          
-          // Simple heuristic: if it's multi-line text, assume cursor is on last line
-          // and move to end of input (Claude Code style)
-          if (lines.length > 1) {
-            // Force cursor to end by temporarily adding/removing a character
-            const originalInput = input;
-            setInput(originalInput + ' ');
-            setTimeout(() => {
-              setInput(originalInput);
-              setHasNavigatedWithinText(true);
-            }, 1);
-            return;
-          } else {
-            // Single line - move to end and prepare for history navigation
-            const originalInput = input;
-            setInput(originalInput + ' ');
-            setTimeout(() => {
-              setInput(originalInput);
-              // After cursor is at end, subsequent down arrow goes to history
-              if (hasNavigatedWithinText && history.length > 0) {
-                setTimeout(() => {
-                  setCurrentInputBuffer(originalInput);
-                  setHistoryIndex(0);
-                  setInput(history[0]);
-                }, 10);
-              } else {
-                setHasNavigatedWithinText(true);
-              }
-            }, 1);
-            return;
-          }
-        }
-        // Let TextInput handle natural cursor movement
-      }
-    } else {
-      // Command suggestion navigation when suggestions are visible
-      if (key.upArrow) {
-        setSelectedSuggestionIndex(prev => 
-          prev <= 0 ? suggestions.length - 1 : prev - 1
-        );
-        return;
-      }
-      
-      if (key.downArrow) {
-        setSelectedSuggestionIndex(prev => 
-          prev >= suggestions.length - 1 ? 0 : prev + 1
-        );
-        return;
-      }
+    // Regular mode: handle command suggestions
+    if (suggestions.length === 0) return;
+    
+    if (key.upArrow) {
+      setSelectedSuggestionIndex(prev => 
+        prev <= 0 ? suggestions.length - 1 : prev - 1
+      );
+      return;
+    }
+    
+    if (key.downArrow) {
+      setSelectedSuggestionIndex(prev => 
+        prev >= suggestions.length - 1 ? 0 : prev + 1
+      );
+      return;
     }
     
     if (key.tab && suggestions.length > 0) {
       // Tab to select current suggestion
       const selectedCommand = suggestions[selectedSuggestionIndex];
       if (selectedCommand) {
-        setInput(selectedCommand.command + ' ');
+        setLocalInput(selectedCommand.command + ' ');
         setSelectedSuggestionIndex(0);
       }
       return;
@@ -255,13 +211,13 @@ export function InputBox({
       if (input.trim() === '/') {
         const selectedCommand = suggestions[selectedSuggestionIndex];
         if (selectedCommand) {
-          setInput(selectedCommand.command + ' ');
+          setLocalInput(selectedCommand.command + ' ');
           setSelectedSuggestionIndex(0);
           return;
         }
       }
     }
-  }, { isActive: !isDisabled });
+  }, { isActive: !isDisabled && !isHybridMode }); // Disable completely in hybrid mode
   
   // Notify parent about suggestions changes (include selected index)
   useEffect(() => {
@@ -273,6 +229,68 @@ export function InputBox({
     }
   }, [suggestions, selectedSuggestionIndex, onSuggestions]);
   
+  // History management for hybrid mode
+  const hybridHistory = useHybridHistory({
+    onSetInput: (value: string) => {
+      setHybridInput(value);
+      setHybridCursor(value.length); // Move cursor to end when setting from history
+    },
+    currentInput: hybridInput,
+  });
+
+  // Enhanced hybrid mode input handler that syncs with cursor changes
+  const handleHybridInputChange = (newValue: string) => {
+    setHybridInput(newValue);
+    // Reset history navigation when user types
+    if (hybridHistory.historyIndex > 0) {
+      hybridHistory.resetHistory();
+    }
+    // Reset cursor end state when user types
+    if (framework && framework.resetCursorEndState) {
+      framework.resetCursorEndState();
+    }
+  };
+
+  // History navigation handlers for hybrid mode
+  const handleHistoryUp = () => {
+    hybridHistory.onHistoryUp();
+  };
+
+  const handleHistoryDown = () => {
+    hybridHistory.onHistoryDown();
+  };
+
+  // In hybrid mode, use proper HybridTextInput following Claude Code architecture
+  if (isHybridMode) {
+    return (
+      <Box flexDirection="column">
+        <Box>
+          <Text color="#007acc">{getPromptPrefix()} </Text>
+          {!isDisabled ? (
+            <HybridTextInput
+              value={hybridInput}
+              onChange={handleHybridInputChange}
+              onSubmit={handleSubmit}
+              onHistoryUp={handleHistoryUp}
+              onHistoryDown={handleHistoryDown}
+              placeholder={placeholder}
+              focus={true}
+              framework={framework}
+              cursorOffset={hybridCursor}
+              onCursorOffsetChange={setHybridCursor}
+              columns={80}
+            />
+          ) : (
+            <Box>
+              <LoadingSpinner />
+              <Text color="#e0e0e0" dimColor> Please wait...</Text>
+            </Box>
+          )}
+        </Box>
+      </Box>
+    )
+  }
+
   return (
     <Box flexDirection="column">
       <Box>
@@ -280,7 +298,7 @@ export function InputBox({
         {!isDisabled ? (
           <TextInput
             value={input}
-            onChange={handleInputChange}
+            onChange={currentInput ? () => {} : setLocalInput} // No-op if controlled by framework
             onSubmit={handleSubmit}
             placeholder={placeholder}
             focus={true}

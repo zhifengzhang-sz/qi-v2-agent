@@ -31,6 +31,7 @@ interface MainLayoutProps {
   isProcessing?: boolean
   currentPhase?: string
   framework?: any
+  currentInput?: string // Add current input text from framework
   permissionRequest?: PermissionRequest | null
   onPermissionApprove?: (requestId: string, remember?: boolean) => void
   onPermissionDeny?: (requestId: string, remember?: boolean) => void
@@ -53,6 +54,7 @@ export const MainLayout = memo(function MainLayout({
   isProcessing = false,
   currentPhase = '',
   framework,
+  currentInput,
   permissionRequest = null,
   onPermissionApprove,
   onPermissionDeny,
@@ -104,6 +106,7 @@ export const MainLayout = memo(function MainLayout({
           onCancel={onCancel}
           onClear={onClear}
           framework={framework}
+          currentInput={currentInput}
           onSuggestions={handleSuggestions}
         />
       </Box>

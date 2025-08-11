@@ -71,14 +71,14 @@ class QiPromptCLI {
   private commandHandler: any;
   private workflowHandler!: IWorkflowHandler;
   private debugMode: boolean;
-  private framework?: 'readline' | 'ink';
+  private framework?: 'readline' | 'ink' | 'hybrid';
   private autoDetect: boolean;
   private currentSession?: string;
 
   constructor(
     options: {
       debug?: boolean;
-      framework?: 'readline' | 'ink';
+      framework?: 'readline' | 'ink' | 'hybrid';
       autoDetect?: boolean;
     } = {}
   ) {
@@ -343,7 +343,9 @@ class QiPromptCLI {
         // Context information now managed through workflow system
         // Workflow stats available through new handler if needed
         const workflowStats = await this.workflowHandler.getAvailableWorkflows();
-        if (workflowStats.length > 0) {
+        // Only show workflow stats in debug mode
+        const isDebugMode = process.argv.includes('--debug') || process.env.DEBUG === 'true';
+        if (workflowStats.length > 0 && isDebugMode) {
           responseContent += `\n\n🔧 Available workflows: ${workflowStats.length}`;
         }
       }
@@ -460,7 +462,7 @@ class QiPromptCLI {
 // Parse command line arguments
 function parseArgs(): {
   debug: boolean;
-  framework?: 'readline' | 'ink';
+  framework?: 'readline' | 'ink' | 'hybrid';
   autoDetect: boolean;
   help: boolean;
 } {
@@ -470,22 +472,22 @@ function parseArgs(): {
   const autoDetect = args.includes('--auto-detect') || args.includes('-a');
   const help = args.includes('--help') || args.includes('-h');
 
-  let framework: 'readline' | 'ink' | undefined;
+  let framework: 'readline' | 'ink' | 'hybrid' | undefined;
 
   // Look for framework argument (supports both --framework=value and --framework value formats)
   for (const arg of args) {
     if (arg.startsWith('--framework=')) {
       const frameworkArg = arg.split('=')[1];
-      if (['readline', 'ink'].includes(frameworkArg)) {
-        framework = frameworkArg as 'readline' | 'ink';
+      if (['readline', 'ink', 'hybrid'].includes(frameworkArg)) {
+        framework = frameworkArg as 'readline' | 'ink' | 'hybrid';
       }
       break;
     } else if (arg === '-f' || arg === '--framework') {
       const index = args.indexOf(arg);
       if (index >= 0 && index + 1 < args.length) {
         const frameworkArg = args[index + 1];
-        if (['readline', 'ink'].includes(frameworkArg)) {
-          framework = frameworkArg as 'readline' | 'ink';
+        if (['readline', 'ink', 'hybrid'].includes(frameworkArg)) {
+          framework = frameworkArg as 'readline' | 'ink' | 'hybrid';
         }
       }
       break;

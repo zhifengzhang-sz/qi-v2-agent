@@ -7,6 +7,7 @@
 
 **Framework Support**:
 - **Ink**: React-based terminal UI with JSX components
+- **Hybrid**: Claude Code-style input navigation with Ink rendering
 - **neo-blessed**: Traditional terminal widget system
 - **PureCLI**: Minimal readline-based interface
 
@@ -52,6 +53,7 @@ interface CLIOutput {
 |-----------|---------------|---------------|--------------|-----------|
 | PureCLI   | <50ms        | <1ms         | 10MB         | Minimal   |
 | Ink       | 100-200ms    | 2-5ms        | 25MB         | Low       |
+| Hybrid    | 100-200ms    | 2-5ms        | 25MB         | Low       |
 | neo-blessed| 50-100ms     | 1-3ms        | 15MB         | Low       |
 
 ### Agent Integration
