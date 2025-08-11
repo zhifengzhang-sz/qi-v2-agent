@@ -66,7 +66,7 @@ export function createAgent(
 }
 
 /**
- * Create a simplified PromptApp orchestrator (no classifier, no workflows)
+ * Create a simplified PromptApp orchestrator with optional workflow support
  */
 export function createPromptApp(
   stateManager: IStateManager,
@@ -74,20 +74,24 @@ export function createPromptApp(
   config: Partial<AgentConfig> & {
     commandHandler?: ICommandHandler;
     promptHandler?: IPromptHandler;
+    workflowHandler?: any; // IWorkflowHandler - using any to avoid circular imports
   }
 ): PromptAppOrchestrator {
   const agentConfig: AgentConfig = {
     domain: config.domain || 'prompt-app',
     enableCommands: config.enableCommands ?? true,
     enablePrompts: config.enablePrompts ?? true,
-    enableWorkflows: false, // PromptApp doesn't use workflows
+    enableWorkflows: config.workflowHandler ? true : false, // Enable workflows if handler provided
     sessionPersistence: config.sessionPersistence ?? false,
   };
 
   const dependencies = {
     commandHandler: config.commandHandler,
     promptHandler: config.promptHandler,
+    workflowHandler: config.workflowHandler,
   };
+
+  console.log('🏗️ Creating PromptAppOrchestrator with workflow handler:', !!config.workflowHandler);
 
   return new PromptAppOrchestrator(stateManager, contextManager, agentConfig, dependencies);
 }

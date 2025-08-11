@@ -48,6 +48,7 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   private isShutdown = false;
   private renderInstance: any = null;
   private connectedAgent: any = null;
+  private isCancelling = false;
 
   constructor(config: Partial<CLIConfig> = {}) {
     super();
@@ -260,9 +261,20 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   onAgentCancelled(reason: string): void {
+    // Prevent recursive cancellation calls that cause infinite loops
+    if (this.isCancelling) {
+      return;
+    }
+    
+    this.isCancelling = true;
     this.state.isProcessing = false;
     this.displayMessage(`Task cancelled: ${reason}`, 'warning');
     this.emit('cancelRequested', { reason });
+    
+    // Reset the cancellation flag after a brief delay
+    setTimeout(() => {
+      this.isCancelling = false;
+    }, 100);
   }
 
   sendToAgent(input: string): void {
@@ -273,8 +285,19 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   cancelAgent(): void {
+    // Prevent recursive cancellation calls
+    if (this.isCancelling) {
+      return;
+    }
+    
     if (this.connectedAgent && typeof this.connectedAgent.cancel === 'function') {
+      this.isCancelling = true;
       this.connectedAgent.cancel();
+      
+      // Reset cancellation flag after a brief delay
+      setTimeout(() => {
+        this.isCancelling = false;
+      }, 100);
     }
   }
 }
@@ -301,6 +324,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   const [taskName, setTaskName] = useState<string>();
   const [providerInfo, setProviderInfo] = useState({ provider: 'ollama', model: 'qwen3:0.6b' });
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const { exit } = useApp();
   
 
@@ -552,28 +576,49 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   }, [framework, state, config, providerInfo]);
 
   const handleCancel = useCallback(() => {
+    // Prevent recursive cancellation calls
+    if (isCancelling) return;
+    
     // Only proceed if actually processing
     if (!state.isProcessing) return;
     
+    setIsCancelling(true);
+    
     // Add a brief cancelled message for user feedback
-    const cancelMessage = createSystemMessage('Request cancelled');
+    const cancelMessage = createSystemMessage('🛑 Operation cancelled');
     setMessages(prev => [...prev, cancelMessage]);
     
     // Reset processing state
     setState(prev => ({ 
       ...prev, 
       isProcessing: false, 
-      currentPhase: ''
+      currentPhase: '',
+      isStreamingActive: false
     }));
     
     // Emit cancel event - the setupQuickCLI will handle agent cancellation
     framework.emit('cancelRequested', { reason: 'user_escape' });
-  }, [framework, state.isProcessing]);
+    
+    // Reset cancellation flag after a brief delay
+    setTimeout(() => {
+      setIsCancelling(false);
+    }, 100);
+  }, [framework, state.isProcessing, isCancelling]);
 
   const handleClear = useCallback(() => {
     // Clear input without adding system feedback message
     // The visual feedback is the cleared input itself
   }, []);
+
+  const handleEscapeWhenIdle = useCallback(() => {
+    // Since we're in a React component scope, we can only emit events
+    // The actual input clearing will be handled by the InputBox component
+    const infoMessage = createSystemMessage('⏹️ ESC - No active operations to cancel');
+    setMessages(prev => [...prev, infoMessage]);
+    
+    // Emit clear event for InputBox to handle
+    framework.emit('clearRequested', { reason: 'escape_idle' });
+  }, [framework]);
 
   // Permission dialog handlers
   const handlePermissionApprove = useCallback((requestId: string, remember?: boolean) => {
@@ -613,10 +658,13 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     
     // Handle Esc to cancel processing
     if (key.escape) {
-      // Only cancel if we're actually processing
+      // Always handle ESC key for better user experience
       if (state.isProcessing) {
         // Call the cancel handler that's passed to MainLayout
         handleCancel();
+      } else {
+        // If not processing, clear input and show feedback
+        handleEscapeWhenIdle();
       }
       return;
     }

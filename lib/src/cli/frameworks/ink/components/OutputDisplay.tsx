@@ -50,10 +50,10 @@ const MESSAGE_PREFIXES = {
   assistant: '🤖'
 } as const
 
-// Claude Code-style sender labels
+// Sender labels for qi-prompt
 const SENDER_LABELS = {
   user: 'You',
-  assistant: 'Claude',
+  assistant: 'Qi',
   system: 'System'
 } as const
 

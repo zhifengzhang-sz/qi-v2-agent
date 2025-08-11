@@ -16,7 +16,7 @@ import {
   type Result,
   validationError,
 } from '@qi/base';
-import { ConfigBuilder } from '@qi/core';
+import { ConfigBuilder, type ValidatedConfig } from '@qi/core';
 import { type ChatModel, igniteEngine, type LlmEngine, loadModels, Message } from 'multi-llm-ts';
 import type {
   IPromptManager,
@@ -33,6 +33,8 @@ interface LLMError extends QiError {
     operation?: string;
     availableProviders?: string[];
     error?: string;
+    actualLength?: number;
+    maxLength?: number;
   };
 }
 
@@ -53,33 +55,27 @@ const llmError = (
 export class QiCorePromptManager implements IPromptManager {
   private engines: Map<string, ProviderEngine> = new Map();
   private config: LLMConfig | null = null;
+  private validatedConfig: ValidatedConfig | null = null;
 
   async loadConfig(configPath: string, schemaPath: string): Promise<Result<LLMConfig, QiError>> {
     return fromAsyncTryCatch(
       async () => {
         const builderResult = await ConfigBuilder.fromYamlFile(configPath);
-        const config = match(
-          (builder: unknown) =>
-            match(
-              (validatedConfig: unknown) => validatedConfig,
-              (error: QiError) => {
-                throw new Error(`Config validation failed: ${error.message}`);
-              },
-              (
-                builder as {
-                  validateWithSchemaFile: (path: string) => {
-                    build: () => Result<unknown, QiError>;
-                  };
-                }
-              )
-                .validateWithSchemaFile(schemaPath)
-                .build()
-            ),
-          (error: QiError) => {
-            throw new Error(`Config loading failed: ${error.message}`);
-          },
-          builderResult
-        );
+
+        if (builderResult.tag === 'failure') {
+          throw new Error(`Config loading failed: ${builderResult.error.message}`);
+        }
+
+        const validatedResult = builderResult.value
+          .validateWithSchemaFile(schemaPath)
+          .buildValidated();
+
+        if (validatedResult.tag === 'failure') {
+          throw new Error(`Config validation failed: ${validatedResult.error.message}`);
+        }
+
+        // Store the validated config for easy access
+        this.validatedConfig = validatedResult.value;
 
         // Extract LLM config
         const llmSection = match(
@@ -87,7 +83,11 @@ export class QiCorePromptManager implements IPromptManager {
           (error: QiError) => {
             throw new Error(`LLM config not found: ${error.message}`);
           },
-          (config as { get: (key: string) => Result<LLMConfig['llm'], QiError> }).get('llm')
+          (
+            validatedResult.value.toConfig() as {
+              get: (key: string) => Result<LLMConfig['llm'], QiError>;
+            }
+          ).get('llm')
         );
 
         const llmConfig: LLMConfig = { llm: llmSection };
@@ -188,13 +188,23 @@ export class QiCorePromptManager implements IPromptManager {
       );
     }
 
-    if (prompt.length > 10000) {
+    // Use qicore ValidatedConfig API for max prompt length with fallback
+    const maxLength =
+      this.validatedConfig?.getOr('requestValidation.maxPromptLength', 100000) ?? 100000;
+    const validationEnabled =
+      this.validatedConfig?.getOr('requestValidation.enabled', true) ?? true;
+
+    if (validationEnabled && prompt.length > maxLength) {
       return Err(
         llmError(
           'PROMPT_TOO_LONG',
-          'Prompt exceeds maximum length of 10,000 characters',
+          `Prompt exceeds maximum length of ${maxLength.toLocaleString()} characters`,
           'VALIDATION',
-          { operation: 'validatePrompt' }
+          {
+            operation: 'validatePrompt',
+            actualLength: prompt.length,
+            maxLength,
+          }
         )
       );
     }

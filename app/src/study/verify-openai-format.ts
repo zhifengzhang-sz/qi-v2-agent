@@ -53,7 +53,7 @@ async function testCorrectOpenAIFormat(): Promise<void> {
       return;
     }
 
-    const result = await response.json();
+    const result = await response.json() as { choices?: Array<{ message?: { content?: string } }>; [key: string]: unknown };
     const messageContent = result.choices?.[0]?.message?.content || "";
     
     console.log('Raw response:', messageContent);

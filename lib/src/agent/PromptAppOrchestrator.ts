@@ -21,6 +21,10 @@ import type { IPromptHandler, PromptOptions, PromptResponse } from '@qi/agent/pr
 import type { IStateManager } from '@qi/agent/state';
 import { create, type ErrorCategory, type QiError } from '@qi/base';
 import type {
+  IWorkflowHandler,
+  WorkflowOptions,
+} from '../workflows/interfaces/IWorkflowHandler.js';
+import type {
   AgentConfig,
   AgentContext,
   AgentRequest,
@@ -124,6 +128,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   private commandHandler?: ICommandHandler;
   private promptHandler?: IPromptHandler;
   private contextAwarePromptHandler?: ContextAwarePromptHandler;
+  private workflowHandler?: IWorkflowHandler;
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -146,6 +151,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     dependencies: {
       commandHandler?: ICommandHandler;
       promptHandler?: IPromptHandler;
+      workflowHandler?: IWorkflowHandler;
     } = {}
   ) {
     super(); // Initialize EventEmitter
@@ -154,6 +160,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     this.config = config;
     this.commandHandler = dependencies.commandHandler;
     this.promptHandler = dependencies.promptHandler;
+    this.workflowHandler = dependencies.workflowHandler;
 
     // Set up CLI event handlers
     this.setupCLIEventHandlers();
@@ -218,11 +225,41 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       this.emit('progress', { phase: 'parsing', progress: 0.1, details: 'Analyzing input...' });
       this.emit('message', { content: 'Processing request...', type: 'status' });
 
-      // Emit processInput event for toolbox workflow processing
-      this.emit('processInput', request.input);
+      // RACE CONDITION FIX: Process workflows synchronously BEFORE parsing
+      let processedInput = request.input;
 
-      // Parse input: command vs prompt (2-category, no workflow)
-      const parsed = parseInput(request.input);
+      if (this.workflowHandler && this.detectWorkflowPattern(request.input)) {
+        this.emit('progress', {
+          phase: 'workflow_processing',
+          progress: 0.15,
+          details: 'Processing file references...',
+        });
+
+        try {
+          const workflowResult = await this.processWorkflow(request.input);
+          if (workflowResult.success) {
+            processedInput = workflowResult.data.output;
+            this.emit('message', {
+              content: `Enhanced input with ${workflowResult.data.filesReferenced?.length || 0} file references`,
+              type: 'status',
+            });
+          }
+        } catch (error) {
+          // Log workflow error but continue with original input
+          console.warn(
+            'Workflow processing failed:',
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      }
+
+      // Check for cancellation after workflow processing
+      if (this.abortController?.signal.aborted) {
+        throw new Error('Request was cancelled during workflow processing');
+      }
+
+      // Parse the processed input (may be enhanced by workflow)
+      const parsed = parseInput(processedInput);
 
       // Check for cancellation
       if (this.abortController?.signal.aborted) {
@@ -862,5 +899,55 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
    */
   private async handleCancelRequest(_event: CancelEvent): Promise<void> {
     this.cancel();
+  }
+
+  // ===========================================
+  // Workflow Processing Methods (Race Condition Fix)
+  // ===========================================
+
+  /**
+   * Detect if input contains patterns that require workflow processing
+   * Currently detects file reference patterns (@file.ext or @path/to/file)
+   */
+  private detectWorkflowPattern(input: string): boolean {
+    return input.includes('@') && (input.includes('.') || input.includes('/'));
+  }
+
+  /**
+   * Process workflow synchronously and return enhanced content
+   * This replaces the async event-based workflow processing to fix race conditions
+   */
+  private async processWorkflow(
+    input: string
+  ): Promise<
+    | { success: true; data: { output: string; filesReferenced?: readonly string[] } }
+    | { success: false; error: string }
+  > {
+    if (!this.workflowHandler) {
+      return { success: false, error: 'Workflow handler not available' };
+    }
+
+    try {
+      // Check for cancellation before starting workflow
+      if (this.abortController?.signal.aborted) {
+        throw new Error('Request was cancelled');
+      }
+
+      // Execute workflow with current session context
+      const workflowOptions: WorkflowOptions = {
+        type: 'file-reference', // Fixed: use correct enum value
+        context: { sessionId: 'main' }, // Use main session or get from context
+        timeout: 10000, // 10 second timeout
+      };
+
+      const result = await this.workflowHandler.executeWorkflow(input, workflowOptions);
+      return result;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: errorMsg,
+      };
+    }
   }
 }

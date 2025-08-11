@@ -323,11 +323,13 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
       );
     }
 
-    if (trimmed.length > 10000) {
+    // TODO: Refactor to use ValidatedConfig API instead of hardcoded limit
+    // For now, use same limit as config default (100,000)
+    if (trimmed.length > 100000) {
       return failure(
         createLangChainFunctionCallingError(
           'INPUT_TOO_LONG',
-          'Input exceeds maximum length of 10,000 characters',
+          'Input exceeds maximum length of 100,000 characters',
           'VALIDATION',
           { length: trimmed.length }
         )

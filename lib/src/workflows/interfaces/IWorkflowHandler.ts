@@ -11,7 +11,16 @@ export interface WorkflowOptions {
   timeout?: number;
 }
 
-export type WorkflowResponse = { success: true; data: unknown } | { success: false; error: string };
+export interface WorkflowData {
+  output: string;
+  metadata?: Record<string, unknown>;
+  filesReferenced?: readonly string[];
+  contextUsed?: readonly string[];
+}
+
+export type WorkflowResponse =
+  | { success: true; data: WorkflowData }
+  | { success: false; error: string };
 
 export interface WorkflowInfo {
   id: string;

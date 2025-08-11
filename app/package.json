@@ -4,8 +4,8 @@
   "description": "Qi V2 Agent - CLI + Agent with Command, Prompt & Context Continuation",
   "type": "module",
   "scripts": {
-    "qi-code": "bun run src/qi-code.ts",
-    "qi-code:test": "bun run src/test-qi-code.ts",
+    "qi-prompt": "bun run src/prompt/qi-prompt.ts",
+    "qi-code": "bun run src/prompt/qi-prompt.ts",
     "demo:three-type": "bun run src/demos/three-type-demo.ts",
     "demo:classifier": "bun run src/demos/classifier-module-demo.ts",
     "demo:simple-classifier": "bun run src/demos/simple-classifier-demo.ts",

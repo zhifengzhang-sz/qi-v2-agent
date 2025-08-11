@@ -486,8 +486,12 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     });
 
     this.inputManager.onEscape(() => {
+      // Always handle ESC key for better user experience
       if (this.state.isProcessing || this.state.isStreamingActive) {
         this.handleCancellation();
+      } else {
+        // If not processing, clear input and show feedback
+        this.handleEscapeWhenIdle();
       }
     });
 
@@ -593,6 +597,19 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     }
 
     this.eventManager.emit('cancelRequested', { reason: 'user_escape' });
+    this.displayMessage('🛑 Operation cancelled', 'warning');
+    this.showPrompt();
+  }
+
+  private handleEscapeWhenIdle(): void {
+    // Clear current input if any
+    const currentInput = this.inputManager.getCurrentInput();
+    if (currentInput && currentInput.trim().length > 0) {
+      this.inputManager.clearInput();
+      this.displayMessage('⏹️ Input cleared', 'info');
+    } else {
+      this.displayMessage('⏹️ ESC - No operation to cancel', 'info');
+    }
     this.showPrompt();
   }
 

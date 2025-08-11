@@ -305,15 +305,15 @@ export class StateManager implements IStateManager {
     if (!this.llmConfig?.llm?.providers || !this.promptConfig?.provider) {
       return [];
     }
-    
+
     // Get models for the current provider
     const currentProvider = this.promptConfig.provider;
     const providerConfig = this.llmConfig.llm.providers[currentProvider];
-    
+
     if (!providerConfig?.models) {
       return [];
     }
-    
+
     // Return model names for the current provider
     return providerConfig.models.map((model: any) => model.name);
   }
@@ -327,20 +327,20 @@ export class StateManager implements IStateManager {
       throw new Error(`Provider '${provider}' not available for prompts`);
     }
     const oldConfig = { ...this.promptConfig };
-    
+
     // Get available models for the new provider (before updating this.promptConfig)
     const providerConfig = this.llmConfig?.llm?.providers?.[provider];
     const availableModels = providerConfig?.models?.map((model: any) => model.name) || [];
     const newModel = availableModels.length > 0 ? availableModels[0] : this.promptConfig.model;
-    
-    this.promptConfig = { 
-      ...this.promptConfig, 
+
+    this.promptConfig = {
+      ...this.promptConfig,
       provider,
-      model: newModel
+      model: newModel,
     };
-    
+
     this.currentModel = newModel;
-    
+
     // Update the underlying config
     if (this.llmConfig?.llm?.prompt) {
       this.llmConfig.llm.prompt.currentModel = newModel;
