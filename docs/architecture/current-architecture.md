@@ -1,8 +1,8 @@
 # qi-v2 Agent Current Architecture
 
-## 🎯 **Current Architecture Overview**
+## Architecture Overview
 
-The qi-v2 agent implements a **agent-centric architecture** with centralized state management and secure context isolation. This design provides superior modularity, testability, and security compared to traditional flow-through architectures.
+The qi-v2 agent implements an **agent-centric architecture** with centralized state management and secure context isolation.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -488,61 +488,54 @@ Tool Execution → Memory Operation → Scope Validation → Storage
    - Batch processing for bulk operations
    - Resource usage monitoring
 
-## 🏆 **Architecture Benefits**
+## Key Architecture Features
 
-### **1. Superior to Flow-Through Designs**
+### 1. Agent-Centric Design
 
-Traditional: `CLI → StateManager → Classifier → Agent → Tools`  
-Our Design: `Agent owns StateManager/ContextManager and uses them via contracts`
+- Agent owns and coordinates StateManager and ContextManager
+- Components interact through well-defined contracts
+- Clear ownership and responsibility boundaries
 
-**Benefits**:
-- Clear ownership and responsibility
-- Easier testing and mocking
-- Better error handling and recovery
-- More flexible component replacement
-
-### **2. Security Through Isolation**
+### 2. Security Through Isolation
 
 - Sub-agents cannot access parent context
 - Tool access restricted by context
 - Resource usage monitored and limited
 - Security boundaries enforced automatically
 
-### **3. Practical Classification System**
+### 3. Three-Type Classification System
 
-- Commands: Direct system operations
-- Prompts: Simple conversational requests  
-- Workflows: Complex multi-step tasks
+- **Commands**: Direct system operations (`/help`, `/model`)
+- **Prompts**: Simple conversational requests (`"hi"`, `"explain X"`)
+- **Workflows**: Complex multi-step tasks (`"fix bug and run tests"`)
 
-**More practical than "everything is a workflow" approaches**
-
-### **4. Centralized State Management**
+### 4. Centralized State Management
 
 - Single source of truth for configuration
 - Consistent session management
 - Unified history tracking
-- Easy state persistence and recovery
+- Persistent state across sessions
 
-## 🔮 **Future Architecture Evolution**
+## Future Development
 
-### **1. Distributed Agent System**
+### 1. Distributed Agent System
 - Multiple specialized agents
 - Cross-agent communication protocols
 - Load balancing and failover
 
-### **2. Plugin Architecture**
+### 2. Plugin Architecture
 - Dynamic tool loading
 - Third-party integrations
 - Custom handler development
 
-### **3. Advanced AI Integration**
+### 3. Advanced AI Integration
 - Multi-model orchestration
 - Model-specific optimizations
 - Intelligent routing and caching
 
 ---
 
-## 📚 **Quick Reference**
+## Quick Reference
 
 ### **Key Files**
 - `src/agent/impl/QiCodeAgent.ts` - Main agent implementation
@@ -566,4 +559,4 @@ const isolatedContext = this.contextManager.createIsolatedContext(config);
 const subAgent = new SubAgent(isolatedContext);
 ```
 
-This architecture provides a robust, secure, and maintainable foundation for AI agent development with clear separation of concerns and strong security boundaries.
+This architecture provides separation of concerns and security boundaries for AI agent development.

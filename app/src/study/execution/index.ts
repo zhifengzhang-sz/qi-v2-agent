@@ -5,7 +5,7 @@
 import { createInputClassifier } from '@qi/agent/classifier';
 import { detectProviderFromModel } from '@qi/agent/classifier/shared/provider-map';
 import type { Logger } from '@qi/core';
-import type { StudyConfig, TestParams, TestResult } from '../types/index.js';
+import type { ClassificationResult, StudyConfig, TestParams, TestResult } from '../types/index.js';
 
 export class ClassificationExecutor {
   private config: StudyConfig;
@@ -72,10 +72,10 @@ export class ClassificationExecutor {
       // Add timeout isolation - each method gets max 30s, no more
       const result = await Promise.race([
         classifier.classify(input),
-        new Promise((_, reject) => 
+        new Promise<never>((_, reject) => 
           setTimeout(() => reject(new Error(`Method timeout after 30s`)), 30000)
         )
-      ]);
+      ]) as ClassificationResult;
       const latency = Date.now() - startTime;
       
       testLogger?.debug('Classification completed successfully', {

@@ -1,7 +1,0 @@
-This is a test file for the file reference workflow.
-It contains some simple text that should be included when referenced with @test_file.txt.
-
-Key features:
-- File reference processing
-- Workflow execution  
-- Content inclusion

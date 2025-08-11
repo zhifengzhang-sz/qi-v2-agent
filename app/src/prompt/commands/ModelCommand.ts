@@ -1,6 +1,6 @@
 /**
  * Model Command Definition for Qi-Prompt App
- * 
+ *
  * App provides the command definition and logic,
  * Agent registers it in its CommandHandler.
  */
@@ -25,33 +25,33 @@ export function createModelCommand(stateManager: IStateManager): {
         name: 'model_name',
         type: 'string',
         required: false,
-        description: 'Model to switch to (e.g., llama3.2:3b, qwen3:8b)'
-      }
-    ]
+        description: 'Model to switch to (e.g., llama3.2:3b, qwen3:8b)',
+      },
+    ],
   };
 
   const handler = async (request: CommandRequest): Promise<CommandResult> => {
     const modelName = request.parameters.get('arg1') as string;
-    
+
     try {
       if (!modelName) {
         // Show current model and available models
         const promptConfig = stateManager.getPromptConfig();
         const currentModel = promptConfig?.model || stateManager.getCurrentModel();
         const availableModels = stateManager.getAvailablePromptModels();
-        
+
         let content = `Current model: ${currentModel}\n`;
         content += `Provider: ${promptConfig?.provider || 'ollama'}\n`;
-        
+
         if (availableModels.length > 0) {
           content += `\nAvailable models:\n`;
-          availableModels.forEach(model => {
+          availableModels.forEach((model) => {
             const indicator = model === currentModel ? '→ ' : '  ';
             content += `${indicator}${model}\n`;
           });
           content += `\nUse '/model <model_name>' to switch models.`;
         }
-        
+
         return {
           status: 'success',
           content,
@@ -61,21 +61,21 @@ export function createModelCommand(stateManager: IStateManager): {
           metadata: new Map([
             ['action', 'view'],
             ['currentModel', currentModel],
-            ['availableCount', String(availableModels.length)]
-          ])
+            ['availableCount', String(availableModels.length)],
+          ]),
         };
       }
-      
+
       // Switch to new model
       const availableModels = stateManager.getAvailablePromptModels();
       const promptConfig = stateManager.getPromptConfig();
       const currentModel = promptConfig?.model || stateManager.getCurrentModel();
-      
+
       // Validate model availability
       if (availableModels.length > 0 && !availableModels.includes(modelName)) {
         return {
           status: 'error',
-          content: `❌ Model '${modelName}' not available.\n\nAvailable models:\n${availableModels.map(m => `  ${m}`).join('\n')}`,
+          content: `❌ Model '${modelName}' not available.\n\nAvailable models:\n${availableModels.map((m) => `  ${m}`).join('\n')}`,
           output: `Model '${modelName}' not available`,
           commandName: 'model',
           success: false,
@@ -83,14 +83,14 @@ export function createModelCommand(stateManager: IStateManager): {
           metadata: new Map([
             ['action', 'switch'],
             ['requestedModel', modelName],
-            ['error', 'model_not_available']
-          ])
+            ['error', 'model_not_available'],
+          ]),
         };
       }
-      
+
       // Update model in StateManager
       stateManager.updatePromptModel(modelName);
-      
+
       return {
         status: 'success',
         content: `✅ Switched to model: ${modelName}`,
@@ -100,10 +100,9 @@ export function createModelCommand(stateManager: IStateManager): {
         metadata: new Map([
           ['action', 'switch'],
           ['previousModel', currentModel],
-          ['newModel', modelName]
-        ])
+          ['newModel', modelName],
+        ]),
       };
-      
     } catch (error) {
       return {
         status: 'error',
@@ -115,8 +114,8 @@ export function createModelCommand(stateManager: IStateManager): {
         metadata: new Map([
           ['action', 'switch'],
           ['requestedModel', modelName || 'unknown'],
-          ['error', 'execution_failed']
-        ])
+          ['error', 'execution_failed'],
+        ]),
       };
     }
   };

@@ -38,7 +38,7 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
     return match(
       (): WorkflowResponse => {
         this.initialized = true;
-        return { success: true, data: 'Workflow handler initialized successfully' };
+        return { success: true, data: { output: 'Workflow handler initialized successfully' } };
       },
       (error): WorkflowResponse => ({ success: false, error: error.message }),
       initResult
@@ -49,34 +49,46 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
    * Execute a workflow with the specified input
    */
   async executeWorkflow(input: string, options: WorkflowOptions = {}): Promise<WorkflowResponse> {
-    if (!this.initialized) {
-      return { success: false, error: 'Handler not initialized. Call initialize() first.' };
+    try {
+      if (!this.initialized) {
+        return { success: false, error: 'Handler not initialized. Call initialize() first.' };
+      }
+
+      // Determine workflow type from options or detect from input
+      const workflowType = this.determineWorkflowType(input, options.type);
+
+      const workflowInput: WorkflowInput = {
+        type: workflowType,
+        content: input,
+        context: options.context || {},
+      };
+
+      const result = await this.manager.executeWorkflow(workflowInput);
+
+      return match(
+        (workflowResult): WorkflowResponse => ({
+          success: true,
+          data: {
+            output: workflowResult.output,
+            metadata: Object.fromEntries(workflowResult.metadata),
+            filesReferenced: workflowResult.filesReferenced,
+            contextUsed: workflowResult.contextUsed,
+          },
+        }),
+        (error): WorkflowResponse => ({ success: false, error: error.message }),
+        result
+      );
+    } catch (error) {
+      // Catch any unexpected errors (e.g., cancellation, network issues, etc.)
+      console.warn(
+        'DefaultWorkflowHandler.executeWorkflow caught error:',
+        error instanceof Error ? error.message : error
+      );
+      return {
+        success: false,
+        error: `Workflow execution failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
-
-    // Determine workflow type from options or detect from input
-    const workflowType = this.determineWorkflowType(input, options.type);
-
-    const workflowInput: WorkflowInput = {
-      type: workflowType,
-      content: input,
-      context: options.context || {},
-    };
-
-    const result = await this.manager.executeWorkflow(workflowInput);
-
-    return match(
-      (workflowResult): WorkflowResponse => ({
-        success: true,
-        data: {
-          output: workflowResult.output,
-          metadata: Object.fromEntries(workflowResult.metadata),
-          filesReferenced: workflowResult.filesReferenced,
-          contextUsed: workflowResult.contextUsed,
-        },
-      }),
-      (error): WorkflowResponse => ({ success: false, error: error.message }),
-      result
-    );
   }
 
   /**

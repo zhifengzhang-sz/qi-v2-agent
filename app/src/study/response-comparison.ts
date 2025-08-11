@@ -51,7 +51,7 @@ class ResponseCapture {
 
   startCapturing() {
     const self = this;
-    global.fetch = async function(url: any, options?: any) {
+    global.fetch = Object.assign(async function(url: any, options?: any) {
       const response = await self.originalFetch(url, options);
       
       // Only capture responses from LLM endpoints
@@ -65,7 +65,7 @@ class ResponseCapture {
       }
       
       return response;
-    };
+    }, { preconnect: self.originalFetch.preconnect });
   }
 
   stopCapturing() {

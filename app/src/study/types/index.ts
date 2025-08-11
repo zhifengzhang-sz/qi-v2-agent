@@ -53,6 +53,7 @@ export interface ClassificationResult {
   type: string;
   confidence: number;
   method: string;
+  metadata?: ReadonlyMap<string, unknown>;
 }
 
 export interface TestResult extends TestParams {

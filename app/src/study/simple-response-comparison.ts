@@ -28,8 +28,8 @@ Input: "${input}"`;
     })
   });
 
-  const result = await response.json();
-  return result.response;
+  const result = await response.json() as { response?: string; [key: string]: unknown };
+  return result.response || '';
 }
 
 async function methodCall(model: string, method: string, input: string): Promise<any> {

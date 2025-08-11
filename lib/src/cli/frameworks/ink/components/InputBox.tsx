@@ -48,10 +48,30 @@ export function InputBox({
 }: InputBoxProps) {
   const [input, setInput] = useState('')
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
+  const [historyIndex, setHistoryIndex] = useState(-1)  // -1 means current input, 0+ are history items
+  const [currentInputBuffer, setCurrentInputBuffer] = useState('') // Store current input when navigating history
+  const [hasNavigatedWithinText, setHasNavigatedWithinText] = useState(false) // Track if user has used arrows to navigate within current text
   const [isPending, startTransition] = useTransition()
   const { exit } = useApp()
   
   const isDisabled = state === 'busy' || isPending
+  
+  // Get command history from framework
+  const getHistory = (): string[] => {
+    if (framework && framework.state && framework.state.history) {
+      return [...framework.state.history].reverse(); // Most recent first
+    }
+    return [];
+  };
+  
+  
+  // Reset history navigation when input changes (user typing)
+  const handleInputChange = (newInput: string) => {
+    setInput(newInput);
+    setHistoryIndex(-1); // Reset to current input
+    setHasNavigatedWithinText(false); // Reset navigation tracking
+  };
+  
   
   // Listen to global framework events for input clearing (avoids useInput conflict)
   useEffect(() => {
@@ -59,6 +79,8 @@ export function InputBox({
     
     const handleClearInput = () => {
       setInput('');
+      setHistoryIndex(-1);
+      setCurrentInputBuffer('');
       if (onClear) {
         onClear();
       }
@@ -87,7 +109,10 @@ export function InputBox({
           onSubmit(trimmedValue)
         }
         
+        // Reset input and history navigation state
         setInput('')
+        setHistoryIndex(-1)
+        setCurrentInputBuffer('')
       })
     }
   }
@@ -127,22 +152,92 @@ export function InputBox({
     setSelectedSuggestionIndex(0)
   }, [suggestions.length])
   
-  // Handle keyboard navigation for command suggestions
-  useInput((input, key) => {
-    if (suggestions.length === 0) return;
+  // Handle keyboard navigation for command suggestions and history
+  useInput((inputChar, key) => {
+    const history = getHistory();
     
-    if (key.upArrow) {
-      setSelectedSuggestionIndex(prev => 
-        prev <= 0 ? suggestions.length - 1 : prev - 1
-      );
-      return;
-    }
-    
-    if (key.downArrow) {
-      setSelectedSuggestionIndex(prev => 
-        prev >= suggestions.length - 1 ? 0 : prev + 1
-      );
-      return;
+    // History navigation takes priority when no suggestions are shown
+    if (suggestions.length === 0) {
+      if (key.upArrow && history.length > 0) {
+        // Navigate up in history (to older commands)
+        if (historyIndex === -1) {
+          // First time entering history - save current input
+          setCurrentInputBuffer(input);
+          setHistoryIndex(0);
+          setInput(history[0]);
+        } else if (historyIndex < history.length - 1) {
+          const newIndex = historyIndex + 1;
+          setHistoryIndex(newIndex);
+          setInput(history[newIndex]);
+        }
+        return;
+      }
+      
+      if (key.downArrow) {
+        if (historyIndex > 0) {
+          // Move to newer history item
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setInput(history[newIndex]);
+          return;
+        } else if (historyIndex === 0) {
+          // At most recent history item, return to current input buffer
+          setHistoryIndex(-1);
+          setInput(currentInputBuffer);
+          return;
+        } else if (historyIndex === -1) {
+          // Claude Code behavior: when on current input (last line of message),
+          // down arrow moves cursor to end of line
+          const lines = input.split('\n');
+          
+          // Simple heuristic: if it's multi-line text, assume cursor is on last line
+          // and move to end of input (Claude Code style)
+          if (lines.length > 1) {
+            // Force cursor to end by temporarily adding/removing a character
+            const originalInput = input;
+            setInput(originalInput + ' ');
+            setTimeout(() => {
+              setInput(originalInput);
+              setHasNavigatedWithinText(true);
+            }, 1);
+            return;
+          } else {
+            // Single line - move to end and prepare for history navigation
+            const originalInput = input;
+            setInput(originalInput + ' ');
+            setTimeout(() => {
+              setInput(originalInput);
+              // After cursor is at end, subsequent down arrow goes to history
+              if (hasNavigatedWithinText && history.length > 0) {
+                setTimeout(() => {
+                  setCurrentInputBuffer(originalInput);
+                  setHistoryIndex(0);
+                  setInput(history[0]);
+                }, 10);
+              } else {
+                setHasNavigatedWithinText(true);
+              }
+            }, 1);
+            return;
+          }
+        }
+        // Let TextInput handle natural cursor movement
+      }
+    } else {
+      // Command suggestion navigation when suggestions are visible
+      if (key.upArrow) {
+        setSelectedSuggestionIndex(prev => 
+          prev <= 0 ? suggestions.length - 1 : prev - 1
+        );
+        return;
+      }
+      
+      if (key.downArrow) {
+        setSelectedSuggestionIndex(prev => 
+          prev >= suggestions.length - 1 ? 0 : prev + 1
+        );
+        return;
+      }
     }
     
     if (key.tab && suggestions.length > 0) {
@@ -185,7 +280,7 @@ export function InputBox({
         {!isDisabled ? (
           <TextInput
             value={input}
-            onChange={setInput}
+            onChange={handleInputChange}
             onSubmit={handleSubmit}
             placeholder={placeholder}
             focus={true}

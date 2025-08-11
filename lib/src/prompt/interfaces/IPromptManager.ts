@@ -15,6 +15,11 @@ export interface LLMConfig {
     maxRetries: number;
     providers: Record<string, LLMProviderConfig>;
   };
+  requestValidation?: {
+    enabled: boolean;
+    maxPromptLength: number;
+    sanitizeInput: boolean;
+  };
 }
 
 export interface LLMProviderConfig {

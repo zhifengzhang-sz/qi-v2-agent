@@ -158,6 +158,7 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
 
     try {
       const workflow = this.workflows.get(input.type);
+
       if (!workflow) {
         return failure(
           workflowError(
@@ -371,7 +372,7 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
     try {
       this.fileResolver = new FileContentResolver();
       const metadata: ToolMetadata = {
-        name: 'FileContentResolver',
+        name: 'file-content-resolver', // Fixed: use kebab-case key that workflow expects
         description: 'Resolves and reads file contents',
         version: '1.0.0',
         category: 'files',
@@ -424,7 +425,7 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
     try {
       this.referenceParser = new FileReferenceParser();
       const metadata: ToolMetadata = {
-        name: 'FileReferenceParser',
+        name: 'file-reference-parser', // Fixed: use kebab-case key that workflow expects
         description: 'Parses file references from input text',
         version: '1.0.0',
         category: 'parsing',

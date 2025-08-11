@@ -53,6 +53,13 @@
     "./mcp": "./dist/mcp/index.js",
     "./llm": "./dist/llm/index.js",
     "./config": "./dist/config/index.js",
-    "./utils": "./dist/utils/index.js"
+    "./utils": "./dist/utils/index.js",
+    "./context": "./dist/context/index.js",
+    "./classifier": "./dist/classifier/index.js",
+    "./classifier/shared/provider-map": "./dist/classifier/shared/provider-map.js",
+    "./state": "./dist/state/index.js",
+    "./prompt": "./dist/prompt/index.js",
+    "./command": "./dist/command/index.js",
+    "./cli": "./dist/cli/index.js"
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Qi-Prompt App Event Definitions
- * 
+ *
  * Defines all event types for communication between CLI and Agent
  * specific to the Qi-Prompt application. These are the "content" that
  * gets plugged into the generic framework "structure".
@@ -51,7 +51,7 @@ export interface CancelRequestedEvent extends BaseEvent {
 /**
  * Union type for all CLI → Agent events
  */
-export type PromptAppCLIEvent = 
+export type PromptAppCLIEvent =
   | ModelChangeRequestedEvent
   | ModeChangeRequestedEvent
   | PromptRequestedEvent
@@ -59,7 +59,7 @@ export type PromptAppCLIEvent =
   | CancelRequestedEvent;
 
 // ===========================================
-// Agent → CLI Events  
+// Agent → CLI Events
 // ===========================================
 
 /**
@@ -160,9 +160,7 @@ export type PromptAppAgentEvent =
 /**
  * Create a CLI → Agent event with automatic timestamp
  */
-export function createCLIEvent<T extends PromptAppCLIEvent>(
-  event: Omit<T, 'timestamp'>
-): T {
+export function createCLIEvent<T extends PromptAppCLIEvent>(event: Omit<T, 'timestamp'>): T {
   return {
     ...event,
     timestamp: new Date(),
@@ -172,9 +170,7 @@ export function createCLIEvent<T extends PromptAppCLIEvent>(
 /**
  * Create an Agent → CLI event with automatic timestamp
  */
-export function createAgentEvent<T extends PromptAppAgentEvent>(
-  event: Omit<T, 'timestamp'>
-): T {
+export function createAgentEvent<T extends PromptAppAgentEvent>(event: Omit<T, 'timestamp'>): T {
   return {
     ...event,
     timestamp: new Date(),
@@ -187,29 +183,29 @@ export function createAgentEvent<T extends PromptAppAgentEvent>(
 
 /**
  * Expected Event Flows:
- * 
+ *
  * MODEL CHANGE:
  * 1. User: /model llama3.2:3b
  * 2. CLI → Agent: ModelChangeRequestedEvent
  * 3. Agent → CLI: ModelChangedEvent (success/failure)
- * 
+ *
  * MODE CHANGE:
- * 1. User: Shift+Tab  
+ * 1. User: Shift+Tab
  * 2. CLI → Agent: ModeChangeRequestedEvent
  * 3. Agent → CLI: ModeChangedEvent (confirmation)
- * 
+ *
  * PROMPT PROCESSING:
  * 1. User: "explain quantum computing"
  * 2. CLI → Agent: PromptRequestedEvent
  * 3. Agent → CLI: ProgressEvent (parsing, llm_processing, etc.)
  * 4. Agent → CLI: MessageChunkEvent(s) (streaming response)
  * 5. Agent → CLI: CompleteEvent (final result + metadata)
- * 
+ *
  * STATUS REQUEST:
  * 1. User: /status
- * 2. CLI → Agent: StatusRequestedEvent  
+ * 2. CLI → Agent: StatusRequestedEvent
  * 3. Agent → CLI: StatusResponseEvent
- * 
+ *
  * CANCELLATION:
  * 1. User: Ctrl+C or Esc
  * 2. CLI → Agent: CancelRequestedEvent
