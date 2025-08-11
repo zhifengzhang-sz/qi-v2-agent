@@ -1,6 +1,51 @@
 # Qi V2 Agent - Version History
 
-## v-0.5.x - Toolbox Preview (Current)
+## v-0.5.2 - Hybrid CLI Framework (Current)
+
+### 📅 **Release Date**: 2025-08-11
+
+### 🎯 **Overview**
+Major addition of Hybrid CLI Framework with Claude Code-style navigation parity. This release demonstrates systematic design analysis and implementation methodology, achieving sophisticated terminal input behavior.
+
+### ✨ **New Features**
+
+#### 🖥️ **Hybrid CLI Framework**
+- **Claude Code Navigation**: Exact dual-purpose arrow key behavior (cursor-first, history-fallback)
+- **Sophisticated Input**: Multiline text editing with proper cursor movement
+- **Immutable Operations**: Functional cursor operations with boundary detection
+- **Clean Architecture**: Separated input handling and history management hooks
+- **React Integration**: Seamless integration with Ink for rendering
+
+#### 🛠️ **Core Components**
+- **HybridCLIFramework**: Event-driven framework class
+- **useHybridTextInput**: Input handling following Claude Code patterns
+- **useHybridHistory**: Dedicated history navigation management  
+- **Cursor & MeasuredText**: Advanced cursor navigation utilities
+- **HybridTextInput**: React component with proper state management
+
+#### 🐛 **Critical Bug Fixes**
+- **Cursor Boundary Detection**: Fixed `down()` method to move to end position
+- **State Management**: Removed stale closures from useCallback
+- **Navigation Logic**: Corrected dual-purpose arrow key implementation
+
+#### 📚 **Systematic Documentation**
+- **Design Analysis**: Comprehensive comparison with Claude Code implementation
+- **Implementation Guide**: Step-by-step systematic approach vs trial-and-error
+- **Navigation Correction**: Detailed dual-purpose arrow key behavior analysis
+- **Architecture Diagrams**: Complete technical documentation
+
+#### 🧹 **Codebase Improvements**
+- **Debug Controls**: Debug messages only show with --debug flag
+- **Documentation Organization**: Proper structure matching code organization
+- **File Cleanup**: Removed temporary files and organized test locations
+- **Code Quality**: All TypeScript and linting checks pass
+
+### 💡 **Key Achievement: Systematic Design Methodology**
+This release showcases moving from "guessing and trying" to systematic analysis of proven patterns, resulting in accurate implementation of complex navigation behavior.
+
+---
+
+## v-0.5.1 - Toolbox Preview
 
 ### 📅 **Release Date**: 2025-01-10
 
