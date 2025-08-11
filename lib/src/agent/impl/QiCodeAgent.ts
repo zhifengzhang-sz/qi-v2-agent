@@ -42,7 +42,7 @@ export class QiCodeAgent implements IAgent {
   private classifier?: IClassifier;
   private commandHandler?: ICommandHandler;
   private promptHandler?: IPromptHandler;
-  private contextAwarePromptHandler?: any; // Will be initialized in initialize()
+  private contextAwarePromptHandler?: unknown; // Will be initialized in initialize()
   private workflowEngine?: IWorkflowEngine;
   private workflowExtractor?: IWorkflowExtractor;
 
@@ -358,7 +358,7 @@ export class QiCodeAgent implements IAgent {
         }
 
         // Execute with context continuation
-        result = await this.contextAwarePromptHandler.completeWithContext(
+        result = await (this.contextAwarePromptHandler as any).completeWithContext(
           request.input,
           promptOptions,
           contextId,

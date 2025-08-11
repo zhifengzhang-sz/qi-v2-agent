@@ -1,13 +1,13 @@
 /**
  * Session Manager Tool
- * 
+ *
  * Manages conversation sessions with persistence and context tracking.
  * Supports Claude Code-style session continuity.
  */
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import type { ContextMessage } from '../../context/abstractions/index.js';
 
 /**
@@ -78,7 +78,7 @@ import type { Tool } from '../index.js';
 
 /**
  * Session Manager Tool
- * 
+ *
  * Provides session management with persistence and context tracking.
  */
 export class SessionManager implements Tool<string, Session> {
@@ -91,7 +91,7 @@ export class SessionManager implements Tool<string, Session> {
 
   constructor(config: Partial<SessionManagerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
+
     if (this.config.enablePersistence) {
       this.ensureStorageDirectory();
     }
@@ -289,7 +289,7 @@ export class SessionManager implements Tool<string, Session> {
   async saveSessions(): Promise<void> {
     if (!this.config.enablePersistence) return;
 
-    const promises = Array.from(this.sessions.keys()).map(id => this.saveSession(id));
+    const promises = Array.from(this.sessions.keys()).map((id) => this.saveSession(id));
     await Promise.all(promises);
   }
 
@@ -319,7 +319,7 @@ export class SessionManager implements Tool<string, Session> {
     if (!existsSync(this.config.storagePath)) return;
 
     try {
-      const files = require('fs').readdirSync(this.config.storagePath);
+      const files = require('node:fs').readdirSync(this.config.storagePath);
       const sessionFiles = files.filter((file: string) => file.endsWith('.json'));
 
       for (const file of sessionFiles) {
@@ -328,7 +328,7 @@ export class SessionManager implements Tool<string, Session> {
           const content = readFileSync(filePath, 'utf-8');
           const storedSession: StoredSession = JSON.parse(content);
           const session = this.sessionFromStorageFormat(storedSession);
-          
+
           this.sessions.set(session.id, session);
         } catch (fileError) {
           console.warn(`Failed to load session from ${file}:`, fileError);
@@ -392,10 +392,10 @@ export class SessionManager implements Tool<string, Session> {
    */
   private async deleteStoredSession(sessionId: string): Promise<void> {
     const filePath = join(this.config.storagePath, `${sessionId}.json`);
-    
+
     try {
       if (existsSync(filePath)) {
-        require('fs').unlinkSync(filePath);
+        require('node:fs').unlinkSync(filePath);
       }
     } catch (error) {
       console.warn(`Failed to delete stored session ${sessionId}:`, error);
@@ -407,10 +407,10 @@ export class SessionManager implements Tool<string, Session> {
    */
   private async cleanupOldSessions(): Promise<void> {
     const sessions = this.listSessions();
-    
+
     if (sessions.length > this.config.maxSessions) {
       const sessionsToDelete = sessions.slice(this.config.maxSessions);
-      
+
       for (const session of sessionsToDelete) {
         await this.deleteSession(session.id);
       }
@@ -423,7 +423,7 @@ export class SessionManager implements Tool<string, Session> {
   private truncateSession(session: Session): Session {
     const messages = [...session.messages];
     let currentTokens = this.estimateTokens(messages);
-    
+
     // Remove oldest messages until we fit in the context window
     while (currentTokens > session.contextWindow.maxTokens && messages.length > 1) {
       messages.shift(); // Remove oldest message
@@ -446,7 +446,7 @@ export class SessionManager implements Tool<string, Session> {
    */
   private estimateTokens(messages: readonly ContextMessage[]): number {
     const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0);
-    
+
     // Rough approximation: 1 token ≈ 4 characters
     return Math.ceil(totalChars / 4);
   }

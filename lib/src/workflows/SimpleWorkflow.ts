@@ -1,6 +1,6 @@
 /**
  * Simple Workflow Architecture
- * 
+ *
  * Bounded workflow classes for qi-prompt extension capabilities.
  * Maintains architectural integrity while adding specific workflow support.
  */
@@ -87,7 +87,7 @@ export abstract class SimpleWorkflow {
    * Create success result
    */
   protected createSuccessResult(
-    output: string, 
+    output: string,
     metadata?: Map<string, unknown>,
     filesReferenced?: string[],
     contextUsed?: string[]
@@ -104,10 +104,7 @@ export abstract class SimpleWorkflow {
   /**
    * Create error result
    */
-  protected createErrorResult(
-    error: string, 
-    metadata?: Map<string, unknown>
-  ): WorkflowResult {
+  protected createErrorResult(error: string, metadata?: Map<string, unknown>): WorkflowResult {
     return {
       success: false,
       output: '',

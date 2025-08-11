@@ -23,13 +23,9 @@ export * from './impl/index.js';
 export * from './utils/index.js';
 
 import type { AppContext } from './abstractions/index.js';
-import {
-  type ToolbasedContextConfig,
-  ToolbasedContextManager,
-} from './impl/ToolbasedContextManager.js';
+// ToolbasedContextManager removed - use standard ContextManager
 // Factory functions
 import { ContextManager } from './impl/ContextManager.js';
-import type { ToolRegistry } from '../tools/index.js';
 
 /**
  * Create a context manager with initial application context
@@ -39,21 +35,14 @@ export function createContextManager(initialAppContext: AppContext): ContextMana
 }
 
 /**
- * Create toolbox-based context manager (RECOMMENDED)
+ * Create toolbox-based context manager (DEPRECATED)
  *
- * Uses toolbox architecture:
- * - Tool registry for composable operations
- * - File reference processing
- * - Project structure awareness
- * - Session persistence and management
- * - Context-aware prompting
+ * Use standard ContextManager instead. Toolbox functionality moved to workflow system.
  */
-export function createToolbasedContextManager(
-  initialAppContext: AppContext,
-  toolRegistry: ToolRegistry,
-  config: Partial<ToolbasedContextConfig> = {}
-): ToolbasedContextManager {
-  return new ToolbasedContextManager(initialAppContext, toolRegistry, config);
+export function createToolbasedContextManager(): never {
+  throw new Error(
+    'ToolbasedContextManager deprecated - use createContextManager() and workflow system'
+  );
 }
 
 /**

@@ -3,10 +3,10 @@
 
 llm:
   # Default provider selection strategy
-  defaultProvider: "openrouter"
+  defaultProvider: "ollama"
   
   # Fallback chain - providers to try in order if primary fails
-  fallbackChain: ["openrouter", "ollama", "groq", "huggingface", "together"]
+  fallbackChain: ["ollama", "openrouter", "groq", "huggingface", "together"]
   
   # Request timeout and retry configuration
   timeout: 30000  # 30 seconds
@@ -28,20 +28,8 @@ llm:
 
   # LLM configuration for user prompts (user-changeable)
   prompt:
-    currentModel: "qwen/qwen3-coder:free"  # Currently selected model
-    availableModels: [
-      "meta-llama/llama-3.2-3b-instruct:free",
-      "meta-llama/llama-3.2-1b-instruct:free", 
-      "qwen/qwen3-coder",
-      "qwen/qwen3-coder:free",
-      "qwen/qwen3-32b-coder",
-      "microsoft/phi-3-mini-128k-instruct:free",
-      "huggingface/zephyr-7b-beta:free",
-      "anthropic/claude-3.5-haiku", 
-      "meta-llama/llama-3.2-3b-instruct", 
-      "google/gemini-flash-1.5"
-    ]  # User can switch between these
-    defaultProvider: "openrouter"
+    currentModel: "llama3.2:3b"  # Start with local model
+    defaultProvider: "ollama"
 
   # Provider configurations
   providers:
@@ -193,61 +181,6 @@ llm:
           defaultParameters:
             temperature: 0.7
             max_tokens: 4096
-        - name: "qwen/qwen3-14b:free"
-          displayName: "Qwen3 14B (Free)"
-          maxTokens: 8192
-          contextWindow: 32768
-          capabilities: ["completion", "chat", "reasoning"]
-          rateLimit:
-            requestsPerMinute: 1000
-            tokensPerMinute: 1000000
-          defaultParameters:
-            temperature: 0.8
-            max_tokens: 2048
-        - name: "qwen/qwen3-30b-a3b:free"
-          displayName: "Qwen3 30B A3B (Free)"
-          maxTokens: 8192
-          contextWindow: 32768
-          capabilities: ["completion", "chat", "reasoning"]
-          rateLimit:
-            requestsPerMinute: 1000
-            tokensPerMinute: 1000000
-          defaultParameters:
-            temperature: 0.8
-            max_tokens: 4096
-        - name: "qwen/qwen3-coder:free"
-          displayName: "Qwen3 Coder (Free)"
-          maxTokens: 8192
-          contextWindow: 32768
-          capabilities: ["completion", "chat", "code"]
-          rateLimit:
-            requestsPerMinute: 1000
-            tokensPerMinute: 1000000
-          defaultParameters:
-            temperature: 0.3
-            max_tokens: 2048
-        - name: "qwen/qwen3-8b"
-          displayName: "Qwen3 8B"
-          maxTokens: 8192
-          contextWindow: 32768
-          capabilities: ["completion", "chat", "reasoning"]
-          rateLimit:
-            requestsPerMinute: 1000
-            tokensPerMinute: 1000000
-          defaultParameters:
-            temperature: 0.8
-            max_tokens: 2048
-        - name: "qwen/qwen3-14b"
-          displayName: "Qwen3 14B"
-          maxTokens: 8192
-          contextWindow: 32768
-          capabilities: ["completion", "chat", "reasoning"]
-          rateLimit:
-            requestsPerMinute: 1000
-            tokensPerMinute: 1000000
-          defaultParameters:
-            temperature: 0.8
-            max_tokens: 2048
       authentication:
         type: "bearer"
         headerName: "Authorization"

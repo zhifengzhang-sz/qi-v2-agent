@@ -1,13 +1,18 @@
 /**
  * Workflow Manager
- * 
+ *
  * Manages simple workflows and routes input to appropriate handlers.
  * Maintains bounded complexity and architectural integrity.
  */
 
-import { SimpleWorkflow, SimpleWorkflowClass, type WorkflowInput, type WorkflowResult } from './SimpleWorkflow.js';
-import { FileReferenceWorkflow } from './FileReferenceWorkflow.js';
 import type { ToolRegistry } from '../tools/index.js';
+import { FileReferenceWorkflow } from './FileReferenceWorkflow.js';
+import type {
+  SimpleWorkflow,
+  SimpleWorkflowClass,
+  WorkflowInput,
+  WorkflowResult,
+} from './SimpleWorkflow.js';
 
 /**
  * Workflow execution statistics
@@ -42,7 +47,7 @@ export class WorkflowManager {
    */
   registerWorkflow(workflow: SimpleWorkflow): void {
     const workflowClass = workflow.getWorkflowClass();
-    
+
     if (this.workflows.has(workflowClass)) {
       throw new Error(`Workflow for class '${workflowClass}' is already registered`);
     }
@@ -62,10 +67,10 @@ export class WorkflowManager {
    */
   async executeWorkflow(input: WorkflowInput): Promise<WorkflowResult> {
     const startTime = Date.now();
-    
+
     try {
       const workflow = this.workflows.get(input.classification);
-      
+
       if (!workflow) {
         return this.createUnsupportedResult(input.classification);
       }
@@ -75,23 +80,22 @@ export class WorkflowManager {
       }
 
       const result = await workflow.execute(input);
-      
+
       // Update statistics
       this.updateStats(input.classification, true, Date.now() - startTime);
-      
-      return result;
 
+      return result;
     } catch (error) {
       // Update statistics for failure
       this.updateStats(input.classification, false, Date.now() - startTime);
-      
+
       return {
         success: false,
         output: '',
         error: `Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         metadata: new Map([
           ['error', error instanceof Error ? error.message : 'Unknown error'],
-          ['executionTime', Date.now() - startTime],
+          ['executionTime', String(Date.now() - startTime)],
         ]),
       };
     }
@@ -109,11 +113,11 @@ export class WorkflowManager {
    */
   getWorkflowDescriptions(): Map<SimpleWorkflowClass, string> {
     const descriptions = new Map<SimpleWorkflowClass, string>();
-    
+
     for (const [workflowClass, workflow] of this.workflows) {
       descriptions.set(workflowClass, workflow.getDescription());
     }
-    
+
     return descriptions;
   }
 
@@ -121,9 +125,10 @@ export class WorkflowManager {
    * Get workflow execution statistics
    */
   getStats(): WorkflowStats {
-    const averageExecutionTime = this.stats.totalExecutions > 0 
-      ? this.stats.totalExecutionTime / this.stats.totalExecutions 
-      : 0;
+    const averageExecutionTime =
+      this.stats.totalExecutions > 0
+        ? this.stats.totalExecutionTime / this.stats.totalExecutions
+        : 0;
 
     return {
       totalExecutions: this.stats.totalExecutions,
@@ -166,7 +171,7 @@ export class WorkflowManager {
       error: `Workflow class '${workflowClass}' is not supported`,
       metadata: new Map([
         ['workflowClass', workflowClass],
-        ['supportedWorkflows', Array.from(this.workflows.keys())],
+        ['supportedWorkflows', Array.from(this.workflows.keys()).join(', ')],
       ]),
     };
   }
@@ -190,13 +195,13 @@ export class WorkflowManager {
    * Update execution statistics
    */
   private updateStats(
-    workflowClass: SimpleWorkflowClass, 
-    success: boolean, 
+    workflowClass: SimpleWorkflowClass,
+    success: boolean,
     executionTime: number
   ): void {
     this.stats.totalExecutions++;
     this.stats.totalExecutionTime += executionTime;
-    
+
     if (success) {
       this.stats.successfulExecutions++;
     } else {

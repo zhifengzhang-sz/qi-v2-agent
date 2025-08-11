@@ -1,12 +1,11 @@
 /**
  * Parsing Tools
- * 
+ *
  * Tools for parsing and extracting patterns from text input.
  */
 
-export { FileReferenceParser } from './FileReferenceParser.js';
-
-export type { 
-  ParsedFileReference, 
-  FileReferenceParsingResult 
+export type {
+  FileReferenceParsingResult,
+  ParsedFileReference,
 } from './FileReferenceParser.js';
+export { FileReferenceParser } from './FileReferenceParser.js';

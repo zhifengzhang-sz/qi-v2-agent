@@ -159,12 +159,19 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
 
       // Use function calling method - works across all providers
       // Note: withStructuredOutput is available on all LangChain chat models
-      this.llmWithStructuredOutput = (
-        llm as ChatOllama | ChatOpenAI | ChatAnthropic
-      ).withStructuredOutput(this.selectedSchema.schema, {
-        name: this.selectedSchema.metadata.name,
-        method: 'functionCalling',
-      }) as unknown as ChatOllama | ChatOpenAI | ChatAnthropic;
+      const llmWithStructuredOutputMethod = (llm as any).withStructuredOutput;
+      if (llmWithStructuredOutputMethod && typeof llmWithStructuredOutputMethod === 'function') {
+        this.llmWithStructuredOutput = llmWithStructuredOutputMethod.call(
+          llm,
+          this.selectedSchema.schema,
+          {
+            name: this.selectedSchema.metadata.name,
+            method: 'functionCalling',
+          }
+        ) as ChatOllama | ChatOpenAI | ChatAnthropic;
+      } else {
+        throw new Error('withStructuredOutput method not available on this LLM instance');
+      }
     } catch (error) {
       throw new Error(
         `Failed to initialize LangChain function calling method: ${error instanceof Error ? error.message : String(error)}`
@@ -386,13 +393,16 @@ ${contextStr}
         }
 
         // Use function calling method - works across all providers
-        const result = await this.llmWithStructuredOutput.invoke(prompt);
+        const rawResult = await this.llmWithStructuredOutput?.invoke(prompt);
+
+        // Extract structured output from the result
+        const result = this.extractStructuredOutput(rawResult);
 
         // DEBUG: Always log result for debugging
         console.log('✅ LLM FUNCTION CALLING RESULT:', {
-          type: result?.type || 'MISSING',
-          confidence: result?.confidence || 'MISSING',
-          reasoning: result?.reasoning?.substring(0, 100) || 'MISSING',
+          type: result.type || 'MISSING',
+          confidence: result.confidence || 'MISSING',
+          reasoning: result.reasoning?.substring(0, 100) || 'MISSING',
           fullResult: JSON.stringify(result, null, 2),
         });
 
@@ -400,12 +410,10 @@ ${contextStr}
         const duration = endTime - startTime;
 
         // Add debug info
-        if (typeof result === 'object' && result !== null) {
-          const debugResult = result as DebugLangChainOutput;
-          debugResult.__debug_timing = duration;
-          debugResult.__debug_method = 'functionCalling';
-          debugResult.__debug_provider = this.detectedProvider?.providerName;
-        }
+        const debugResult = result as DebugLangChainOutput;
+        debugResult.__debug_timing = duration;
+        debugResult.__debug_method = 'functionCalling';
+        debugResult.__debug_provider = this.detectedProvider?.providerName || 'unknown';
 
         return result;
       },
@@ -474,14 +482,15 @@ ${contextStr}
       ]);
 
       // Add debug timing if available
-      if (result.__debug_timing) {
-        metadata.set('debug_timing_ms', result.__debug_timing.toString());
+      const debugResult = result as DebugLangChainOutput;
+      if (debugResult.__debug_timing) {
+        metadata.set('debug_timing_ms', debugResult.__debug_timing.toString());
       }
-      if (result.__debug_method) {
-        metadata.set('debug_method', result.__debug_method);
+      if (debugResult.__debug_method) {
+        metadata.set('debug_method', debugResult.__debug_method);
       }
-      if (result.__debug_provider) {
-        metadata.set('debug_provider', result.__debug_provider);
+      if (debugResult.__debug_provider) {
+        metadata.set('debug_provider', debugResult.__debug_provider);
       }
 
       const extractedData = new Map<string, unknown>();
@@ -542,6 +551,46 @@ ${contextStr}
     }
 
     return parts.length > 0 ? `**Context:** ${parts.join(' | ')}` : '';
+  }
+
+  /**
+   * Extract structured output from LangChain result (handles AIMessageChunk)
+   */
+  private extractStructuredOutput(rawResult: unknown): LangChainClassificationOutput {
+    // If the result is already structured (direct function calling result)
+    const resultObj = rawResult as any;
+    if (resultObj && typeof resultObj === 'object' && resultObj.type && resultObj.confidence) {
+      return resultObj as LangChainClassificationOutput;
+    }
+
+    // Handle AIMessageChunk - extract from tool_calls or content
+    if (
+      resultObj?.tool_calls &&
+      Array.isArray(resultObj.tool_calls) &&
+      resultObj.tool_calls.length > 0
+    ) {
+      const toolCall = resultObj.tool_calls[0];
+      if (toolCall?.args) {
+        return toolCall.args as LangChainClassificationOutput;
+      }
+    }
+
+    // Handle content-based result
+    if (resultObj?.content && typeof resultObj.content === 'string') {
+      try {
+        const parsed = JSON.parse(resultObj.content);
+        return parsed as LangChainClassificationOutput;
+      } catch {
+        // Fallback for unparseable content
+      }
+    }
+
+    // Default fallback
+    return {
+      type: 'prompt',
+      confidence: 0.5,
+      reasoning: 'Unable to extract structured output from LLM response',
+    };
   }
 
   private trackPerformance(startTime: number, success: boolean): void {

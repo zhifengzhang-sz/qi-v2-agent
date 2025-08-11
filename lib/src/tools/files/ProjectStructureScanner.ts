@@ -1,12 +1,12 @@
 /**
  * Project Structure Scanner Tool
- * 
+ *
  * Discovers and analyzes project structure for context awareness.
  * Used for project discovery and memory file detection.
  */
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, basename } from 'node:path';
+import { basename, join, relative } from 'node:path';
 
 /**
  * Project context information
@@ -71,7 +71,7 @@ import type { Tool } from '../index.js';
 
 /**
  * Project Structure Scanner Tool
- * 
+ *
  * Provides project discovery and structure analysis.
  */
 export class ProjectStructureScanner implements Tool<string, ProjectContext | null> {
@@ -111,7 +111,7 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
         // Reached filesystem root
         break;
       }
-      
+
       currentPath = parentPath;
       depth++;
     }
@@ -162,7 +162,7 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
 
     try {
       const entries = readdirSync(rootPath);
-      
+
       for (const entry of entries) {
         // Skip hidden files unless configured to include them
         if (!this.config.includeHidden && entry.startsWith('.')) {
@@ -179,31 +179,28 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
 
         try {
           const stats = statSync(fullPath);
-          
+
           if (stats.isFile()) {
             results.push(relativePath);
           } else if (stats.isDirectory()) {
             // Add directory itself
-            results.push(relativePath + '/');
-            
+            results.push(`${relativePath}/`);
+
             // Recursively scan subdirectory
             const subResults = await this.scanStructure(fullPath, currentDepth + 1);
             for (const subPath of subResults) {
               results.push(join(relativePath, subPath));
-              
+
               if (results.length >= this.config.maxFiles) {
                 break;
               }
             }
           }
-          
+
           if (results.length >= this.config.maxFiles) {
             break;
           }
-        } catch (statError) {
-          // Skip files/directories that can't be accessed
-          continue;
-        }
+        } catch (_statError) {}
       }
     } catch (readError) {
       // Skip directories that can't be read
@@ -230,18 +227,18 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
       '.git',
     ];
 
-    return indicators.some(indicator => existsSync(join(dirPath, indicator)));
+    return indicators.some((indicator) => existsSync(join(dirPath, indicator)));
   }
 
   /**
    * Find memory files in the project structure
    */
-  private findMemoryFiles(structure: string[], rootPath: string): string[] {
+  private findMemoryFiles(structure: string[], _rootPath: string): string[] {
     const memoryFiles: string[] = [];
 
     for (const filePath of structure) {
       const fileName = basename(filePath);
-      
+
       // Check exact matches
       if (this.config.memoryFileNames.includes(fileName)) {
         memoryFiles.push(filePath);
@@ -263,12 +260,12 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
   /**
    * Find configuration files in the project structure
    */
-  private findConfigFiles(structure: string[], rootPath: string): string[] {
+  private findConfigFiles(structure: string[], _rootPath: string): string[] {
     const configFiles: string[] = [];
 
     for (const filePath of structure) {
       const fileName = basename(filePath);
-      
+
       for (const pattern of this.config.configFilePatterns) {
         if (this.matchesPattern(fileName, pattern)) {
           configFiles.push(filePath);
@@ -311,13 +308,13 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
    */
   private shouldExclude(relativePath: string): boolean {
     const normalizedPath = relativePath.replace(/\\/g, '/');
-    
-    return this.config.excludePatterns.some(pattern => {
+
+    return this.config.excludePatterns.some((pattern) => {
       if (pattern.includes('*')) {
         const regexPattern = pattern.replace(/\*/g, '.*');
         return new RegExp(regexPattern).test(normalizedPath);
       }
-      
+
       return normalizedPath.includes(pattern) || normalizedPath.startsWith(pattern);
     });
   }
@@ -330,10 +327,8 @@ export class ProjectStructureScanner implements Tool<string, ProjectContext | nu
       return fileName === pattern;
     }
 
-    const regexPattern = pattern
-      .replace(/\./g, '\\.')
-      .replace(/\*/g, '.*');
-    
+    const regexPattern = pattern.replace(/\./g, '\\.').replace(/\*/g, '.*');
+
     return new RegExp(`^${regexPattern}$`).test(fileName);
   }
 }

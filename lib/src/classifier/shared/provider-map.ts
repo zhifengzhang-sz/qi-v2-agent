@@ -229,7 +229,7 @@ export async function createLLMInstance(
   }
 
   // Dynamically import and instantiate the appropriate LLM class
-  let LLMClass: any;
+  let LLMClass: any; // Required for dynamic module imports
 
   switch (providerConfig.endpointType) {
     case 'ollama': {
