@@ -1,23 +1,27 @@
 /**
  * File Reference Workflow
- * 
+ *
  * Handles @file.txt patterns by resolving file content and enhancing prompts.
  * This is a bounded, simple workflow with max 3 operations.
  */
 
-import { SimpleWorkflow, SimpleWorkflowClass, type WorkflowInput, type WorkflowResult } from './SimpleWorkflow.js';
 import type { FileContentResolver, FileReferenceParser } from '../tools/index.js';
+import {
+  SimpleWorkflow,
+  SimpleWorkflowClass,
+  type WorkflowInput,
+  type WorkflowResult,
+} from './SimpleWorkflow.js';
 
 /**
  * File Reference Workflow Implementation
- * 
+ *
  * Workflow steps (max 3):
  * 1. Parse file references from input
- * 2. Resolve file content using FileContentResolver  
+ * 2. Resolve file content using FileContentResolver
  * 3. Enhance prompt with file content
  */
 export class FileReferenceWorkflow extends SimpleWorkflow {
-  
   /**
    * Get the workflow class this handles
    */
@@ -36,8 +40,10 @@ export class FileReferenceWorkflow extends SimpleWorkflow {
    * Check if this workflow can handle the input
    */
   canHandle(input: WorkflowInput): boolean {
-    return input.classification === SimpleWorkflowClass.FILE_REFERENCE &&
-           this.hasFileReferences(input.originalInput);
+    return (
+      input.classification === SimpleWorkflowClass.FILE_REFERENCE &&
+      this.hasFileReferences(input.originalInput)
+    );
   }
 
   /**
@@ -80,24 +86,31 @@ export class FileReferenceWorkflow extends SimpleWorkflow {
         return this.createErrorResult('FileContentResolver tool not available', metadata);
       }
 
-      const filePaths = references.map(ref => ref.filePath);
+      const filePaths = references.map((ref) => ref.filePath);
       const basePath = input.projectPath || process.cwd();
-      
+
       // Resolve each file individually since the tool interface expects single input
       const fileReferences = await Promise.all(
-        filePaths.map(filePath => resolver.resolveFile(filePath, basePath))
+        filePaths.map((filePath) => resolver.resolveFile(filePath, basePath))
       );
-      
-      const validFiles = fileReferences.filter(ref => ref.exists && ref.content);
-      const invalidFiles = fileReferences.filter(ref => !ref.exists || ref.error);
+
+      const validFiles = fileReferences.filter((ref) => ref.exists && ref.content);
+      const invalidFiles = fileReferences.filter((ref) => !ref.exists || ref.error);
 
       metadata.set('validFiles', validFiles.length);
       metadata.set('invalidFiles', invalidFiles.length);
 
       // Operation 3: Enhance prompt with file content
+      // Filter out files with undefined content
+      const filesWithContent = validFiles.filter((file) => file.content !== undefined) as Array<{
+        relativePath: string;
+        content: string;
+        lastModified?: Date;
+      }>;
+
       const enhancedPrompt = this.buildEnhancedPrompt(
         parseResult.cleanedInput,
-        validFiles,
+        filesWithContent,
         invalidFiles
       );
 
@@ -107,10 +120,9 @@ export class FileReferenceWorkflow extends SimpleWorkflow {
       return this.createSuccessResult(
         enhancedPrompt,
         metadata,
-        validFiles.map(ref => ref.relativePath),
+        validFiles.map((ref) => ref.relativePath),
         ['file-content', 'project-structure']
       );
-
     } catch (error) {
       metadata.set('error', error instanceof Error ? error.message : 'Unknown error');
       return this.createErrorResult(
@@ -126,12 +138,12 @@ export class FileReferenceWorkflow extends SimpleWorkflow {
   private hasFileReferences(input: string): boolean {
     // Simple check for common file reference patterns
     const patterns = [
-      /@[^\s\n]+/,          // @path/to/file
-      /@"[^"]+"/,           // @"path with spaces"  
-      /@'[^']+'/,           // @'path with spaces'
+      /@[^\s\n]+/, // @path/to/file
+      /@"[^"]+"/, // @"path with spaces"
+      /@'[^']+'/, // @'path with spaces'
     ];
 
-    return patterns.some(pattern => pattern.test(input));
+    return patterns.some((pattern) => pattern.test(input));
   }
 
   /**
@@ -147,7 +159,7 @@ export class FileReferenceWorkflow extends SimpleWorkflow {
     // Add file content sections
     if (validFiles.length > 0) {
       enhanced += '# Referenced Files\n\n';
-      
+
       for (const file of validFiles) {
         enhanced += `## ${file.relativePath}\n`;
         if (file.lastModified) {
@@ -162,7 +174,7 @@ export class FileReferenceWorkflow extends SimpleWorkflow {
     // Add information about invalid files
     if (invalidFiles.length > 0) {
       enhanced += '# Unavailable Files\n\n';
-      
+
       for (const file of invalidFiles) {
         enhanced += `- **${file.relativePath}**: ${file.error || 'File not found'}\n`;
       }

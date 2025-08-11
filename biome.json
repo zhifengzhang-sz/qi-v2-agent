@@ -37,11 +37,18 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noExplicitAny": "off"
       },
       "style": {
         "useImportType": "error",
-        "useNodejsImportProtocol": "error"
+        "useNodejsImportProtocol": "error",
+        "noNonNullAssertion": "warn"
+      },
+      "correctness": {
+        "noUnusedPrivateClassMembers": "warn"
+      },
+      "complexity": {
+        "noBannedTypes": "warn"
       }
     }
   },

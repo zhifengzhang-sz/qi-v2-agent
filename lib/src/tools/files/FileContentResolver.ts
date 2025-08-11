@@ -1,13 +1,13 @@
 /**
  * File Content Resolver Tool
- * 
+ *
  * Resolves file references and provides content with metadata.
  * Used for Claude Code-style @file.txt pattern resolution.
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve, relative, basename, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { basename, isAbsolute, relative, resolve } from 'node:path';
 
 /**
  * File reference information
@@ -61,7 +61,7 @@ import type { Tool } from '../index.js';
 
 /**
  * File Content Resolver Tool
- * 
+ *
  * Provides file content resolution with caching and validation.
  */
 export class FileContentResolver implements Tool<string, FileReference> {
@@ -115,7 +115,7 @@ export class FileContentResolver implements Tool<string, FileReference> {
    * Resolve multiple file references
    */
   async resolveFiles(filePaths: string[], basePath?: string): Promise<FileReference[]> {
-    const promises = filePaths.map(path => this.resolveFile(path, basePath));
+    const promises = filePaths.map((path) => this.resolveFile(path, basePath));
     return Promise.all(promises);
   }
 
@@ -255,14 +255,14 @@ export class FileContentResolver implements Tool<string, FileReference> {
     if (!this.config.excludePatterns) return false;
 
     const normalizedPath = relativePath.replace(/\\/g, '/');
-    
-    return this.config.excludePatterns.some(pattern => {
+
+    return this.config.excludePatterns.some((pattern) => {
       if (pattern.includes('*')) {
         // Simple glob pattern matching
         const regexPattern = pattern.replace(/\*/g, '.*');
         return new RegExp(regexPattern).test(normalizedPath);
       }
-      
+
       // Exact or directory matching
       return normalizedPath.includes(pattern);
     });

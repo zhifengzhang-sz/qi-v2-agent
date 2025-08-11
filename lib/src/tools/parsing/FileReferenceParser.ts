@@ -1,6 +1,6 @@
 /**
  * File Reference Parser Tool
- * 
+ *
  * Parses and extracts file references from text input.
  * Supports Claude Code-style @file.txt patterns and variations.
  */
@@ -9,11 +9,11 @@
  * Parsed file reference information
  */
 export interface ParsedFileReference {
-  readonly original: string;        // Original matched text
-  readonly filePath: string;       // Extracted file path
-  readonly startIndex: number;     // Position in original text
-  readonly endIndex: number;       // End position in original text
-  readonly context?: string;       // Surrounding context
+  readonly original: string; // Original matched text
+  readonly filePath: string; // Extracted file path
+  readonly startIndex: number; // Position in original text
+  readonly endIndex: number; // End position in original text
+  readonly context?: string; // Surrounding context
   readonly metadata: ReadonlyMap<string, unknown>;
 }
 
@@ -24,7 +24,7 @@ export interface FileReferenceParsingResult {
   readonly input: string;
   readonly references: readonly ParsedFileReference[];
   readonly hasReferences: boolean;
-  readonly cleanedInput: string;   // Input with references removed or marked
+  readonly cleanedInput: string; // Input with references removed or marked
   readonly metadata: ReadonlyMap<string, unknown>;
 }
 
@@ -34,8 +34,8 @@ export interface FileReferenceParsingResult {
 export interface FileReferenceParserConfig {
   readonly patterns: readonly string[];
   readonly maxContextLength: number;
-  readonly preserveReferences: boolean;  // Keep references in cleaned text
-  readonly markReferences: boolean;      // Mark references with special syntax
+  readonly preserveReferences: boolean; // Keep references in cleaned text
+  readonly markReferences: boolean; // Mark references with special syntax
   readonly caseInsensitive: boolean;
 }
 
@@ -44,13 +44,13 @@ export interface FileReferenceParserConfig {
  */
 const DEFAULT_CONFIG: FileReferenceParserConfig = {
   patterns: [
-    '@([^\\s\\n]+)',                    // @path/to/file
-    '@"([^"]+)"',                       // @"path with spaces"
-    '@\'([^\']+)\'',                    // @'path with spaces'
-    '`([^`]+)`',                        // `path/to/file`
-    '\\./([^\\s\\n]+)',                 // ./relative/path
-    '\\.\\./([^\\s\\n]+)',              // ../relative/path
-    '/([^\\s\\n]+)',                    // /absolute/path (be careful with this)
+    '@([^\\s\\n]+)', // @path/to/file
+    '@"([^"]+)"', // @"path with spaces"
+    "@'([^']+)'", // @'path with spaces'
+    '`([^`]+)`', // `path/to/file`
+    '\\./([^\\s\\n]+)', // ./relative/path
+    '\\.\\./([^\\s\\n]+)', // ../relative/path
+    '/([^\\s\\n]+)', // /absolute/path (be careful with this)
   ],
   maxContextLength: 50,
   preserveReferences: false,
@@ -62,7 +62,7 @@ import type { Tool } from '../index.js';
 
 /**
  * File Reference Parser Tool
- * 
+ *
  * Extracts file references from natural language input.
  */
 export class FileReferenceParser implements Tool<string, FileReferenceParsingResult> {
@@ -90,11 +90,11 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
   parseFileReferences(input: string): FileReferenceParsingResult {
     const references: ParsedFileReference[] = [];
     let cleanedInput = input;
-    
+
     // Process each pattern
     for (const pattern of this.compiledPatterns) {
       const matches = [...input.matchAll(pattern)];
-      
+
       for (const match of matches) {
         if (match.index === undefined) continue;
 
@@ -155,7 +155,7 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
    * Check if the input contains file references
    */
   hasFileReferences(input: string): boolean {
-    return this.compiledPatterns.some(pattern => pattern.test(input));
+    return this.compiledPatterns.some((pattern) => pattern.test(input));
   }
 
   /**
@@ -163,7 +163,7 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
    */
   extractFilePaths(input: string): string[] {
     const result = this.parseFileReferences(input);
-    return result.references.map(ref => ref.filePath);
+    return result.references.map((ref) => ref.filePath);
   }
 
   /**
@@ -171,8 +171,8 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
    */
   private compilePatterns(): RegExp[] {
     const flags = this.config.caseInsensitive ? 'gi' : 'g';
-    
-    return this.config.patterns.map(pattern => {
+
+    return this.config.patterns.map((pattern) => {
       try {
         return new RegExp(pattern, flags);
       } catch (error) {
@@ -188,14 +188,14 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
   private extractContext(input: string, startIndex: number, endIndex: number): string {
     const contextStart = Math.max(0, startIndex - this.config.maxContextLength);
     const contextEnd = Math.min(input.length, endIndex + this.config.maxContextLength);
-    
+
     return input.substring(contextStart, contextEnd).trim();
   }
 
   /**
    * Check if a match is likely a false positive
    */
-  private isFalsePositive(filePath: string, original: string, context: string): boolean {
+  private isFalsePositive(filePath: string, _original: string, context: string): boolean {
     // Skip very short paths
     if (filePath.length < 2) {
       return true;
@@ -236,7 +236,9 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
     }
 
     // Common programming file extensions boost more
-    if (/\.(js|ts|tsx|jsx|py|java|cpp|h|cs|rb|go|rs|php|html|css|md|json|yaml|yml)$/.test(filePath)) {
+    if (
+      /\.(js|ts|tsx|jsx|py|java|cpp|h|cs|rb|go|rs|php|html|css|md|json|yaml|yml)$/.test(filePath)
+    ) {
       confidence += 0.2;
     }
 
@@ -264,7 +266,7 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
   private normalizePath(filePath: string): string {
     return filePath
       .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/\\/g, '/');        // Normalize path separators
+      .replace(/\\/g, '/'); // Normalize path separators
   }
 
   /**
@@ -290,17 +292,17 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
   private removeReferences(input: string, references: ParsedFileReference[]): string {
     // Sort by position (descending) to avoid index issues
     const sortedRefs = [...references].sort((a, b) => b.startIndex - a.startIndex);
-    
+
     let result = input;
-    
+
     for (const ref of sortedRefs) {
       const before = result.substring(0, ref.startIndex);
       const after = result.substring(ref.endIndex);
-      
+
       // Clean up extra whitespace
-      result = (before.trimEnd() + ' ' + after.trimStart()).trim();
+      result = `${before.trimEnd()} ${after.trimStart()}`.trim();
     }
-    
+
     return result;
   }
 
@@ -310,17 +312,17 @@ export class FileReferenceParser implements Tool<string, FileReferenceParsingRes
   private markReferences(input: string, references: ParsedFileReference[]): string {
     // Sort by position (descending) to avoid index issues
     const sortedRefs = [...references].sort((a, b) => b.startIndex - a.startIndex);
-    
+
     let result = input;
-    
+
     for (const ref of sortedRefs) {
       const before = result.substring(0, ref.startIndex);
       const after = result.substring(ref.endIndex);
       const marked = `[FILE:${ref.filePath}]`;
-      
+
       result = before + marked + after;
     }
-    
+
     return result;
   }
 }

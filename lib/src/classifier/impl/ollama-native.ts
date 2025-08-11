@@ -79,8 +79,8 @@ export class OllamaNativeClassificationMethod implements IClassificationMethod {
 
   // Performance tracking
   private totalClassifications = 0;
-  private totalLatencyMs = 0;
   private successfulClassifications = 0;
+  private totalLatencyMs = 0;
 
   constructor(config: Partial<OllamaNativeClassificationConfig> = {}) {
     this.config = {

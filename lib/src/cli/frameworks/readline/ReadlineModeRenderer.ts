@@ -416,7 +416,8 @@ export class ReadlineModeRenderer implements IModeRenderer {
 
   private getDisplayWidth(text: string): number {
     // Remove ANSI escape sequences for width calculation
-    const cleaned = text.replace(/\u001b\[[0-9;]*m/g, '');
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequence is intentional
+    const cleaned = text.replace(/\x1b\[[0-9;]*m/g, '');
 
     // Count visual characters (Unicode aware)
     let width = 0;

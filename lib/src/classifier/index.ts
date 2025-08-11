@@ -19,7 +19,7 @@ export type {
 } from './abstractions/index.js';
 
 import type { ClassificationConfig, ClassificationMethod } from './abstractions/index.js';
-import { FileReferenceClassifier } from './impl/FileReferenceClassifier.js';
+// FileReferenceClassifier removed - classification handled by workflows
 import { InputClassifier } from './impl/input-classifier.js';
 import { LangChainFunctionCallingClassificationMethod } from './impl/langchain-function-calling.js';
 import { OllamaNativeClassificationMethod } from './impl/ollama-native.js';
@@ -232,18 +232,8 @@ export function createInputClassifier(
     }
 
     case 'file-reference': {
-      // File reference classifier with advanced pattern recognition
-      const fileRefMethod = new FileReferenceClassifier({
-        enableFileAwareness: true,
-        enableExtendedThinking: true,
-        enableContextContinuation: true,
-        confidenceThresholds: new Map([
-          ['command', 1.0],
-          ['prompt', config.confidenceThreshold || 0.8],
-          ['simple-workflow', config.confidenceThreshold || 0.7],
-        ]),
-      });
-      return new InputClassifier(fileRefMethod);
+      // File reference classification now handled by workflows
+      throw new Error('file-reference classification method has been moved to workflow system');
     }
 
     default:
@@ -329,7 +319,6 @@ export {
   RuleBasedClassificationMethod,
   OllamaNativeClassificationMethod,
   LangChainFunctionCallingClassificationMethod, // Provider-agnostic implementation
-  FileReferenceClassifier, // Functional file reference classifier
   InputClassifier,
 };
 

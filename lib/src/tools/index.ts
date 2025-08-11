@@ -1,14 +1,14 @@
 /**
  * Tool Registry
- * 
+ *
  * Central registry for all tools in the toolbox architecture.
  * Provides composable, single-purpose tools for workflows.
  */
 
+export * from './context/index.js';
 // Export tool implementations
 export * from './files/index.js';
-export * from './parsing/index.js'; 
-export * from './context/index.js';
+export * from './parsing/index.js';
 
 /**
  * Generic tool interface
@@ -90,14 +90,14 @@ export class ToolRegistry {
    * List tools by category
    */
   listByCategory(category: string): ToolMetadata[] {
-    return this.listTools().filter(meta => meta.category === category);
+    return this.listTools().filter((meta) => meta.category === category);
   }
 
   /**
    * List tools by tag
    */
   listByTag(tag: string): ToolMetadata[] {
-    return this.listTools().filter(meta => meta.tags.includes(tag));
+    return this.listTools().filter((meta) => meta.tags.includes(tag));
   }
 
   /**
@@ -109,9 +109,9 @@ export class ToolRegistry {
 
     // Call cleanup if available
     if (tool.cleanup) {
-      tool.cleanup().catch(error => 
-        console.warn(`Error during cleanup of tool '${name}':`, error)
-      );
+      tool
+        .cleanup()
+        .catch((error) => console.warn(`Error during cleanup of tool '${name}':`, error));
     }
 
     this.tools.delete(name);
@@ -122,10 +122,7 @@ export class ToolRegistry {
   /**
    * Execute a tool by name
    */
-  async execute<TInput, TOutput>(
-    toolName: string, 
-    input: TInput
-  ): Promise<TOutput> {
+  async execute<TInput, TOutput>(toolName: string, input: TInput): Promise<TOutput> {
     const tool = this.tools.get(toolName);
     if (!tool) {
       throw new Error(`Tool '${toolName}' not found in registry`);
@@ -137,7 +134,7 @@ export class ToolRegistry {
     }
 
     try {
-      return await tool.execute(input) as TOutput;
+      return (await tool.execute(input)) as TOutput;
     } catch (error) {
       throw new Error(`Tool '${toolName}' execution failed: ${error}`);
     }
@@ -148,13 +145,13 @@ export class ToolRegistry {
    */
   async clear(): Promise<void> {
     const cleanupPromises = Array.from(this.tools.values())
-      .filter(tool => tool.cleanup)
-      .map(tool => tool.cleanup!().catch(error => 
-        console.warn(`Error during cleanup:`, error)
-      ));
+      .filter((tool) => tool.cleanup)
+      .map((tool) =>
+        tool.cleanup?.().catch((error) => console.warn(`Error during cleanup:`, error))
+      );
 
     await Promise.all(cleanupPromises);
-    
+
     this.tools.clear();
     this.metadata.clear();
   }
@@ -173,7 +170,7 @@ export class ToolRegistry {
 
     for (const meta of metadata) {
       categories[meta.category] = (categories[meta.category] || 0) + 1;
-      
+
       for (const tag of meta.tags) {
         tags[tag] = (tags[tag] || 0) + 1;
       }
@@ -192,9 +189,9 @@ export class ToolRegistry {
  */
 export function createDefaultToolRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
-  
+
   // Tools will be registered by the application or during initialization
   // This keeps the registry flexible and prevents circular dependencies
-  
+
   return registry;
 }

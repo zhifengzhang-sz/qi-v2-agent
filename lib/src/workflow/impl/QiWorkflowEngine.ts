@@ -18,8 +18,8 @@ import type {
 } from '../interfaces/index.js';
 
 export class QiWorkflowEngine implements IWorkflowEngine {
-  private config: IWorkflowEngineConfig;
   private compiledWorkflows = new Map<string, ExecutableWorkflow>();
+  private config: IWorkflowEngineConfig;
 
   constructor(config: IWorkflowEngineConfig = {}) {
     this.config = config;

@@ -82,19 +82,11 @@
         "prompt": {
           "type": "object",
           "description": "LLM configuration for user prompts and conversations",
-          "required": ["currentModel", "availableModels"],
+          "required": ["currentModel"],
           "properties": {
             "currentModel": {
               "type": "string",
               "description": "Currently selected model for prompts (user-changeable)"
-            },
-            "availableModels": {
-              "type": "array",
-              "description": "Models available for user selection",
-              "items": {
-                "type": "string"
-              },
-              "minItems": 1
             },
             "defaultProvider": {
               "type": "string",
