@@ -154,6 +154,7 @@ export function setupQuickCLI(
   // Merge config with explicit options taking precedence
   const config = {
     ...cliConfig, // Base config
+    framework, // Override with the determined framework
     // Explicit options override everything
     ...(options.enableHotkeys !== undefined && { enableHotkeys: options.enableHotkeys }),
     ...(options.enableStreaming !== undefined && { enableStreaming: options.enableStreaming }),
