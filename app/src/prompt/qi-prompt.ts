@@ -15,54 +15,52 @@ const envPath = join(__dirname, '..', '..', '..', '.env');
 config({ path: envPath });
 
 /**
- * Qi Prompt CLI Application - v-0.5.x Preview
+ * Qi Prompt CLI Application - v-0.6.1 Pure Message-Driven Architecture
  *
- * Preview of v-0.8.x agent functionality with toolbox architecture:
- * - v-0.4.x: Pure prompt app
- * - v-0.5.x: Current - toolbox preview with file references and workflows
+ * Roadmap:
+ * - v-0.4.x: Pure prompt app ✓
+ * - v-0.5.x: Toolbox preview with file references and workflows ✓
+ * - v-0.6.1: Pure message-driven architecture (h2A pattern) ← YOU ARE HERE
  * - v-0.6.x: Full toolbox (100+ tools, MCP integration)
- * - v-0.7.x: Advanced workflows
+ * - v-0.7.x: Advanced workflows  
  * - v-0.8.x: Full agent capabilities
  *
- * Current Features (v-0.5.x):
- * - File reference processing (@file.txt patterns)
- * - Simple workflow architecture (FILE_REFERENCE)
- * - Tool registry with composable tools
- * - Session persistence and project awareness
- * - Context-aware prompting
- * - Shift+Tab: Cycle between Interactive/Command/Streaming modes
- * - Real-time progress bars and streaming responses
+ * v-0.6.1 Features:
+ * - Pure message-driven coordination (no EventEmitter race conditions)
+ * - h2A-inspired QiAsyncMessageQueue for all communication
+ * - Single message processing loop eliminates duplicate LLM calls
+ * - Sequential processing prevents race conditions
+ * - Maintains all v-0.5.x features through message flow
  */
 
-import { createPromptApp } from '@qi/agent';
-import { setupQuickCLI } from '@qi/agent/cli';
+// v-0.6.1: Direct imports for message-driven architecture
 import { createCommandHandler } from '@qi/agent/command';
 import { createDefaultAppContext } from '@qi/agent/context';
 import { createPromptHandler } from '@qi/agent/prompt';
 import { createStateManager } from '@qi/agent/state';
+import { match } from '@qi/base';
 // Use standard context manager instead of tool-based one
 import { ContextManager } from '../../../lib/src/context/impl/ContextManager.js';
 // Import new two-layer workflow architecture (v0.5.x refactored)
 import { createWorkflowHandler, type IWorkflowHandler } from '../../../lib/src/workflows/index.js';
+// v-0.6.1: Import new QiPrompt Core and message queue
+import { QiPromptCLI } from './QiPromptCLI.js';
+import { QiAsyncMessageQueue } from '../../../lib/src/messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../../../lib/src/messaging/types/MessageTypes.js';
 // Import app-specific commands
 import { createModelCommand } from './commands/ModelCommand.js';
 import { createProviderCommand } from './commands/ProviderCommand.js';
 import { createStatusCommand } from './commands/StatusCommand.js';
-// Import app-specific event types
-import type {
-  ModeChangedEvent,
-  ModeChangeRequestedEvent,
-  ModelChangedEvent,
-  ModelChangeRequestedEvent,
-  StatusResponseEvent,
-} from './events/PromptAppEvents.js';
 
 /**
- * Qi Prompt CLI - v-0.5.x Toolbox Preview
+ * Main Application Class - v-0.6.1 Pure Message-Driven Architecture
  *
- * Preview implementation of v-0.8.x agent with toolbox architecture.
+ * Coordinates QiPrompt Core, CLI, and all components through message queue.
+ * Eliminates EventEmitter race conditions with h2A-inspired sequential processing.
  */
-class QiPromptCLI {
+class QiPromptApp {
+  private qiPromptCore?: QiPromptCLI; // v-0.6.1: New message-driven core
+  private messageQueue: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Central coordination
   private orchestrator: any;
   private cli: any;
   private stateManager: any;
@@ -86,6 +84,16 @@ class QiPromptCLI {
     this.framework = options.framework;
     this.autoDetect = options.autoDetect ?? false;
 
+    // v-0.6.1: Initialize message queue first (central coordination hub)
+    // Design specification: Single Message Queue with sequential processing
+    this.messageQueue = new QiAsyncMessageQueue<QiMessage>({
+      maxConcurrent: 1, // SINGLE processing loop as per design
+      priorityQueuing: true,
+      autoCleanup: true,
+      enableStats: this.debugMode,
+      messageTtl: 30000, // 30 seconds
+    });
+
     // Initialize two-layer workflow architecture (v-0.5.x refactored)
     this.workflowHandler = createWorkflowHandler();
 
@@ -106,7 +114,7 @@ class QiPromptCLI {
   }
 
   async initialize(): Promise<void> {
-    console.log('🚀 Initializing Qi Prompt CLI v-0.5.x (Refactored Architecture)...');
+    console.log('🚀 Initializing Qi Prompt CLI v-0.6.1 (Pure Message-Driven Architecture)...');
 
     try {
       // Initialize workflow handler (v-0.5.x refactored)
@@ -143,43 +151,59 @@ class QiPromptCLI {
       this.currentSession = conversationContext.id;
       console.log(`✅ Conversation context created: ${conversationContext.id}`);
 
-      // Create orchestrator with toolbox context manager and workflow handler
-      this.orchestrator = createPromptApp(this.stateManager, this.contextManager, {
-        domain: 'prompt-app-v0-5-x',
-        enableCommands: true,
-        enablePrompts: true,
-        sessionPersistence: true,
-        commandHandler: this.commandHandler,
-        promptHandler: this.promptHandler,
-        workflowHandler: this.workflowHandler, // Pass workflow handler to fix race condition
-      });
+      // v-0.6.1: Create orchestrator directly with message queue (bypass factory)
+      this.orchestrator = new (await import('../../../lib/src/agent/PromptAppOrchestrator.js')).PromptAppOrchestrator(
+        this.stateManager,
+        this.contextManager,
+        {
+          domain: 'prompt-app-v0-6-1',
+          enableCommands: true,
+          enablePrompts: true,
+          sessionPersistence: true,
+        },
+        {
+          commandHandler: this.commandHandler,
+          promptHandler: this.promptHandler,
+          workflowHandler: this.workflowHandler,
+          messageQueue: this.messageQueue, // v-0.6.1: Direct injection
+        }
+      );
 
       await this.orchestrator.initialize();
-      console.log('✅ PromptApp orchestrator initialized');
+      console.log('✅ PromptApp orchestrator initialized with message queue');
 
-      // Create event-driven CLI with framework selection and configuration support
-      this.cli = setupQuickCLI({
-        framework: this.framework,
-        agent: this.orchestrator,
+      // v-0.6.1: Use proper CLI framework with message queue injection
+      const { createCLI } = await import('../../../lib/src/cli/index.js');
+      
+      this.cli = createCLI({
+        framework: this.framework || 'hybrid',
         enableHotkeys: true,
         enableStreaming: true,
         debug: this.debugMode,
-        commandHandler: this.commandHandler,
-        autoDetect: this.autoDetect,
-        args: process.argv.slice(2),
+        messageQueue: this.messageQueue, // v-0.6.1: Pass message queue to framework
       });
+      console.log('✅ CLI framework created');
 
-      console.log('✅ Event-driven CLI created');
+      // CLI will be initialized by QiPromptCore
 
-      // Explicitly initialize the CLI to ensure hotkeys work
-      await this.cli.initialize();
-      console.log('✅ Event-driven CLI initialized');
+      // v-0.6.1: Create simplified QiPrompt Core for message processing
+      this.qiPromptCore = new QiPromptCLI(
+        this.cli,
+        this.orchestrator,
+        this.messageQueue
+      );
 
-      // Setup toolbox-enhanced event communication (v-0.5.x)
-      this.setupToolboxEventCommunication();
-      console.log('✅ Toolbox event communication wired');
+      const coreInitResult = await this.qiPromptCore.initialize();
+      // Use QiCore functional pattern instead of manual checking
+      match(
+        () => console.log('✅ QiPrompt Core initialized with message processing loop'),
+        (error) => {
+          throw new Error(`Failed to initialize QiPrompt Core: ${error.message}`);
+        },
+        coreInitResult
+      );
 
-      console.log('🎉 v-0.5.x toolbox initialization complete!\n');
+      console.log('🎉 v-0.6.1 message-driven architecture initialization complete!\n');
     } catch (error) {
       console.error('❌ Initialization failed:', error);
       throw error;
@@ -189,8 +213,11 @@ class QiPromptCLI {
   async start(): Promise<void> {
     await this.initialize();
 
-    // Display welcome message with v-0.5.x features
-    console.log('🧰 v-0.5.x Toolbox Preview Features:');
+    // Display welcome message with v-0.6.1 features
+    console.log('📨 v-0.6.1 Pure Message-Driven Features:');
+    console.log('  - h2A-inspired message queue eliminates race conditions');
+    console.log('  - Sequential processing prevents duplicate LLM calls');
+    console.log('  - Pure message coordination (no EventEmitter)');
     console.log('  - File references: Use @path/to/file to reference files');
     console.log('  - Simple workflows: FILE_REFERENCE workflow for @file + prompt patterns');
     console.log('  - Tool registry: Composable, reusable tools');
@@ -201,21 +228,50 @@ class QiPromptCLI {
     console.log(`  - Tools managed by workflow system`);
     console.log('');
 
-    // Start the event-driven CLI
-    await this.cli.start();
+    // v-0.6.1: Start QiPrompt Core message processing loop
+    if (!this.qiPromptCore) {
+      throw new Error('QiPrompt Core not initialized');
+    }
+
+    const startResult = await this.qiPromptCore.start();
+    // Use QiCore functional pattern
+    match(
+      () => console.log('🎯 QiPrompt Core message processing loop started'),
+      (error) => {
+        throw new Error(`Failed to start QiPrompt Core: ${error.message}`);
+      },
+      startResult
+    );
   }
 
   /**
-   * Enhanced shutdown with toolbox cleanup (v-0.5.x)
+   * Enhanced shutdown with v-0.6.1 message queue cleanup
    */
   async shutdown(): Promise<void> {
-    console.log('\n🛑 Shutting down v-0.5.x toolbox CLI...');
+    console.log('\n🛑 Shutting down v-0.6.1 message-driven CLI...');
 
     try {
-      // Shutdown toolbox context manager
+      // v-0.6.1: Shutdown QiPrompt Core first (stops message processing)
+      if (this.qiPromptCore) {
+        const shutdownResult = await this.qiPromptCore.shutdown();
+        // Use QiCore functional pattern
+        match(
+          () => console.log('✅ QiPrompt Core shut down'),
+          (error) => console.warn('⚠️ QiPrompt Core shutdown had issues:', error.message),
+          shutdownResult
+        );
+      }
+
+      // Shutdown message queue
+      if (this.messageQueue) {
+        await this.messageQueue.destroy();
+        console.log('✅ Message queue destroyed');
+      }
+
+      // Shutdown context manager
       if (this.contextManager) {
         await this.contextManager.shutdown();
-        console.log('✅ Toolbox context manager shut down');
+        console.log('✅ Context manager shut down');
       }
 
       // Cleanup workflow handler
@@ -224,135 +280,15 @@ class QiPromptCLI {
         console.log('✅ Workflow handler cleaned up');
       }
 
-      // Shutdown CLI and orchestrator
-      if (this.cli) {
-        await this.cli.shutdown();
-      }
-
-      if (this.orchestrator) {
-        await this.orchestrator.shutdown();
-      }
-
-      console.log('✅ v-0.5.x shutdown complete');
+      console.log('✅ v-0.6.1 shutdown complete');
     } catch (error) {
-      console.error('Error during toolbox shutdown:', error);
+      console.error('Error during v-0.6.1 shutdown:', error);
     }
   }
 
-  /**
-   * Setup toolbox-enhanced event communication (v-0.5.x)
-   */
-  private setupToolboxEventCommunication(): void {
-    // Setup additional event handlers
-    this.setupEventHandlers();
-    // CLI Events → Agent
-    this.cli.on('modelChangeRequest', (modelName: string) => {
-      const event: ModelChangeRequestedEvent = {
-        type: 'modelChangeRequested',
-        modelName,
-        timestamp: new Date(),
-      };
-      this.orchestrator.emit('modelChangeRequested', event);
-    });
+  // v-0.6.1: All event communication methods removed - pure message-driven architecture
 
-    this.cli.on('modeChangeRequest', (mode: 'interactive' | 'command' | 'streaming') => {
-      const event: ModeChangeRequestedEvent = {
-        type: 'modeChangeRequested',
-        mode,
-        timestamp: new Date(),
-      };
-      this.orchestrator.emit('modeChangeRequested', event);
-    });
-
-    // Enhanced: File reference detection (v-0.5.x)
-    this.cli.on('fileReferenceDetected', (filePath: string) => {
-      if (this.currentSession) {
-        // File references now handled through workflow system
-        console.log(`File reference detected: ${filePath}`);
-      }
-    });
-
-    // Agent Events → CLI
-    this.orchestrator.on('modelChanged', (event: ModelChangedEvent) => {
-      if (event.success) {
-        this.cli.displayMessage(`✅ Model changed: ${event.oldModel} → ${event.newModel}`);
-        this.cli.updatePrompt(`${event.newModel} [🧰] > `);
-      } else {
-        this.cli.displayMessage(`❌ Model change failed: ${event.error}`);
-      }
-    });
-
-    this.orchestrator.on('modeChanged', (event: ModeChangedEvent) => {
-      if (event.success) {
-        this.cli.displayMessage(`✅ Mode changed: ${event.oldMode} → ${event.newMode}`);
-      } else {
-        this.cli.displayMessage(`❌ Mode change failed`);
-      }
-    });
-
-    // Enhanced status with toolbox information (v-0.5.x)
-    this.orchestrator.on('statusResponse', (event: StatusResponseEvent) => {
-      const { model, mode, uptime, provider, memoryUsage } = event.status;
-      // Simplified for refactored architecture
-      const _session = null; // Old session methods not available
-      const _projectContext = null; // Old project methods not available
-
-      const content =
-        `📊 v-0.5.x System Status:\n\n` +
-        `  Mode: ${mode}\n` +
-        `  Provider: ${provider}\n` +
-        `  Model: ${model}\n` +
-        `  Uptime: ${uptime}s\n` +
-        `  Memory: ${memoryUsage}MB\n\n` +
-        `🧰 Refactored Architecture (v-0.5.x):\n` +
-        `  Workflow System: Active\n` +
-        `  Tools: Managed by workflow handler\n` +
-        `  Project: ${process.cwd()}\n` +
-        `  Session: ${this.currentSession || 'None'}`;
-
-      this.cli.displayMessage(content);
-    });
-
-    // NOTE: Removed async processInput event handling to fix race condition
-    // Workflow processing now happens synchronously in PromptAppOrchestrator.process()
-  }
-
-  // REMOVED: handleProcessInput method - workflow processing now handled synchronously
-  // in PromptAppOrchestrator.process() to fix the race condition
-
-  /**
-   * Setup additional event handlers
-   */
-  private setupEventHandlers(): void {
-    // Enhanced completion with workflow metadata (v-0.5.x)
-    this.orchestrator.on('complete', async (event: { result: any; input?: string }) => {
-      let responseContent = 'Task completed successfully';
-
-      if (event.result) {
-        if (typeof event.result === 'string') {
-          responseContent = event.result;
-        } else if (event.result.content) {
-          responseContent = event.result.content;
-        } else if (event.result.data) {
-          responseContent = event.result.data;
-        }
-      }
-
-      // Add toolbox context information (v-0.5.x)
-      if (this.currentSession) {
-        // Context information now managed through workflow system
-        // Workflow stats available through new handler if needed
-        const workflowStats = await this.workflowHandler.getAvailableWorkflows();
-        // Only show workflow stats in debug mode
-        const isDebugMode = process.argv.includes('--debug') || process.env.DEBUG === 'true';
-        if (workflowStats.length > 0 && isDebugMode) {
-          responseContent += `\n\n🔧 Available workflows: ${workflowStats.length}`;
-        }
-      }
-
-      this.cli.displayMessage(responseContent, 'complete');
-    });
-  }
+  // v-0.6.1: All deprecated event handling methods removed completely
 
   /**
    * Register application-specific commands with toolbox enhancements (v-0.5.x)
@@ -457,6 +393,8 @@ class QiPromptCLI {
       }
     );
   }
+
+  // v-0.6.1: Input handling delegated to CLI framework
 }
 
 // Parse command line arguments
@@ -588,7 +526,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(0);
   }
 
-  const cli = new QiPromptCLI(options);
+  const cli = new QiPromptApp(options);
 
   // Handle graceful shutdown - only for external SIGTERM, let CLI handle SIGINT (Ctrl+C) internally
   let shutdownRequested = false;
@@ -643,4 +581,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { QiPromptCLI };
+
+export { QiPromptApp };

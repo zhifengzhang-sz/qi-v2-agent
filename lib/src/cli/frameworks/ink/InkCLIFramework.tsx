@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { render, Text, useInput, useApp } from 'ink';
-import { EventEmitter } from 'node:events';
+import { EventEmitter } from 'events';
 import type {
   ICLIFramework,
   IAgentCLIBridge,
@@ -14,8 +14,11 @@ import type {
   CLIState,
   CLIMode,
   CLIEvents,
-  MessageType,
+  MessageType as ICLIFrameworkMessageType,
 } from '../../abstractions/ICLIFramework.js';
+import type { QiAsyncMessageQueue } from '../../../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../../../messaging/types/MessageTypes.js';
+import { MessageType } from '../../../messaging/types/MessageTypes.js';
 import { MainLayout } from './components/MainLayout.js';
 import { createOutputMessage, createUserMessage, createAssistantMessage, createSystemMessage, type OutputMessage } from './components/OutputDisplay.js';
 import { createPermissionRequest, type PermissionRequest } from './components/PermissionDialog.js';
@@ -40,6 +43,7 @@ const defaultInkConfig: CLIConfig = {
 
 /**
  * Ink CLI Framework - React-based CLI implementation
+ * Hybrid approach: EventEmitter for UI events, MessageQueue for agent communication
  */
 export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAgentCLIBridge {
   private config: CLIConfig;
@@ -49,9 +53,11 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   private renderInstance: any = null;
   private connectedAgent: any = null;
   private isCancelling = false;
+  private messageQueue?: QiAsyncMessageQueue<QiMessage>;
 
-  constructor(config: Partial<CLIConfig> = {}) {
-    super();
+  constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
+    super(); // Initialize EventEmitter
+    this.messageQueue = messageQueue;
     
     this.config = { ...defaultInkConfig, ...config };
     this.state = {
@@ -81,7 +87,6 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
     }
     
     this.isInitialized = true;
-    this.emit('ready', { startTime: this.state.startTime });
   }
 
   async start(): Promise<void> {
@@ -114,7 +119,7 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
       this.renderInstance = null;
     }
     
-    this.emit('shutdown', { reason: 'user_requested' });
+    // Clean up EventEmitter listeners
     this.removeAllListeners();
   }
 
@@ -126,7 +131,9 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
     const previousMode = this.state.mode;
     this.state.mode = mode;
     this.state.lastActivity = new Date();
-    this.emit('modeChanged', { previousMode, newMode: mode });
+    
+    // Emit mode change event for React component
+    this.emit('modeChange', { mode, previousMode });
   }
 
   getMode(): CLIMode {
@@ -138,6 +145,7 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   handleInput(input: string): void {
+    console.log(`[InkCLIFramework] handleInput: "${input}"`);
     this.state.currentInput = input;
     this.state.history.push(input);
     if (this.state.history.length > this.config.historySize) {
@@ -145,26 +153,54 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
     }
     this.state.lastActivity = new Date();
     
-    // Follow the same pattern as EventDrivenCLI - just emit the event
-    // setupQuickCLI will handle the agent communication
-    this.emit('userInput', { input, mode: this.state.mode });
+    // Handle exit commands directly
+    if (input.trim() === '/exit' || input.trim() === '/quit') {
+      console.log('👋 Goodbye!');
+      process.exit(0);
+      return;
+    }
+    
+    // v-0.6.1: Direct message queue enqueuing - pure async messaging
+    if (this.messageQueue) {
+      console.log(`[InkCLIFramework] Enqueuing to message queue: "${input}"`);
+      this.messageQueue.enqueue({
+        type: MessageType.USER_INPUT,
+        input: input,
+        raw: false,
+        source: 'cli' as const,
+        timestamp: new Date(),
+        id: Math.random().toString(36),
+        priority: 2 as any
+      });
+    } else {
+      console.error(`[InkCLIFramework] FATAL: No message queue - input lost!`);
+    }
   }
 
-  displayMessage(content: string, type: MessageType = 'info'): void {
-    this.emit('messageReceived', { content, type });
+  displayMessage(content: string, type: ICLIFrameworkMessageType = 'info'): void {
+    console.log(`[InkCLIFramework] displayMessage: ${content}`);
+    
+    // Emit message event for React component
+    this.emit('message', { content, type });
   }
 
   displayProgress(phase: string, progress: number, details?: string): void {
-    this.emit('progressUpdate', { phase, progress, details });
+    console.log(`[InkCLIFramework] Progress: ${phase} ${progress}%`);
+    
+    // Emit progress event for React component
+    this.emit('progress', { phase, progress, details });
   }
 
   startStreaming(): void {
     this.state.isStreamingActive = true;
-    this.emit('streamingStarted');
+    
+    // Emit streaming start event for React component
+    this.emit('streamingStart');
   }
 
   addStreamingChunk(content: string): void {
     if (this.state.isStreamingActive) {
+      // Emit streaming chunk event for React component
       this.emit('streamingChunk', { content });
     }
   }
@@ -172,7 +208,9 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   completeStreaming(message?: string): void {
     this.state.isStreamingActive = false;
     const totalTime = Date.now() - this.state.startTime.getTime();
-    this.emit('streamingComplete', { totalTime });
+    
+    // Emit streaming complete event for React component
+    this.emit('streamingComplete', { totalTime, message });
     
     if (message) {
       this.displayMessage(message, 'complete');
@@ -181,6 +219,8 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
 
   cancelStreaming(): void {
     this.state.isStreamingActive = false;
+    
+    // Emit streaming cancelled event for React component
     this.emit('streamingCancelled');
   }
 
@@ -226,7 +266,7 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   onAgentMessage(message: { content: string; type: string }): void {
-    this.displayMessage(message.content, message.type as MessageType);
+    this.displayMessage(message.content, message.type as ICLIFrameworkMessageType);
   }
 
   onAgentComplete(result: any): void {
@@ -250,14 +290,17 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
     this.displayMessage(responseContent, 'complete');
     
     // Also emit streaming complete to clear progress state
-    this.emit('streamingComplete', { totalTime: Date.now() - this.state.startTime.getTime() });
+    this.emit('streamingComplete', { totalTime: 0, message: responseContent });
   }
 
   onAgentError(error: any): void {
     this.state.isProcessing = false;
     const errorMessage = error?.message || 'An error occurred';
     this.displayMessage(`Error: ${errorMessage}`, 'error');
-    this.emit('error', { error, context: 'agent' });
+    
+    // Emit error event for React component
+    this.emit('error', { error: errorMessage, originalError: error });
+    console.error(`[InkCLIFramework] Agent error:`, error);
   }
 
   onAgentCancelled(reason: string): void {
@@ -269,7 +312,9 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
     this.isCancelling = true;
     this.state.isProcessing = false;
     this.displayMessage(`Task cancelled: ${reason}`, 'warning');
-    this.emit('cancelRequested', { reason });
+    
+    // Emit cancellation event for React component
+    this.emit('cancelled', { reason });
     
     // Reset the cancellation flag after a brief delay
     setTimeout(() => {
@@ -397,90 +442,92 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     };
   }, [framework]);
 
-  // Subscribe to framework events
+  // Event subscriptions for React component updates
   useEffect(() => {
-    const handleMessageReceived = (data: { content: string; type: MessageType }) => {
-      // Filter out generic processing messages
-      const genericMessages = [
-        'Processing request...',
-        'Task completed successfully',
-        'Request processed',
-        'Processing...',
-        'Task complete'
-      ];
-      
-      if (genericMessages.includes(data.content.trim())) {
-        return; // Skip these generic messages
-      }
-      
-      // Use appropriate message type based on content - Claude Code style differentiation
-      let message: OutputMessage;
+    const handleMessage = (data: { content: string; type: string }) => {
+      const message = data.type === 'complete' 
+        ? createAssistantMessage(data.content)
+        : createSystemMessage(data.content);
+      setMessages(prev => [...prev, message]);
       
       if (data.type === 'complete') {
-        // This is likely an AI response
-        message = createAssistantMessage(data.content);
-      } else if (data.type === 'streaming') {
-        // Streaming AI response
-        message = createAssistantMessage(data.content, false);
-      } else {
-        // System messages (info, warning, error, etc.)
-        message = createOutputMessage(data.content, data.type);
+        setState(prev => ({ ...prev, isProcessing: false, currentPhase: '' }));
       }
-      
-      setMessages(prev => [...prev, message]);
     };
 
-    const handleModeChanged = (data: { previousMode: CLIMode; newMode: CLIMode }) => {
-      setState(prev => ({ ...prev, mode: data.newMode, lastActivity: new Date() }));
-    };
-
-    const handleProgressUpdate = (data: { phase: string; progress: number; details?: string }) => {
+    const handleProgress = (data: { phase: string; progress: number; details?: string }) => {
       setState(prev => ({ 
         ...prev, 
-        isProcessing: true, 
-        lastActivity: new Date(),
-        currentPhase: data.phase
+        isProcessing: true,
+        currentPhase: data.phase 
       }));
-      // Don't add ugly progress messages - let the UI handle progress display
+    };
+
+    const handleModeChange = (data: { mode: CLIMode; previousMode: CLIMode }) => {
+      setState(prev => ({ ...prev, mode: data.mode }));
     };
 
     const handleStreamingChunk = (data: { content: string }) => {
-      // Update the last message if it's a streaming message, or create new one
+      // Handle streaming chunks - could append to last message or create new
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1];
-        if (lastMessage && (lastMessage.type === 'streaming' || lastMessage.sender === 'assistant')) {
-          return [
-            ...prev.slice(0, -1),
-            { ...lastMessage, content: lastMessage.content + data.content }
-          ];
+        if (lastMessage && lastMessage.type === 'assistant') {
+          // Append to existing assistant message
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...lastMessage,
+            content: lastMessage.content + data.content
+          };
+          return updated;
         } else {
-          return [...prev, createAssistantMessage(data.content, false)];
+          // Create new assistant message
+          return [...prev, createAssistantMessage(data.content)];
         }
       });
     };
 
-    const handleStreamingComplete = () => {
+    const handleStreamingComplete = (data: { totalTime: number; message?: string }) => {
       setState(prev => ({ 
         ...prev, 
-        isStreamingActive: false, 
-        isProcessing: false,
-        currentPhase: '',
-        lastActivity: new Date() 
+        isProcessing: false, 
+        isStreamingActive: false,
+        currentPhase: '' 
       }));
     };
 
-    framework.on('messageReceived', handleMessageReceived);
-    framework.on('modeChanged', handleModeChanged);
-    framework.on('progressUpdate', handleProgressUpdate);
+    const handleError = (data: { error: string; originalError: any }) => {
+      setState(prev => ({ ...prev, isProcessing: false, currentPhase: '' }));
+      const errorMessage = createSystemMessage(`❌ ${data.error}`);
+      setMessages(prev => [...prev, errorMessage]);
+    };
+
+    const handleCancelled = (data: { reason: string }) => {
+      setState(prev => ({ 
+        ...prev, 
+        isProcessing: false, 
+        isStreamingActive: false,
+        currentPhase: '' 
+      }));
+    };
+
+    // Subscribe to framework events
+    framework.on('message', handleMessage);
+    framework.on('progress', handleProgress);
+    framework.on('modeChange', handleModeChange);
     framework.on('streamingChunk', handleStreamingChunk);
     framework.on('streamingComplete', handleStreamingComplete);
+    framework.on('error', handleError);
+    framework.on('cancelled', handleCancelled);
 
     return () => {
-      framework.off('messageReceived', handleMessageReceived);
-      framework.off('modeChanged', handleModeChanged);
-      framework.off('progressUpdate', handleProgressUpdate);
+      // Clean up event listeners
+      framework.off('message', handleMessage);
+      framework.off('progress', handleProgress);
+      framework.off('modeChange', handleModeChange);
       framework.off('streamingChunk', handleStreamingChunk);
       framework.off('streamingComplete', handleStreamingComplete);
+      framework.off('error', handleError);
+      framework.off('cancelled', handleCancelled);
     };
   }, [framework]);
 
@@ -570,8 +617,9 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
         break;
         
       default:
-        // For unrecognized commands, emit to agent/CLI system
-        framework.emit('command', { command, args });
+        // Unrecognized commands handled by message queue
+        const commandInput = `/${command} ${args.join(' ')}`;
+        framework.handleInput(commandInput);
     }
   }, [framework, state, config, providerInfo]);
 
@@ -596,8 +644,8 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
       isStreamingActive: false
     }));
     
-    // Emit cancel event - the setupQuickCLI will handle agent cancellation
-    framework.emit('cancelRequested', { reason: 'user_escape' });
+    // Direct cancellation through agent bridge
+    framework.cancelAgent();
     
     // Reset cancellation flag after a brief delay
     setTimeout(() => {
@@ -616,8 +664,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     const infoMessage = createSystemMessage('⏹️ ESC - No active operations to cancel');
     setMessages(prev => [...prev, infoMessage]);
     
-    // Emit clear event for InputBox to handle
-    framework.emit('clearRequested', { reason: 'escape_idle' });
+    // Direct UI feedback only
   }, [framework]);
 
   // Permission dialog handlers
@@ -625,16 +672,14 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     const systemMessage = createSystemMessage(`Tool permission approved${remember ? ' (remembered)' : ''}`);
     setMessages(prev => [...prev, systemMessage]);
     setPermissionRequest(null);
-    // Emit approval event for the agent/CLI system
-    framework.emit('permissionApproved', { requestId, remember });
+    // Permission handling through message queue if needed
   }, [framework]);
 
   const handlePermissionDeny = useCallback((requestId: string, remember?: boolean) => {
     const systemMessage = createSystemMessage(`Tool permission denied${remember ? ' (remembered)' : ''}`);
     setMessages(prev => [...prev, systemMessage]);
     setPermissionRequest(null);
-    // Emit denial event for the agent/CLI system
-    framework.emit('permissionDenied', { requestId, remember });
+    // Permission handling through message queue if needed
   }, [framework]);
 
   const handlePermissionDismiss = useCallback(() => {
@@ -645,8 +690,7 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   useInput((inputChar, key) => {
     // Handle Ctrl+C to clear input - high priority handler
     if (key.ctrl && inputChar === 'c') {
-      // Emit a custom event that InputBox can listen to
-      framework.emit('clearInput', { reason: 'ctrl+c' });
+      // Direct input clearing handled by UI components
       return;
     }
     

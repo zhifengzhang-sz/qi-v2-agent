@@ -28,7 +28,7 @@ export {
   loadCLIConfig,
 } from './config/index.js';
 // Framework-agnostic factories and configuration
-export { createCLI, getAvailableFrameworks, recommendFramework } from './factories/createCLI.js';
+export { getAvailableFrameworks, recommendFramework } from './factories/createCLI.js';
 export {
   createReadlineCLI,
   createReadlineCLIAsync,
@@ -108,10 +108,10 @@ export const DefaultCLIConfig: import('./abstractions/ICLIFramework.js').CLIConf
 };
 
 /**
- * Quick setup function for common use cases with framework selection
- * Now supports configuration loading from environment variables, CLI args, and config files
+ * Create CLI framework instance with configuration support
+ * Supports configuration loading from environment variables, CLI args, and config files
  */
-export function setupQuickCLI(
+export function createCLI(
   options: {
     framework?: 'readline' | 'ink' | 'blessed' | 'hybrid';
     agent?: any;
@@ -122,6 +122,7 @@ export function setupQuickCLI(
     configPath?: string;
     args?: string[];
     autoDetect?: boolean; // Auto-detect best framework
+    messageQueue?: any; // v-0.6.1: Message queue for pure async messaging
   } = {}
 ) {
   // Always load configuration to get all settings
@@ -171,13 +172,13 @@ export function setupQuickCLI(
   switch (framework) {
     case 'ink': {
       const { createInkCLI } = require('./factories/createCLI.js');
-      result = createInkCLI(config);
+      result = createInkCLI(config, options.messageQueue);
       break;
     }
 
     case 'hybrid': {
       const { createHybridCLI } = require('./factories/createCLI.js');
-      result = createHybridCLI(config);
+      result = createHybridCLI(config, options.messageQueue);
       break;
     }
 
