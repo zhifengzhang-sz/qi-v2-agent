@@ -104,12 +104,15 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    * AsyncIterable implementation - core h2A pattern
    */
   [Symbol.asyncIterator](): AsyncIterator<T, any, undefined> {
+    console.log(`[QiAsyncMessageQueue] Creating async iterator, started: ${this.state.started}`);
     if (this.state.started) {
+      console.log(`[QiAsyncMessageQueue] ERROR: Queue already started - this causes duplicates!`);
       throw queueError('ALREADY_STARTED', 'Queue can only be iterated once');
     }
 
     this.state = { ...this.state, started: true };
     this.emit(QueueEventType.QUEUE_RESUMED, { started: true });
+    console.log(`[QiAsyncMessageQueue] Async iterator created successfully`);
 
     return this;
   }
@@ -137,6 +140,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     return match(
       (queuedMessage) => {
         if (queuedMessage) {
+          console.log(`[QiAsyncMessageQueue] Dequeuing message ID: ${queuedMessage.message.id}, type: ${queuedMessage.message.type}`);
           this.updateMessageStatus(queuedMessage, MessageStatus.PROCESSING);
           this.emit(QueueEventType.MESSAGE_DEQUEUED, { message: queuedMessage.message });
 
@@ -183,6 +187,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    * Enqueue message - supports real-time injection (h2A pattern)
    */
   enqueue(message: T): Result<void, QueueError> {
+    console.log(`[QiAsyncMessageQueue] Enqueuing message ID: ${message.id}, type: ${message.type}`);
     // Validate queue state
     if (this.state.isDone) {
       return failure(

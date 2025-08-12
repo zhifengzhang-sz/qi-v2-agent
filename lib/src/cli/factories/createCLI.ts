@@ -254,7 +254,7 @@ export function recommendFramework(): {
 
 // Framework-specific factories
 
-function createInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
+function createInkCLI(config: Partial<CLIConfig> = {}, messageQueue?: any): Result<ICLIFramework, QiError> {
   try {
     // Check if Ink is available
     const support = checkInkSupport();
@@ -269,7 +269,7 @@ function createInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, Qi
     }
 
     // Create actual Ink CLI implementation
-    const cli = new InkCLIFramework(config);
+    const cli = new InkCLIFramework(config, messageQueue);
 
     return Ok(cli);
   } catch (error: any) {

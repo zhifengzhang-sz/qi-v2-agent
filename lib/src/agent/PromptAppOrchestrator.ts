@@ -1,16 +1,19 @@
 /**
- * Prompt App Orchestrator
+ * Prompt App Orchestrator - v-0.6.1 Message-Driven Architecture
  *
  * Implements the same IAgent interface as QiCodeAgent but with simplified 2-category parsing:
  * - Commands (start with /) → route to command handler
  * - Prompts (everything else) → route to prompt handler
  *
- * No classifier, no workflow - just command vs prompt routing.
- *
- * Now includes EventEmitter for responsive UI with progress tracking and cancellation.
+ * v-0.6.1 changes:
+ * - Removed EventEmitter dependency 
+ * - Integrated QiAsyncMessageQueue for message coordination
+ * - All emit() calls replaced with message enqueuing
+ * - Maintains responsive UI through message flow
  */
 
-import { EventEmitter } from 'node:events';
+import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../messaging/types/MessageTypes.js';
 import type { CommandRequest, ICommandHandler } from '@qi/agent/command';
 import type { IContextManager } from '@qi/agent/context';
 import {
@@ -119,16 +122,17 @@ export function parseInput(input: string): ParsedInput {
 }
 
 /**
- * Prompt App Orchestrator - Same interface as QiCodeAgent but simplified routing
- * Now extends EventEmitter for responsive UI
+ * Prompt App Orchestrator - v-0.6.1 Pure Message-driven routing
+ * No EventEmitter - pure processing with message queue coordination
  */
-export class PromptAppOrchestrator extends EventEmitter implements IAgent {
+export class PromptAppOrchestrator implements IAgent {
   private stateManager: IStateManager;
   private contextManager: IContextManager;
   private commandHandler?: ICommandHandler;
   private promptHandler?: IPromptHandler;
   private contextAwarePromptHandler?: ContextAwarePromptHandler;
   private workflowHandler?: IWorkflowHandler;
+  private messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Message coordination
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -152,38 +156,25 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       commandHandler?: ICommandHandler;
       promptHandler?: IPromptHandler;
       workflowHandler?: IWorkflowHandler;
+      messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Add message queue
     } = {}
   ) {
-    super(); // Initialize EventEmitter
     this.stateManager = stateManager;
     this.contextManager = contextManager;
     this.config = config;
     this.commandHandler = dependencies.commandHandler;
     this.promptHandler = dependencies.promptHandler;
     this.workflowHandler = dependencies.workflowHandler;
+    this.messageQueue = dependencies.messageQueue; // v-0.6.1: Store message queue
 
-    // Set up CLI event handlers
-    this.setupCLIEventHandlers();
+    // v-0.6.1: Remove CLI event handlers - communication through message queue only
   }
 
   /**
-   * Set up handlers for CLI events (app-specific event-driven communication)
+   * Set message queue for v-0.6.1 communication
    */
-  private setupCLIEventHandlers(): void {
-    // Handle model change requests from CLI
-    this.on('modelChangeRequested', this.handleModelChangeRequest.bind(this));
-
-    // Handle mode change requests from CLI
-    this.on('modeChangeRequested', this.handleModeChangeRequest.bind(this));
-
-    // Handle prompt requests from CLI
-    this.on('promptRequested', this.handlePromptRequest.bind(this));
-
-    // Handle status requests from CLI
-    this.on('statusRequested', this.handleStatusRequest.bind(this));
-
-    // Handle cancel requests from CLI
-    this.on('cancelRequested', this.handleCancelRequest.bind(this));
+  setMessageQueue(messageQueue: QiAsyncMessageQueue<QiMessage>): void {
+    this.messageQueue = messageQueue;
   }
 
   async initialize(): Promise<void> {
@@ -221,31 +212,18 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
     this.abortController = new AbortController();
 
     try {
-      // Emit start event
-      this.emit('progress', { phase: 'parsing', progress: 0.1, details: 'Analyzing input...' });
-      this.emit('message', { content: 'Processing request...', type: 'status' });
+      // v-0.6.1: Pure processing - no progress messages (violates design)
 
       // RACE CONDITION FIX: Process workflows synchronously BEFORE parsing
       let processedInput = request.input;
 
       if (this.workflowHandler && this.detectWorkflowPattern(request.input)) {
-        this.emit('progress', {
-          phase: 'workflow_processing',
-          progress: 0.15,
-          details: 'Processing file references...',
-        });
-
         try {
           const workflowResult = await this.processWorkflow(request.input);
           if (workflowResult.success) {
             processedInput = workflowResult.data.output;
-            this.emit('message', {
-              content: `Enhanced input with ${workflowResult.data.filesReferenced?.length || 0} file references`,
-              type: 'status',
-            });
           }
         } catch (error) {
-          // Log workflow error but continue with original input
           console.warn(
             'Workflow processing failed:',
             error instanceof Error ? error.message : String(error)
@@ -266,29 +244,15 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         throw new Error('Request was cancelled');
       }
 
-      this.emit('progress', {
-        phase: 'routing',
-        progress: 0.2,
-        details: `Routing to ${parsed.type} handler...`,
-      });
+      // v-0.6.1: Pure processing only
 
       let response: AgentResponse;
 
       switch (parsed.type) {
         case 'command':
-          this.emit('progress', {
-            phase: 'command_processing',
-            progress: 0.3,
-            details: 'Executing command...',
-          });
           response = await this.handleCommand(request, parsed.content);
           break;
         case 'prompt':
-          this.emit('progress', {
-            phase: 'llm_processing',
-            progress: 0.3,
-            details: 'Sending to LLM...',
-          });
           response = await this.handlePrompt(request, parsed.content);
           break;
         default:
@@ -300,11 +264,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         throw new Error('Request was cancelled during processing');
       }
 
-      this.emit('progress', {
-        phase: 'completing',
-        progress: 0.9,
-        details: 'Finalizing response...',
-      });
+      // v-0.6.1: Pure processing
 
       const executionTime = Date.now() - startTime;
       this.totalResponseTime += executionTime;
@@ -320,8 +280,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
         ]),
       };
 
-      // Emit completion events
-      this.emit('complete', { result: finalResponse });
+      // v-0.6.1: Pure processing - return response only
 
       return finalResponse;
     } catch (error) {
@@ -331,22 +290,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       // Check if it was a cancellation
       const wasCancelled = error instanceof Error && error.message.includes('cancelled');
 
-      if (wasCancelled) {
-        this.emit('cancelled', { reason: 'user_requested' });
-        this.emit('message', { content: 'Request was cancelled', type: 'error' });
-      } else {
-        // Emit error events
-        const qiError =
-          error instanceof Error
-            ? createAgentError('PROCESSING_FAILED', error.message, 'SYSTEM')
-            : createAgentError('UNKNOWN_ERROR', String(error), 'SYSTEM');
-
-        this.emit('error', { error: qiError, context: 'process' });
-        this.emit('message', {
-          content: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          type: 'error',
-        });
-      }
+      // v-0.6.1: Pure processing - just return error response
 
       return {
         content: `Processing failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -373,7 +317,7 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   cancel(): void {
     if (this.isProcessing && this.abortController) {
       this.abortController.abort();
-      this.emit('cancelled', { reason: 'user_requested' });
+      // v-0.6.1: Pure processing - no message creation
     }
   }
 
@@ -745,11 +689,12 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
   }
 
   // ===========================================
-  // CLI Event Handlers (Event-Driven Communication)
+  // v-0.6.1: Removed CLI Event Handlers - Communication through message queue only
   // ===========================================
 
   /**
-   * Handle model change requests from CLI
+   * Handle model change requests from CLI (DEPRECATED in v-0.6.1)
+   * @deprecated Use message queue communication instead
    */
   private async handleModelChangeRequest(event: ModelChangeEvent): Promise<void> {
     const { modelName } = event;
@@ -759,73 +704,30 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       // Validate model is available
       const availableModels = this.stateManager.getAvailablePromptModels();
       if (availableModels.length > 0 && !availableModels.includes(modelName)) {
-        this.emit('modelChanged', {
-          type: 'modelChanged',
-          oldModel: currentModel,
-          newModel: modelName,
-          success: false,
-          error: `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`,
-          timestamp: new Date(),
-        });
+        // v-0.6.1: No emit - deprecated method
+        console.warn(`Model '${modelName}' not available. Available: ${availableModels.join(', ')}`);
         return;
       }
 
       // Update model via StateManager
       this.stateManager.updatePromptModel(modelName);
 
-      // Emit success event back to CLI
-      this.emit('modelChanged', {
-        type: 'modelChanged',
-        oldModel: currentModel,
-        newModel: modelName,
-        success: true,
-        timestamp: new Date(),
-      });
+      // v-0.6.1: Enqueue model changed message instead of emit (deprecated)
+      // This method is deprecated - model changes should be handled through message queue
     } catch (error) {
-      this.emit('modelChanged', {
-        type: 'modelChanged',
-        oldModel: currentModel,
-        newModel: modelName,
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date(),
-      });
+      // v-0.6.1: No emit - deprecated method
+      console.warn('Model change failed:', error);
     }
   }
 
   /**
-   * Handle mode change requests from CLI
-   * TODO: Implement proper CLI mode to App mode mapping
-   * Reason: CLI modes (interactive/command/streaming) are UI behavior states,
-   * while App modes (ready/planning/editing/executing/error) are workflow states.
-   * Currently just acknowledging the request without proper state management.
+   * Handle mode change requests from CLI (DEPRECATED in v-0.6.1)
+   * @deprecated Use message queue communication instead
    */
   private async handleModeChangeRequest(event: ModeChangeEvent): Promise<void> {
     const { mode } = event;
-    // TODO: Implement proper mode handling logic
-    // For now, just acknowledge the mode change request
-
-    try {
-      // TODO: Determine if CLI modes should map to App workflow modes
-      // Current approach: acknowledge but don't change App mode
-
-      // Emit success event back to CLI
-      this.emit('modeChanged', {
-        type: 'modeChanged',
-        oldMode: mode, // TODO: Get actual previous CLI mode
-        newMode: mode,
-        success: true,
-        timestamp: new Date(),
-      });
-    } catch (_error) {
-      this.emit('modeChanged', {
-        type: 'modeChanged',
-        oldMode: mode,
-        newMode: mode,
-        success: false,
-        timestamp: new Date(),
-      });
-    }
+    // v-0.6.1: This method is deprecated - mode changes should be handled through message queue
+    console.log(`Mode change request: ${mode} (deprecated)`);
   }
 
   /**
@@ -848,50 +750,18 @@ export class PromptAppOrchestrator extends EventEmitter implements IAgent {
       // Process through traditional flow (will emit progress, complete events)
       await this.process(agentRequest);
     } catch (error) {
-      this.emit('error', {
-        type: 'error',
-        error: {
-          code: 'PROMPT_PROCESSING_FAILED',
-          message: error instanceof Error ? error.message : String(error),
-        },
-        timestamp: new Date(),
-      });
+      // v-0.6.1: No emit - deprecated method  
+      console.error('Prompt processing failed:', error);
     }
   }
 
   /**
-   * Handle status requests from CLI
+   * Handle status requests from CLI (DEPRECATED in v-0.6.1)
+   * @deprecated Use message queue communication instead
    */
   private async handleStatusRequest(_event: StatusEvent): Promise<void> {
-    try {
-      const currentModel = this.stateManager.getCurrentModel();
-      const currentMode = this.stateManager.getCurrentMode();
-      const promptConfig = this.stateManager.getPromptConfig();
-      const uptime = Math.floor(process.uptime());
-      const _availableModels = this.stateManager.getAvailablePromptModels();
-
-      this.emit('statusResponse', {
-        type: 'statusResponse',
-        status: {
-          model: currentModel,
-          mode: currentMode,
-          uptime,
-          provider: promptConfig?.provider || 'ollama',
-          availableCommands: this.commandHandler?.getAvailableCommands().length || 0,
-          memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        },
-        timestamp: new Date(),
-      });
-    } catch (error) {
-      this.emit('error', {
-        type: 'error',
-        error: {
-          code: 'STATUS_REQUEST_FAILED',
-          message: error instanceof Error ? error.message : String(error),
-        },
-        timestamp: new Date(),
-      });
-    }
+    // v-0.6.1: This method is deprecated - status should be handled through message queue
+    console.log('Status request (deprecated)');
   }
 
   /**

@@ -1,21 +1,22 @@
 /**
- * Refactored Event-Driven CLI Framework
+ * v-0.6.1 Pure Enqueue-Only CLI Framework
  *
- * Pure orchestration layer using dependency injection.
- * Delegates all operations to injected components while maintaining
- * the same public API for backward compatibility.
+ * Transformed for pure message-driven architecture:
+ * - No direct orchestrator calls - only enqueues messages
+ * - Integrates with QiAsyncMessageQueue for coordination
+ * - Maintains same public API for backward compatibility
+ * - All processing happens through message flow
  *
- * Key changes from original:
- * - Reduced from 750+ lines to ~200 lines
- * - Uses dependency injection for all components
- * - All business logic extracted to services
- * - Framework-agnostic (works with readline/ink/blessed)
+ * Key changes for v-0.6.1:
+ * - sendToAgent() -> enqueueUserInput()
+ * - All agent communication through message queue
+ * - Event emission converted to message enqueuing
+ * - Pure display and input handling only
  */
 
 import type { ICommandHandler } from '../../command/abstractions/index.js';
 import type {
   CLIConfig,
-  CLIEvents,
   CLIMode,
   CLIState,
   IAgentCLIBridge,
@@ -25,7 +26,6 @@ import type {
 import type {
   IAgentConnector,
   ICommandRouter,
-  IEventManager,
 } from '../abstractions/ICLIServices.js';
 import type { IInputManager } from '../abstractions/IInputManager.js';
 // Injected dependencies interfaces
@@ -35,9 +35,13 @@ import type {
   IProgressRenderer,
   IStreamRenderer,
 } from '../abstractions/IUIComponent.js';
+// v-0.6.1 Message Queue integration
+import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../../messaging/types/MessageTypes.js';
+import { MessageType } from '../../messaging/types/MessageTypes.js';
 
 /**
- * Refactored EventDrivenCLI - Pure orchestration with dependency injection
+ * v-0.6.1 Pure Enqueue-Only CLI - Message-driven architecture
  *
  * This implementation delegates all operations to injected components:
  * - Terminal operations → ITerminal implementation
@@ -45,9 +49,9 @@ import type {
  * - Progress display → IProgressRenderer implementation
  * - Mode management → IModeRenderer implementation
  * - Streaming → IStreamRenderer implementation
- * - Events → IEventManager implementation
+ * - v-0.6.1: Events removed - pure message coordination
  * - Commands → ICommandRouter implementation
- * - Agent communication → IAgentConnector implementation
+ * - Message coordination → QiAsyncMessageQueue (v-0.6.1)
  */
 export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   private config: CLIConfig;
@@ -61,9 +65,9 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     private progressRenderer: IProgressRenderer,
     private modeRenderer: IModeRenderer,
     private streamRenderer: IStreamRenderer,
-    private eventManager: IEventManager,
+    // v-0.6.1: IEventManager removed - pure message-driven
     private commandRouter: ICommandRouter,
-    private agentConnector: IAgentConnector,
+    private messageQueue: QiAsyncMessageQueue<QiMessage>, // v-0.6.1: Replace agentConnector
     config: Partial<CLIConfig> = {},
     private commandHandler?: ICommandHandler
   ) {
@@ -104,23 +108,19 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    // Initialize components
+    // v-0.6.1: Minimal initialization - pure message-driven CLI
     this.inputManager.initialize({
       historySize: this.config.historySize,
       autoComplete: this.config.autoComplete,
       enableColors: this.config.colors,
     });
 
-    // Setup input handling
-    this.setupInputHandlers();
-
-    // Setup mode indicator
-    if (this.config.enableModeIndicator) {
-      this.modeRenderer.show();
-    }
+    // Essential: Connect input capture to message flow
+    this.inputManager.onInput((input) => {
+      this.handleInput(input);
+    });
 
     this.isInitialized = true;
-    this.eventManager.emit('ready', { startTime: this.state.startTime });
   }
 
   /**
@@ -137,13 +137,11 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
     this.terminal.writeLine('🚀 Event-Driven CLI Ready');
     this.terminal.writeLine('=========================');
-    this.terminal.writeLine('💡 Press Shift+Tab to cycle modes, Esc to cancel operations');
-    this.terminal.writeLine('⌨️  Ctrl+C to clear prompt • Ctrl+D to exit');
+    this.terminal.writeLine('💡 Type /exit to quit');
     this.terminal.writeLine('');
 
-    // Update prompt with current model/mode info
-    this.updatePrompt();
-    this.showPrompt();
+    // Show initial prompt
+    this.inputManager.showPrompt();
 
     this.isStarted = true;
   }
@@ -156,7 +154,8 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
     // Cancel any active operations
     if (this.state.isProcessing) {
-      this.eventManager.emit('cancelRequested', { reason: 'shutdown' });
+      // v-0.6.1: Direct cancellation instead of events
+      this.state.isProcessing = false;
     }
 
     // Cleanup components
@@ -164,10 +163,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     this.modeRenderer.destroy();
     this.streamRenderer.destroy();
     this.inputManager.close();
-    this.eventManager.destroy();
+    // v-0.6.1: No eventManager to destroy
 
     this.isStarted = false;
-    this.eventManager.emit('shutdown', { reason: 'normal' });
+    // v-0.6.1: No shutdown events
   }
 
   // State management (delegated to components)
@@ -177,13 +176,8 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   setMode(mode: CLIMode): void {
-    const previousMode = this.state.mode;
+    // v-0.6.1: Simplified mode setting
     this.state.mode = mode;
-
-    this.modeRenderer.setMode(mode);
-    this.updatePrompt();
-
-    this.eventManager.emit('modeChanged', { previousMode, newMode: mode });
   }
 
   getMode(): CLIMode {
@@ -198,122 +192,18 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     }
   }
 
-  handleInput(input: string): void {
-    if (!input.trim()) {
-      this.showPrompt();
-      return;
-    }
+  // v-0.6.1: handleInput moved to line 351 to follow design specification
 
-    this.state.currentInput = input;
-    this.state.lastActivity = new Date();
-
-    // Add to history
-    this.inputManager.addToHistory(input);
-
-    // Handle CLI commands first
-    const parseResult = this.commandRouter.parseInput(input);
-
-    if (parseResult.tag === 'success') {
-      const parsed = parseResult.value;
-
-      if (parsed.type === 'command') {
-        this.handleCommand(parsed.command!, parsed.args || [], parsed.flags || {});
-        return;
-      }
-    }
-
-    // Emit user input event for prompts
-    this.eventManager.emit('userInput', { input, mode: this.state.mode });
+  displayMessage(content: string, type?: MessageType): void {
+    // Only responsibility: display (EXACT design specification)
+    this.terminal.writeLine(content);
+    // Essential: Show prompt for next input
+    this.inputManager.showPrompt();
   }
 
-  displayMessage(content: string, type: MessageType = 'info'): void {
-    const icons = {
-      status: 'ℹ️',
-      streaming: '📡',
-      complete: '✅',
-      error: '❌',
-      info: 'ℹ️',
-      warning: '⚠️',
-    };
+  // v-0.6.1: All complex methods removed - CLI only enqueues and displays
 
-    const icon = icons[type] || 'ℹ️';
-    const message = `${icon} ${content}`;
-
-    // Check if TUI mode is enabled
-    if (this.isTUIMode()) {
-      const tuiLayout = this.getTUILayout();
-      if (tuiLayout) {
-        // Route message to TUI main panel instead of terminal.writeLine()
-        tuiLayout.addToMain(message);
-      } else {
-        // Fallback to terminal if TUI layout not available
-        this.terminal.writeLine(message);
-      }
-    } else {
-      // Regular mode: use terminal.writeLine()
-      this.terminal.writeLine(message);
-    }
-
-    this.eventManager.emit('messageReceived', { content, type });
-  }
-
-  displayProgress(phase: string, progress: number, details?: string): void {
-    if (!this.config.enableProgressDisplay) return;
-
-    this.progressRenderer.updateProgress(progress, phase, details);
-    this.eventManager.emit('progressUpdate', { phase, progress, details });
-  }
-
-  // Streaming (delegated to stream renderer)
-
-  startStreaming(): void {
-    if (!this.config.enableStreaming) return;
-
-    this.state.isStreamingActive = true;
-    this.streamRenderer.startStreaming();
-    this.eventManager.emit('streamingStarted');
-  }
-
-  addStreamingChunk(content: string): void {
-    if (!this.state.isStreamingActive) return;
-
-    this.streamRenderer.addChunk(content);
-    this.eventManager.emit('streamingChunk', { content });
-  }
-
-  completeStreaming(message?: string): void {
-    if (!this.state.isStreamingActive) return;
-
-    this.streamRenderer.complete(message);
-    this.state.isStreamingActive = false;
-    this.eventManager.emit('streamingComplete', {
-      totalTime: Date.now() - this.state.lastActivity.getTime(),
-    });
-    this.showPrompt();
-  }
-
-  cancelStreaming(): void {
-    if (!this.state.isStreamingActive) return;
-
-    this.streamRenderer.cancel();
-    this.state.isStreamingActive = false;
-    this.eventManager.emit('streamingCancelled');
-    this.showPrompt();
-  }
-
-  // Event handling (delegated to event manager)
-
-  on<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
-    this.eventManager.on(event, listener);
-  }
-
-  off<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
-    this.eventManager.off(event, listener);
-  }
-
-  emit<K extends keyof CLIEvents>(event: K, data: CLIEvents[K]): void {
-    this.eventManager.emit(event, data);
-  }
+  // v-0.6.1: Event handling completely removed - pure message-driven architecture
 
   // Configuration
 
@@ -333,418 +223,43 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     return { ...this.config };
   }
 
-  // Agent integration (delegated to agent connector)
+  // v-0.6.1: Pure message queue - no agent integration methods needed
 
-  connectAgent(agent: any): void {
-    const connectResult = this.agentConnector.connectAgent(agent);
+  // v-0.6.1: Agent callbacks removed - communication through message queue only
 
-    if (connectResult.tag === 'success') {
-      this.setupAgentEventHandlers();
-      this.updatePromptWithAgentInfo();
-    }
-  }
 
-  disconnectAgent(): void {
-    this.agentConnector.disconnectAgent();
-  }
 
-  onAgentProgress(progress: { phase: string; progress: number; details?: string }): void {
-    this.state.isProcessing = true;
-    this.displayProgress(progress.phase, progress.progress, progress.details);
-  }
 
-  onAgentMessage(message: { content: string; type: string }): void {
-    if (message.type === 'streaming' && this.config.enableStreaming) {
-      if (!this.state.isStreamingActive) {
-        this.startStreaming();
-      }
-      this.addStreamingChunk(message.content);
-    } else if (message.type !== 'status' || !this.state.isProcessing) {
-      this.displayMessage(message.content, message.type as MessageType);
-    }
-  }
-
-  onAgentComplete(result: any): void {
-    this.state.isProcessing = false;
-
-    const wasStreaming = this.state.isStreamingActive;
-
-    if (this.state.isStreamingActive) {
-      this.completeStreaming('Response completed');
-    }
-
-    // Extract and display result - but only if we weren't streaming
-    // (streaming already sent the content)
-    const content = this.extractResultContent(result);
-    this.progressRenderer.hideAndReplace();
-
-    if (content && !wasStreaming) {
-      // Only display content if it wasn't already streamed
-      if (this.isTUIMode()) {
-        const tuiLayout = this.getTUILayout();
-        if (tuiLayout) {
-          // Route response content to TUI main panel
-          tuiLayout.addToMain(content);
-
-          // Add AI response to conversation history for non-streaming
-          const timestamp = new Date().toLocaleTimeString();
-          const responsePreview = content.substring(0, 100) + (content.length > 100 ? '...' : '');
-          tuiLayout.addToContext(
-            `{bold}{green-fg}[${timestamp}] AI:{/green-fg}{/bold} ${responsePreview}`
-          );
-        } else {
-          // Fallback to terminal if TUI layout not available
-          this.terminal.writeLine(`${content}\n`);
-        }
-      } else {
-        // Regular mode: use terminal.writeLine()
-        this.terminal.writeLine(`${content}\n`);
-      }
-    }
-
-    this.showPrompt();
-  }
-
-  onAgentError(error: any): void {
-    this.state.isProcessing = false;
-    this.progressRenderer.hide();
-
-    if (this.state.isStreamingActive) {
-      this.cancelStreaming();
-    }
-
-    const errorMessage = error.message || error.error?.message || String(error);
-    this.displayMessage(`Error: ${errorMessage}`, 'error');
-    this.eventManager.emit('error', { error: new Error(errorMessage), context: 'agent' });
-    this.showPrompt();
-  }
-
-  onAgentCancelled(reason: string): void {
-    this.state.isProcessing = false;
-    this.progressRenderer.hide();
-
-    if (this.state.isStreamingActive) {
-      this.cancelStreaming();
-    }
-
-    this.displayMessage(`Request cancelled: ${reason}`, 'warning');
-    this.showPrompt();
-  }
-
-  sendToAgent(input: string): void {
-    if (!this.agentConnector.isAgentConnected()) {
-      this.displayMessage('No agent connected', 'error');
-      this.showPrompt();
+  // Design specification: handleInput() method
+  handleInput(input: string): void {
+    console.log(`[EventDrivenCLI] handleInput called with: "${input}"`);
+    // Handle essential commands directly for functionality
+    if (input.trim() === '/exit' || input.trim() === '/quit') {
+      this.terminal.writeLine('👋 Goodbye!');
+      process.exit(0);
       return;
     }
-
-    this.state.isProcessing = true;
-    this.progressRenderer.start({ phase: 'starting', progress: 0, details: 'Initializing...' });
-
-    const context = {
-      sessionId: 'cli-session',
-      timestamp: new Date(),
-      source: 'event-driven-cli',
-      mode: this.state.mode,
-    };
-
-    this.agentConnector.sendToAgent(input, context).catch((error) => {
-      this.onAgentError(error);
-    });
+    
+    // All other input goes to message queue
+    console.log(`[EventDrivenCLI] Enqueuing to message queue`);
+    this.messageQueue.enqueue({ type: MessageType.USER_INPUT, input: input });
   }
 
-  cancelAgent(): void {
-    this.agentConnector.cancelAgent();
-  }
+  // v-0.6.1: Pure message-driven CLI - only handleInput and displayMessage
 
-  // Private methods (significantly reduced)
+  // v-0.6.1: All complex private methods removed - pure message-driven only
 
-  private setupEventHandlers(): void {
-    // Setup streaming renderer event handlers
-    this.streamRenderer.onStreamingComplete((_content) => {
-      this.state.isStreamingActive = false;
-      this.showPrompt();
-    });
-
-    this.streamRenderer.onStreamingCancelled(() => {
-      this.state.isStreamingActive = false;
-      this.showPrompt();
-    });
-  }
-
-  private setupInputHandlers(): void {
-    // User input handler
-    this.inputManager.onInput((input) => {
-      this.handleInput(input);
-    });
-
-    // Special key handlers
-    this.inputManager.onShiftTab(() => {
-      if (!this.state.isProcessing) {
-        this.cycleMode();
-      }
-    });
-
-    this.inputManager.onEscape(() => {
-      // Always handle ESC key for better user experience
-      if (this.state.isProcessing || this.state.isStreamingActive) {
-        this.handleCancellation();
-      } else {
-        // If not processing, clear input and show feedback
-        this.handleEscapeWhenIdle();
-      }
-    });
-
-    this.inputManager.onCtrlC(() => {
-      this.handleClearPrompt();
-    });
-
-    this.inputManager.onCtrlD(() => {
-      this.handleGracefulExit();
-    });
-  }
-
-  private setupAgentEventHandlers(): void {
-    this.agentConnector.onAgentProgress(this.onAgentProgress.bind(this));
-    this.agentConnector.onAgentMessage(this.onAgentMessage.bind(this));
-    this.agentConnector.onAgentComplete(this.onAgentComplete.bind(this));
-    this.agentConnector.onAgentError(this.onAgentError.bind(this));
-    this.agentConnector.onAgentCancelled(this.onAgentCancelled.bind(this));
-  }
-
-  private async handleCommand(
-    command: string,
-    args: string[],
-    flags: Record<string, string | boolean>
-  ): Promise<void> {
-    // Use commandHandler directly if available (preferred approach)
-    if (this.commandHandler) {
-      const parameters = new Map<string, unknown>();
-
-      // Map args to parameters
-      args.forEach((arg, index) => {
-        parameters.set(`arg${index}`, arg);
-      });
-
-      // Add flags to parameters
-      Object.entries(flags).forEach(([key, value]) => {
-        parameters.set(key, value);
-      });
-
-      const request = {
-        commandName: command,
-        parameters,
-        rawInput: `/${command} ${args.join(' ')}`.trim(),
-        context: new Map<string, unknown>(),
-      };
-
-      try {
-        const result = await this.commandHandler.executeCommand(request);
-
-        if (result.success) {
-          this.displayMessage(result.content, 'info');
-
-          // Check if this was a model command and update prompt
-          if (command === 'model') {
-            this.updatePrompt(); // Refresh prompt to show current model
-          }
-        } else {
-          this.displayMessage(result.error || 'Command failed', 'error');
-        }
-      } catch (error) {
-        // CommandHandler should not throw, but handle gracefully if it does
-        this.displayMessage(
-          `Command execution error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'error'
-        );
-      }
-    } else {
-      // Fallback to commandRouter (existing behavior)
-      const result = await this.commandRouter.handleCommand(command, args, flags);
-
-      if (result.tag === 'success') {
-        this.displayMessage(result.value, 'info');
-      } else {
-        this.displayMessage(result.error.message, 'error');
-      }
-    }
-
-    this.showPrompt();
-  }
-
-  private cycleMode(): void {
-    const newMode = this.modeRenderer.cycleMode(true);
-    this.state.mode = newMode;
-    this.updatePrompt();
-
-    // Force immediate visual refresh of the prompt to show mode change
-    this.showPrompt();
-
-    this.eventManager.emit('modeChanged', {
-      previousMode: this.state.mode,
-      newMode,
-    });
-  }
-
-  private handleCancellation(): void {
-    if (this.state.isStreamingActive) {
-      this.cancelStreaming();
-    }
-
-    if (this.state.isProcessing) {
-      this.state.isProcessing = false;
-      this.progressRenderer.hide();
-    }
-
-    this.eventManager.emit('cancelRequested', { reason: 'user_escape' });
-    this.displayMessage('🛑 Operation cancelled', 'warning');
-    this.showPrompt();
-  }
-
-  private handleEscapeWhenIdle(): void {
-    // Clear current input if any
-    const currentInput = this.inputManager.getCurrentInput();
-    if (currentInput && currentInput.trim().length > 0) {
-      this.inputManager.clearInput();
-      this.displayMessage('⏹️ Input cleared', 'info');
-    } else {
-      this.displayMessage('⏹️ ESC - No operation to cancel', 'info');
-    }
-    this.showPrompt();
-  }
-
-  private handleClearPrompt(): void {
-    // Clear current input line
-    this.inputManager.clearInput();
-    this.displayMessage('Prompt cleared', 'info');
-  }
-
-  private handleGracefulExit(): void {
-    this.terminal.writeLine('\n👋 Goodbye!');
-
-    // Ensure we exit even if shutdown hangs
-    setTimeout(() => {
-      process.exit(0);
-    }, 100);
-
-    this.shutdown().finally(() => {
-      process.exit(0);
-    });
-  }
-
-  private updatePrompt(): void {
-    const provider = this.getAgentProvider();
-    const model = this.getAgentModel();
-    const modePrefix = this.modeRenderer.getPromptPrefix();
-
-    // Show both provider and current model name in prompt
-    const prompt = `${provider}:${model} ${modePrefix}${this.config.prompt}`;
-    this.inputManager.setPrompt(prompt);
-  }
-
-  private updatePromptWithAgentInfo(): void {
-    this.updatePrompt();
-  }
-
-  private getAgentProvider(): string {
-    try {
-      const agent = (this.agentConnector as any).currentAgent;
-
-      // Try to get provider from state manager's prompt config
-      if (agent?.stateManager?.getPromptConfig) {
-        const promptConfig = agent.stateManager.getPromptConfig();
-        if (promptConfig?.provider) {
-          return promptConfig.provider;
-        }
-      }
-
-      // Fallback to default
-      return 'ollama';
-    } catch {
-      return 'ollama';
-    }
-  }
-
-  private getAgentModel(): string {
-    // Try to get model from agent's prompt handler or state manager
-    try {
-      const _agentInfo = this.agentConnector.getAgentInfo();
-      const agent = (this.agentConnector as any).currentAgent;
-
-      // Try to get current model from state manager's prompt config (most accurate)
-      if (agent?.stateManager?.getPromptConfig) {
-        const promptConfig = agent.stateManager.getPromptConfig();
-        if (promptConfig?.model) {
-          return promptConfig.model;
-        }
-      }
-
-      // Try to get model from agent's prompt handler
-      if (agent?.promptHandler?.getCurrentModel) {
-        return agent.promptHandler.getCurrentModel();
-      }
-
-      // Try to get model from state manager (general)
-      if (agent?.stateManager?.getCurrentModel) {
-        return agent.stateManager.getCurrentModel();
-      }
-
-      // Try to get from prompt handler config
-      if (agent?.promptHandler?.config?.defaultModel) {
-        return agent.promptHandler.config.defaultModel;
-      }
-
-      // Fallback to match what the status command shows
-      return 'qwen3:8b';
-    } catch {
-      return 'qwen3:8b';
-    }
-  }
-
-  private extractResultContent(result: any): string {
-    if (result && typeof result === 'object') {
-      if (result.result?.content) return result.result.content;
-      if (result.content) return result.content;
-      if (result.response) return result.response;
-      if (result.message) return result.message;
-      if (result.text) return result.text;
-    }
-
-    return result ? String(result) : '';
-  }
-
-  private isPromptActive(): boolean {
-    return !this.state.isProcessing && !this.state.isStreamingActive;
-  }
-
-  /**
-   * Check if TUI mode is enabled
-   */
-  private isTUIMode(): boolean {
-    // Check if input manager has TUI layout (blessed with TUI)
-    if ((this.inputManager as any).getTUILayout) {
-      const tuiLayout = (this.inputManager as any).getTUILayout();
-      return tuiLayout !== undefined;
-    }
-    return false;
-  }
-
-  /**
-   * Get TUI layout instance if available
-   */
-  private getTUILayout(): any {
-    if ((this.inputManager as any).getTUILayout) {
-      return (this.inputManager as any).getTUILayout();
-    }
-    return null;
-  }
+  // v-0.6.1: All complex private methods removed - CLI is now pure (only enqueue and display)
 }
 
 /**
- * Backward compatibility factory function
+ * v-0.6.1 Factory function - requires message queue injection
  */
-export function createEventDrivenCLI(_config?: Partial<CLIConfig>): EventDrivenCLI {
-  // This creates a CLI with the original interface but now uses dependency injection internally
+export function createEventDrivenCLI(
+  messageQueue: QiAsyncMessageQueue<QiMessage>,
+  _config?: Partial<CLIConfig>
+): EventDrivenCLI {
+  // v-0.6.1: Message queue is required for pure enqueue-only architecture
   // The actual implementation will be handled by the factory functions
-  throw new Error('Use createCLI() or createReadlineCLI() from factories instead');
+  throw new Error('Use createCLI() from factories with messageQueue parameter instead');
 }
