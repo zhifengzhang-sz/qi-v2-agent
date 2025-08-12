@@ -1,6 +1,50 @@
 # Qi V2 Agent - Version History
 
-## v-0.5.3 - Command Navigation Enhancement (Current)
+## v-0.6.0 - Message Queue Structure (COMPLETED)
+
+### 📅 **Release Date**: 2025-08-12  
+
+### 🎯 **Overview**
+Complete implementation of h2A-inspired async message queue system based on Claude Code analysis. This release adds non-blocking message processing, type-safe message creation, and provides the async foundation for future agent capabilities.
+
+### ✨ **New Features** ✅
+
+#### 🔄 **Async Message Queue System**
+- **QiAsyncMessageQueue**: h2A-pattern AsyncIterable with non-blocking operations ✅
+- **Promise-based Flow Control**: readResolve/readReject callbacks for async coordination ✅
+- **Real-time Message Injection**: Add messages during active iteration ✅
+- **State Management**: Complete lifecycle with started/done/error flags ✅
+- **QiCore Integration**: Full Result<T> patterns throughout async operations ✅
+
+#### 📨 **Type-Safe Message System**
+- **QiMessageFactory**: Type-safe message creation with validation ✅
+- **15+ Message Types**: Command, UserInput, AgentOutput, SystemControl, Streaming, etc. ✅
+- **Priority Processing**: CRITICAL → HIGH → NORMAL → LOW automatic ordering ✅
+- **Request-Response Correlation**: Built-in correlation ID and parent ID support ✅
+- **Message Validation**: Comprehensive validation with detailed error context ✅
+
+#### ⚡ **Advanced Queue Features**
+- **Priority Queuing**: Automatic priority-based message ordering ✅
+- **Message TTL**: Automatic expiration and cleanup of old messages ✅
+- **Statistics & Monitoring**: Performance metrics and queue health tracking ✅
+- **Pause/Resume Control**: Dynamic processing control ✅
+- **Resource Management**: Proper cleanup and memory management ✅
+
+#### 🧪 **Testing & Documentation**
+- **Comprehensive Tests**: 42/42 tests passing with proper QiCore patterns ✅
+- **Complete Documentation**: User guide, API reference, migration guide ✅
+- **QiCore Best Practices**: Functional composition with match() patterns ✅
+- **Type Safety**: Full TypeScript coverage with generic support ✅
+
+### 🏗️ **Architecture Foundation**
+This version establishes the async messaging foundation required for:
+- **v-0.7.x**: Concurrent tool execution with proper coordination
+- **v-0.8.x**: Complex workflow orchestration with SubAgent support
+- **v-0.9.x**: Full agent loop implementation with real-time steering
+
+---
+
+## v-0.5.3 - Command Navigation Enhancement
 
 ### 📅 **Release Date**: 2025-08-11
 
@@ -135,12 +179,32 @@ Preview implementation of v-0.8.x agent functionality with toolbox architecture.
 @src/file.ts explain this code
 ```
 
-### 🛣️ **Versioning Roadmap**
+### 🛣️ **Versioning Roadmap** (Updated 2025-08-11)
+
+**Progressive Architecture Build-up Approach:**
+
 - **v-0.4.x**: Pure prompt app ✅
-- **v-0.5.x**: Current - toolbox preview ← HERE
-- **v-0.6.x**: Full toolbox (100+ tools, MCP integration)
-- **v-0.7.x**: Advanced workflows
-- **v-0.8.x**: Full agent capabilities
+- **v-0.5.x**: Hybrid CLI framework ✅
+- **v-0.6.x**: Message Queue Structure (current) ← HERE
+  - h2A-inspired async messaging foundation
+  - Real-time steering with stdin monitoring
+  - Enhanced QiCoreEventManager with stream processing
+  - AbortController integration for graceful interruption
+- **v-0.7.x**: Tools System
+  - 6-stage tool execution pipeline (MH1 pattern)
+  - Concurrent execution control (max 10 parallel, UH1 pattern)
+  - MCP integration + 100+ tools ecosystem
+  - 6-layer permission validation gateway
+- **v-0.8.x**: Workflow System
+  - Intelligent workflow extraction from text input
+  - SubAgent creation with isolated execution (I2A pattern)
+  - Multi-agent orchestration and result synthesis (KN5 pattern)
+  - Context compression algorithm (92% threshold)
+- **v-0.9.x**: qi-code Agent
+  - Complete coder agent with Claude Code feature parity
+  - Full agent orchestration (nO-style agent loop)
+  - Project-wide context management and adaptive learning
+  - Integration with qi-prompt for unified experience
 
 ---
 
