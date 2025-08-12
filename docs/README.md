@@ -21,6 +21,7 @@ Each module has contract specifications and logical structure docs:
 
 - **[classifier/](classifier/)** - Three-type input classification system
 - **[agent/](agent/)** - Main coordinator with streaming responses  
+- **[messaging/](messaging/)** - v-0.6.x async message queue system (NEW)
 - **[workflow/](workflow/)** - Multi-step task orchestration
 - **[prompt/](prompt/)** - LLM integration and template management
 - **[cli/](cli/)** - Terminal interface implementations

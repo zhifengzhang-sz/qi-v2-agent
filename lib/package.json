@@ -61,6 +61,10 @@
     "./state": "./dist/state/index.js",
     "./prompt": "./dist/prompt/index.js",
     "./command": "./dist/command/index.js",
-    "./cli": "./dist/cli/index.js"
+    "./cli": "./dist/cli/index.js",
+    "./messaging": "./dist/messaging/index.js",
+    "./messaging/types": "./dist/messaging/types/index.js",
+    "./messaging/interfaces": "./dist/messaging/interfaces/index.js",
+    "./messaging/impl": "./dist/messaging/impl/index.js"
   }
 }
