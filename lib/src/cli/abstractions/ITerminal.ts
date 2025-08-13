@@ -2,7 +2,7 @@
  * Terminal abstraction interface
  *
  * Provides a framework-agnostic interface for terminal operations.
- * Implemented by ReadlineTerminal, InkTerminal, and BlessedTerminal.
+ * Implemented by ReadlineTerminal and InkTerminal (Hybrid delegates to Ink).
  */
 
 export interface TerminalDimensions {

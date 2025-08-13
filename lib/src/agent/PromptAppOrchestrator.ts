@@ -6,14 +6,12 @@
  * - Prompts (everything else) → route to prompt handler
  *
  * v-0.6.1 changes:
- * - Removed EventEmitter dependency 
+ * - Removed EventEmitter dependency
  * - Integrated QiAsyncMessageQueue for message coordination
  * - All emit() calls replaced with message enqueuing
  * - Maintains responsive UI through message flow
  */
 
-import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
-import type { QiMessage } from '../messaging/types/MessageTypes.js';
 import type { CommandRequest, ICommandHandler } from '@qi/agent/command';
 import type { IContextManager } from '@qi/agent/context';
 import {
@@ -23,6 +21,9 @@ import {
 import type { IPromptHandler, PromptOptions, PromptResponse } from '@qi/agent/prompt';
 import type { IStateManager } from '@qi/agent/state';
 import { create, type ErrorCategory, type QiError } from '@qi/base';
+import { createDebugLogger } from '../utils/DebugLogger.js';
+import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../messaging/types/MessageTypes.js';
 import type {
   IWorkflowHandler,
   WorkflowOptions,
@@ -92,7 +93,7 @@ const createAgentError = (
  * - Starts with `/` → Command
  * - Anything else → Prompt
  */
-export type InputType = 'command' | 'prompt';
+export type InputType = 'command' | 'workflow' | 'prompt';
 
 export interface ParsedInput {
   type: InputType;
@@ -106,14 +107,25 @@ export interface ParsedInput {
 export function parseInput(input: string): ParsedInput {
   const trimmed = input.trim();
 
+  // Highest precedence: explicit slash commands
   if (trimmed.startsWith('/')) {
     return {
       type: 'command',
       raw: input,
-      content: trimmed.slice(1), // Remove the leading `/`
+      content: trimmed.slice(1),
     };
   }
 
+  // Next: workflow patterns (e.g., file references like @path/file.ext)
+  if (trimmed.includes('@') && (trimmed.includes('.') || trimmed.includes('/'))) {
+    return {
+      type: 'workflow',
+      raw: input,
+      content: trimmed,
+    };
+  }
+
+  // Default: free-form prompt
   return {
     type: 'prompt',
     raw: input,
@@ -133,6 +145,7 @@ export class PromptAppOrchestrator implements IAgent {
   private contextAwarePromptHandler?: ContextAwarePromptHandler;
   private workflowHandler?: IWorkflowHandler;
   private messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Message coordination
+  private debug = createDebugLogger('PromptAppOrchestrator');
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -212,32 +225,8 @@ export class PromptAppOrchestrator implements IAgent {
     this.abortController = new AbortController();
 
     try {
-      // v-0.6.1: Pure processing - no progress messages (violates design)
-
-      // RACE CONDITION FIX: Process workflows synchronously BEFORE parsing
-      let processedInput = request.input;
-
-      if (this.workflowHandler && this.detectWorkflowPattern(request.input)) {
-        try {
-          const workflowResult = await this.processWorkflow(request.input);
-          if (workflowResult.success) {
-            processedInput = workflowResult.data.output;
-          }
-        } catch (error) {
-          console.warn(
-            'Workflow processing failed:',
-            error instanceof Error ? error.message : String(error)
-          );
-        }
-      }
-
-      // Check for cancellation after workflow processing
-      if (this.abortController?.signal.aborted) {
-        throw new Error('Request was cancelled during workflow processing');
-      }
-
-      // Parse the processed input (may be enhanced by workflow)
-      const parsed = parseInput(processedInput);
+      // v-0.6.1: Pure processing - classify input explicitly
+      const parsed = parseInput(request.input);
 
       // Check for cancellation
       if (this.abortController?.signal.aborted) {
@@ -252,7 +241,12 @@ export class PromptAppOrchestrator implements IAgent {
         case 'command':
           response = await this.handleCommand(request, parsed.content);
           break;
+        case 'workflow':
+          this.debug.warn(`Input "${parsed.content}" classified as workflow - this should not happen for simple prompts!`);
+          response = await this.handleWorkflow(request, parsed.content);
+          break;
         case 'prompt':
+          this.debug.log(`✅ Input "${parsed.content}" correctly classified as prompt`);
           response = await this.handlePrompt(request, parsed.content);
           break;
         default:
@@ -448,7 +442,34 @@ export class PromptAppOrchestrator implements IAgent {
     };
   }
 
+  private async handleWorkflow(request: AgentRequest, content: string): Promise<AgentResponse> {
+    this.debug.warn(`handleWorkflow called with: "${content}" - WHY IS THIS A WORKFLOW?`);
+    
+    if (!this.workflowHandler) {
+      return this.createDisabledResponse('workflow', 'Workflow processing is disabled');
+    }
+
+    // Execute the workflow first; if it yields enhanced content, treat that as a prompt
+    const wf = await this.processWorkflow(content);
+    if (!wf.success) {
+      return this.createErrorResponse('workflow', wf.error);
+    }
+
+    const enhanced = wf.data.output ?? content;
+    
+    // Check if this was a passthrough (no actual workflow processing)
+    if (wf.data.output === content || (wf.data as any).metadata?.passthrough) {
+      // This was passthrough - route directly to prompt handler without re-classification
+      return this.handlePrompt(request, enhanced);
+    }
+
+    // Route to prompt handler with the enhanced content, preserving context
+    return this.handlePrompt(request, enhanced);
+  }
+
   private async handlePrompt(request: AgentRequest, promptContent: string): Promise<AgentResponse> {
+    this.debug.log(`🔍 handlePrompt called with: "${promptContent}"`);
+    
     if (!this.config.enablePrompts) {
       return this.createDisabledResponse('prompt', 'Prompt processing is disabled');
     }
@@ -486,15 +507,23 @@ export class PromptAppOrchestrator implements IAgent {
         }
 
         // Execute with context continuation
+        this.debug.log(`🚀 About to call LLM with contextAwarePromptHandler for: "${promptContent}"`);
+        const startTime = Date.now();
         result = await this.contextAwarePromptHandler.completeWithContext(
           promptContent,
           promptOptions,
           contextId,
           true // Include conversation history
         );
+        const duration = Date.now() - startTime;
+        this.debug.log(`⚡ LLM call completed in ${duration}ms`);
       } else {
         // Fallback to basic prompt processing
+        this.debug.log(`🚀 About to call LLM with basic promptHandler for: "${promptContent}"`);
+        const startTime = Date.now();
         result = await this.promptHandler.complete(promptContent, promptOptions);
+        const duration = Date.now() - startTime;
+        this.debug.log(`⚡ LLM call completed in ${duration}ms`);
 
         // Manually update state manager for fallback
         this.stateManager.addConversationEntry({
@@ -705,7 +734,9 @@ export class PromptAppOrchestrator implements IAgent {
       const availableModels = this.stateManager.getAvailablePromptModels();
       if (availableModels.length > 0 && !availableModels.includes(modelName)) {
         // v-0.6.1: No emit - deprecated method
-        console.warn(`Model '${modelName}' not available. Available: ${availableModels.join(', ')}`);
+        console.warn(
+          `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`
+        );
         return;
       }
 
@@ -750,7 +781,7 @@ export class PromptAppOrchestrator implements IAgent {
       // Process through traditional flow (will emit progress, complete events)
       await this.process(agentRequest);
     } catch (error) {
-      // v-0.6.1: No emit - deprecated method  
+      // v-0.6.1: No emit - deprecated method
       console.error('Prompt processing failed:', error);
     }
   }
@@ -803,9 +834,9 @@ export class PromptAppOrchestrator implements IAgent {
         throw new Error('Request was cancelled');
       }
 
-      // Execute workflow with current session context
+      // Execute workflow with current session context (let handler determine type)
       const workflowOptions: WorkflowOptions = {
-        type: 'file-reference', // Fixed: use correct enum value
+        // Don't force a specific type - let the handler detect the correct workflow
         context: { sessionId: 'main' }, // Use main session or get from context
         timeout: 10000, // 10 second timeout
       };

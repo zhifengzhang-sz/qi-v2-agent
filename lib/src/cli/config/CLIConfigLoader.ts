@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import YAML from 'js-yaml';
 import type { CLIConfig } from '../abstractions/ICLIFramework.js';
 
-export type CLIFramework = 'readline' | 'ink' | 'blessed';
+export type CLIFramework = 'readline' | 'ink' | 'hybrid';
 
 export interface CLIConfigWithFramework extends CLIConfig {
   framework: CLIFramework;
@@ -241,7 +241,7 @@ function parseArgValue(value: string, key: string): any {
  */
 function validateConfig(config: CLIConfigWithFramework): CLIConfigWithFramework {
   // Validate framework
-  const validFrameworks: CLIFramework[] = ['readline', 'ink'];
+  const validFrameworks: CLIFramework[] = ['readline', 'ink', 'hybrid'];
   if (!validFrameworks.includes(config.framework)) {
     console.warn(`Warning: Invalid framework '${config.framework}', using 'readline'`);
     config.framework = 'readline';
@@ -278,6 +278,8 @@ export function getAvailableFrameworks(): CLIFramework[] {
     // Ink not available
   }
 
+  // Hybrid is a meta-framework that wraps Ink capabilities
+  frameworks.push('hybrid');
   return frameworks;
 }
 
@@ -304,7 +306,7 @@ export function displayConfigHelp(): void {
 CLI Framework Configuration
 
 Environment Variables:
-  QI_CLI_FRAMEWORK        Framework to use (readline|ink|blessed)
+  QI_CLI_FRAMEWORK        Framework to use (readline|ink|hybrid)
   QI_CLI_DEBUG           Enable debug mode (true|false)
   QI_CLI_ENABLE_HOTKEYS  Enable hotkeys (true|false)
   QI_CLI_ENABLE_STREAMING Enable streaming (true|false)
@@ -312,7 +314,7 @@ Environment Variables:
   QI_CLI_ANIMATIONS      Enable animations (true|false)
 
 Command Line Arguments:
-  --framework, -f        Framework to use (readline|ink|blessed)
+  --framework, -f        Framework to use (readline|ink|hybrid)
   --debug, -d           Enable debug mode
   --no-hotkeys          Disable hotkeys
   --no-streaming        Disable streaming

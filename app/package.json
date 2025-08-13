@@ -45,7 +45,7 @@
     "finetune:sync": "cd src/fine-tuning && uv sync",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --watch",
-    "lint": "biome check .",
+    "lint": "biome check . --diagnostic-level=error",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",

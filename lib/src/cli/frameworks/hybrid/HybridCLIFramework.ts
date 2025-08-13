@@ -13,6 +13,8 @@
 
 import { create, failure, match, type QiError, type Result, success } from '@qi/base';
 import { ConfigBuilder, createLogger, type Logger, type ValidatedConfig } from '@qi/core';
+import type { QiAsyncMessageQueue } from '../../../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../../../messaging/types/MessageTypes.js';
 import { Cursor } from '../../../utils/Cursor.js';
 import type { CLIConfig } from '../../abstractions/ICLIFramework.js';
 import { InkCLIFramework } from '../ink/InkCLIFramework.js';
@@ -66,8 +68,8 @@ export class HybridCLIFramework extends InkCLIFramework {
   private logger: Logger | null = null; // QiCore logger instance
   private hybridConfig: any | null = null; // QiCore configuration (using any for now until ValidatedConfig is available)
 
-  constructor(config: CLIConfig) {
-    super(config);
+  constructor(config: CLIConfig, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
+    super(config, messageQueue);
     this.initializeInfrastructure(config);
   }
 

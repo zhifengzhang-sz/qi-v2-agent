@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { render, Text, useInput, useApp } from 'ink';
 import { EventEmitter } from 'events';
+import { randomBytes } from 'crypto';
 import type {
   ICLIFramework,
   IAgentCLIBridge,
@@ -22,6 +23,14 @@ import { MessageType } from '../../../messaging/types/MessageTypes.js';
 import { MainLayout } from './components/MainLayout.js';
 import { createOutputMessage, createUserMessage, createAssistantMessage, createSystemMessage, type OutputMessage } from './components/OutputDisplay.js';
 import { createPermissionRequest, type PermissionRequest } from './components/PermissionDialog.js';
+import { createDebugLogger } from '../../../utils/DebugLogger.js';
+
+/**
+ * Generate a unique message ID using crypto random bytes
+ */
+const generateUniqueId = (): string => {
+  return randomBytes(8).toString('hex');
+};
 
 /**
  * Default CLI configuration for Ink
@@ -54,6 +63,7 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   private connectedAgent: any = null;
   private isCancelling = false;
   private messageQueue?: QiAsyncMessageQueue<QiMessage>;
+  private debug = createDebugLogger('InkCLIFramework');
 
   constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     super(); // Initialize EventEmitter
@@ -145,7 +155,7 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   handleInput(input: string): void {
-    console.log(`[InkCLIFramework] handleInput: "${input}"`);
+    this.debug.log(`handleInput: "${input}"`);
     this.state.currentInput = input;
     this.state.history.push(input);
     if (this.state.history.length > this.config.historySize) {
@@ -153,23 +163,41 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
     }
     this.state.lastActivity = new Date();
     
-    // Handle exit commands directly
+    // CRITICAL: Set processing state when handling input
+    this.state.isProcessing = true;
+    this.debug.log(`Set isProcessing to true for input processing`);
+    
+    // Handle exit commands: clear input and enqueue exit message
     if (input.trim() === '/exit' || input.trim() === '/quit') {
-      console.log('👋 Goodbye!');
-      process.exit(0);
+      // Clear input box in UI before exiting
+      this.state.currentInput = '';
+      this.emit('clearInput');
+
+      if (this.messageQueue) {
+        this.messageQueue.enqueue({
+          type: MessageType.USER_INPUT,
+          input: input,
+          raw: false,
+          source: 'cli' as const,
+          timestamp: new Date(),
+          id: generateUniqueId(),
+          priority: 2 as any
+        });
+      }
       return;
     }
     
-    // v-0.6.1: Direct message queue enqueuing - pure async messaging
+    // v-0.6.1: InkCLIFramework handles message enqueuing for React-based input
+    // (EventDrivenCLI inputManager is not used in hybrid/ink mode)
     if (this.messageQueue) {
-      console.log(`[InkCLIFramework] Enqueuing to message queue: "${input}"`);
+      this.debug.log(`Enqueuing to message queue: "${input}"`);
       this.messageQueue.enqueue({
         type: MessageType.USER_INPUT,
         input: input,
         raw: false,
         source: 'cli' as const,
         timestamp: new Date(),
-        id: Math.random().toString(36),
+        id: generateUniqueId(),
         priority: 2 as any
       });
     } else {
@@ -178,14 +206,38 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   displayMessage(content: string, type: ICLIFrameworkMessageType = 'info'): void {
-    console.log(`[InkCLIFramework] displayMessage: ${content}`);
+    // FIX: Prevent displaying empty or whitespace-only messages that cause empty lines
+    if (!content || content.trim() === '') {
+      this.debug.warn(`Skipping empty message display, type: ${type}`);
+      return;
+    }
     
-    // Emit message event for React component
-    this.emit('message', { content, type });
+    this.debug.log(`displayMessage: ${content}`);
+    this.debug.log(`displayMessage type: ${type}`);
+    this.debug.log(`displayMessage content length: ${content.length}`);
+    
+    // CRITICAL: Reset processing state when displaying final message
+    this.state.isProcessing = false;
+    this.debug.log(`Reset isProcessing to false`);
+    
+    // CRITICAL: Emit 'complete' event to reset React component processing state
+    this.debug.log(`Emitting 'complete' event to reset React state`);
+    this.emit('message', { content, type: 'complete' });
+    
+    // Essential: Signal that we're ready for new input after displaying message
+    this.debug.log(`Ready for new input after displaying message`);
+    this.emit('readyForInput');
   }
 
   displayProgress(phase: string, progress: number, details?: string): void {
-    console.log(`[InkCLIFramework] Progress: ${phase} ${progress}%`);
+    // FIX: Prevent empty or meaningless progress events that cause empty line rendering
+    if (!phase || phase.trim() === '' || progress < 0 || progress > 100) {
+      this.debug.warn(`Skipping invalid progress: phase="${phase}", progress=${progress}`);
+      return;
+    }
+    
+    this.debug.log(`Progress: ${phase} ${progress}% - Details: ${details}`);
+    this.debug.log(`🔍 PROGRESS MESSAGE - This might be the workflow messages you're seeing!`);
     
     // Emit progress event for React component
     this.emit('progress', { phase, progress, details });
@@ -261,11 +313,23 @@ export class InkCLIFramework extends EventEmitter implements ICLIFramework, IAge
   }
 
   onAgentProgress(progress: { phase: string; progress: number; details?: string }): void {
+    // FIX: Validate progress data before processing to prevent empty line rendering
+    if (!progress || !progress.phase || progress.phase.trim() === '') {
+      this.debug.warn(`Ignoring invalid progress event:`, progress);
+      return;
+    }
+    
     this.state.isProcessing = true;
     this.displayProgress(progress.phase, progress.progress, progress.details);
   }
 
   onAgentMessage(message: { content: string; type: string }): void {
+    // FIX: Validate message content to prevent empty line rendering
+    if (!message || !message.content || message.content.trim() === '') {
+      this.debug.warn(`Ignoring empty agent message:`, message);
+      return;
+    }
+    
     this.displayMessage(message.content, message.type as ICLIFrameworkMessageType);
   }
 

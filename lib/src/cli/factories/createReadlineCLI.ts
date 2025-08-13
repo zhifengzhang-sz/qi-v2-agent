@@ -7,6 +7,9 @@
 
 import { create, Err, flatMap, match, Ok, type QiError, type Result } from '@qi/base';
 import type { ICommandHandler } from '../../command/abstractions/index.js';
+import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue.js';
+import { QiAsyncMessageQueue as QiAsyncMessageQueueImpl } from '../../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage } from '../../messaging/types/MessageTypes.js';
 import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
 import type {
   IAgentConnector,
@@ -87,6 +90,7 @@ export function createReadlineCLI(
   config: Partial<CLIConfig> = {},
   options: {
     commandHandler?: ICommandHandler;
+    messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Required for message-driven architecture
   } = {}
 ): Result<ICLIFramework, QiError> {
   const fullConfig: CLIConfig = { ...DEFAULT_READLINE_CONFIG, ...config };
@@ -100,8 +104,13 @@ export function createReadlineCLI(
 
     return match(
       () => {
-        // Create CLI instance with commandHandler option
-        return createCLIInstance(container, fullConfig, options.commandHandler);
+        // Create CLI instance with commandHandler and messageQueue options
+        return createCLIInstance(
+          container,
+          fullConfig,
+          options.commandHandler,
+          options.messageQueue
+        );
       },
       (error) => Err(error),
       registrationResult
@@ -254,18 +263,28 @@ function registerServices(
 function createCLIInstance(
   container: CLIContainer,
   config: CLIConfig,
-  commandHandler?: ICommandHandler
+  commandHandler?: ICommandHandler,
+  messageQueue?: QiAsyncMessageQueue<QiMessage>
 ): Result<ICLIFramework, QiError> {
   try {
+    // v-0.6.1: Create default message queue if not provided
+    const actualMessageQueue =
+      messageQueue ||
+      new QiAsyncMessageQueueImpl<QiMessage>({
+        maxConcurrent: 1,
+        priorityQueuing: true,
+        autoCleanup: true,
+        enableStats: false,
+        messageTtl: 30000,
+      });
+
     // Resolve all dependencies with explicit types
     const terminal = container.resolve<ITerminal>('terminal');
     const inputManager = container.resolve<IInputManager>('inputManager');
     const progressRenderer = container.resolve<IProgressRenderer>('progressRenderer');
     const modeRenderer = container.resolve<IModeRenderer>('modeRenderer');
     const streamRenderer = container.resolve<IStreamRenderer>('streamRenderer');
-    const eventManager = container.resolve<IEventManager>('eventManager');
     const commandRouter = container.resolve<ICommandRouter>('commandRouter');
-    const agentConnector = container.resolve<IAgentConnector>('agentConnector');
 
     // Check all resolutions succeeded
     const dependencies = [
@@ -274,9 +293,7 @@ function createCLIInstance(
       progressRenderer,
       modeRenderer,
       streamRenderer,
-      eventManager,
       commandRouter,
-      agentConnector,
     ];
 
     for (const dep of dependencies) {
@@ -293,9 +310,8 @@ function createCLIInstance(
       (progressRenderer as any).value,
       (modeRenderer as any).value,
       (streamRenderer as any).value,
-      (eventManager as any).value,
       (commandRouter as any).value,
-      (agentConnector as any).value,
+      actualMessageQueue, // v-0.6.1: Use message queue instead of agentConnector
       config,
       commandHandler // Pass the commandHandler directly
     );

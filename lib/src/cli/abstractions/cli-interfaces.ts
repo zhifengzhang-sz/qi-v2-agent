@@ -39,7 +39,7 @@ export interface ICLIApplication {
 }
 
 export interface CLIConfig {
-  readonly framework: 'ink' | 'neo-blessed';
+  readonly framework: 'readline' | 'ink' | 'hybrid';
   readonly enableShellCommands?: boolean;
   readonly sessionPersistence?: boolean;
   readonly theme?: CLITheme;

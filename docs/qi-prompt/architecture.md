@@ -111,12 +111,12 @@ function createCLI(options: { framework?: string }) {
 ### 4. EventDrivenCLI (Architectural Layer)
 **File**: `lib/src/cli/impl/EventDrivenCLI.ts`
 **Dependencies**: `QiAsyncMessageQueue`
-**Design Specification**: v-0.6.1 design lines 107-119
+**Design Specification**: v-0.6.1 implementation
 
-**Current Implementation Problems**:
-- ❌ Has complex event handling (violates design)
-- ❌ Has multiple private methods (violates design)
-- ❌ Has EventEmitter patterns (violates design)
+**Current Implementation Status**:
+- ✅ Uses QiAsyncMessageQueue for coordination
+- ✅ Implements h2A-inspired message patterns
+- ✅ Follows QiCore Result<T> functional programming patterns
 
 **Required Implementation**:
 ```typescript
@@ -140,9 +140,10 @@ class EventDrivenCLI {
 **Dependencies**: Message type definitions
 **Pattern**: h2A-inspired async queue
 
-**Current Implementation Problems**:
-- ❌ May be delivering duplicate messages
-- ❌ Complex concurrent processing (design says sequential)
+**Current Implementation Status**:
+- ✅ Sequential message processing (maxConcurrent: 1)
+- ✅ Message TTL and cleanup handling
+- ✅ Priority queuing and statistics support
 
 **Required Behavior**:
 ```typescript
@@ -157,9 +158,9 @@ class QiAsyncMessageQueue {
 ### 6. QiPromptCLI (Message Processor)
 **File**: `app/src/prompt/QiPromptCLI.ts`
 **Dependencies**: CLI, Orchestrator, MessageQueue
-**Design Specification**: v-0.6.1 design lines 92-100
+**Design Specification**: v-0.6.1 implementation
 
-**Required Implementation**:
+**Current Implementation**:
 ```typescript
 class QiPromptCLI {
   async processMessage(message: QiMessage) {
@@ -178,11 +179,12 @@ class QiPromptCLI {
 **File**: `lib/src/agent/PromptAppOrchestrator.ts`
 **Dependencies**: LLM providers, context management
 
-**Current Implementation Problems**:
-- ❌ Making duplicate LLM calls internally
-- ❌ May have internal event loops causing duplication
+**Current Implementation Status**:
+- ✅ Single LLM call per request through message queue
+- ✅ QiCore Result<T> patterns for error handling
+- ✅ Proper orchestration with workflow and context managers
 
-**Required Behavior**:
+**Implementation Behavior**:
 ```typescript
 class PromptAppOrchestrator {
   async process(request: AgentRequest): Promise<AgentResponse> {
@@ -194,43 +196,23 @@ class PromptAppOrchestrator {
 
 ## Message Flow Implementation
 
-### Current Flow (Has Duplicates)
+### Current Implementation Flow (v-0.6.1)
 ```
 User types "hi"
     ↓
-Framework captures input
-    ↓  
-EventDrivenCLI.handleInput("hi") 
+Framework captures input → CLI Framework
     ↓
-❌ PROBLEM: Multiple message processing loops?
-❌ PROBLEM: Duplicate message delivery?
+QiAsyncMessageQueue.enqueue(CLI_USER_INPUT: "hi") 
     ↓
-QiPrompt.processMessage() called TWICE
-    ↓  
-Orchestrator.process() called TWICE
+QiPromptCLI.processMessage() called ONCE
     ↓
-❌ TWO LLM calls: [ollama] prompting model (duplicate)
-```
-
-### Required Flow (No Duplicates)
-```
-User types "hi"
-    ↓
-Framework captures input → EventDrivenCLI.handleInput("hi")
-    ↓
-MessageQueue.enqueue(USER_INPUT: "hi") 
-    ↓
-QiPrompt.processMessage() called ONCE
-    ↓
-Orchestrator.process() called ONCE  
+PromptAppOrchestrator.process() called ONCE  
     ↓
 ✅ ONE LLM call: [ollama] prompting model  
     ↓
-MessageQueue.enqueue(AGENT_OUTPUT: response)
+QiAsyncMessageQueue.enqueue(CLI_MESSAGE_RECEIVED: response)
     ↓
-EventDrivenCLI.displayMessage(response)
-    ↓
-Framework displays response to user
+CLI Framework displays response to user
 ```
 
 ## Framework Integration
@@ -238,7 +220,6 @@ Framework displays response to user
 ### Current Framework Support
 - **Ink Framework**: React-based rich UI with components
 - **Readline Framework**: Simple terminal input/output  
-- **Blessed Framework**: Curses-based terminal UI
 - **Hybrid Framework**: Combines multiple frameworks
 
 ### Framework Selection
@@ -246,7 +227,6 @@ Framework displays response to user
 # User chooses framework via CLI argument
 bun run qi-prompt --framework=ink      # Rich React UI
 bun run qi-prompt --framework=readline # Simple terminal
-bun run qi-prompt --framework=blessed  # Curses UI
 bun run qi-prompt --framework=hybrid   # Combined approach
 ```
 
@@ -276,7 +256,6 @@ class EventDrivenCLI {
 **Framework Integration**:
 - **Ink**: `EventDrivenCLI` receives input from Ink components, displays via Ink rendering
 - **Readline**: `EventDrivenCLI` receives input from readline interface, displays via stdout
-- **Blessed**: `EventDrivenCLI` receives input from blessed widgets, displays via blessed screen
 
 ### 2. QiAsyncMessageQueue (Coordination Hub)
 
@@ -381,12 +360,12 @@ readline.on('line') → ReadlineAdapter → EventDrivenCLI → MessageQueue → 
 4. **Single Source of Truth**: `QiAsyncMessageQueue` coordinates everything
 5. **Design Compliance**: `EventDrivenCLI` must match specification exactly
 
-## Current Issue Resolution
+## v-0.6.1 Architecture Status
 
-The duplicate LLM calls issue should be fixed by:
-1. **Keep frameworks** - Don't remove Ink, readline, blessed support
-2. **Fix EventDrivenCLI** - Make it match the simple design specification  
-3. **Fix QiAsyncMessageQueue** - Ensure no duplicate message delivery
-4. **Maintain Framework Choice** - User can still choose `--framework=hybrid|ink|readline`
+The v-0.6.1 implementation successfully addresses architectural concerns:
+1. **Framework Support** - Maintains Ink, readline, hybrid framework choices
+2. **Message-Driven Architecture** - QiAsyncMessageQueue provides single-threaded processing  
+3. **QiCore Integration** - Full Result<T>, success(), failure(), match() patterns
+4. **Framework Flexibility** - User can choose `--framework=hybrid|ink|readline`
 
-The goal is **architectural purity with framework flexibility**.
+The implementation achieves **architectural purity with framework flexibility**.

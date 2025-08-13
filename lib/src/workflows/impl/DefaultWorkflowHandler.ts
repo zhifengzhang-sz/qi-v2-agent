@@ -57,6 +57,17 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
       // Determine workflow type from options or detect from input
       const workflowType = this.determineWorkflowType(input, options.type);
 
+      // If no workflow detected, return success with original input (passthrough)
+      if (workflowType === null) {
+        return {
+          success: true,
+          data: {
+            output: input, // Pass through original input unchanged
+            metadata: { workflowType: 'none', passthrough: true },
+          },
+        };
+      }
+
       const workflowInput: WorkflowInput = {
         type: workflowType,
         content: input,
@@ -182,7 +193,7 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
 
   // Private helper methods
 
-  private determineWorkflowType(input: string, explicitType?: string): SimpleWorkflowClass {
+  private determineWorkflowType(input: string, explicitType?: string): SimpleWorkflowClass | null {
     if (explicitType) {
       return this.mapWorkflowTypeToClass(explicitType);
     }
@@ -192,8 +203,8 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
       return SimpleWorkflowClass.FILE_REFERENCE;
     }
 
-    // Default workflow type
-    return SimpleWorkflowClass.FILE_REFERENCE;
+    // No workflow detected - return null to indicate direct prompt processing
+    return null;
   }
 
   private mapWorkflowTypeToClass(workflowType: string): SimpleWorkflowClass {

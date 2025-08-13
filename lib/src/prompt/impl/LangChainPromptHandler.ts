@@ -71,6 +71,11 @@ export class LangChainPromptHandler implements IPromptHandler {
       // TODO: Future improvement - update multi-llm-ts to accept Message objects directly
       const formattedPrompt = this.messagesToString(messages);
 
+      console.log(`📝 [DEBUG] Final formatted prompt being sent to LLM:`);
+      console.log(`--- START PROMPT ---`);
+      console.log(formattedPrompt);
+      console.log(`--- END PROMPT ---`);
+
       // Execute with base handler
       const result = await this.baseHandler.complete(formattedPrompt, options);
 

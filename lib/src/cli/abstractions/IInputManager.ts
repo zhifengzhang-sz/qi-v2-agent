@@ -2,7 +2,7 @@
  * Input Manager abstraction interface
  *
  * Provides a framework-agnostic interface for input handling.
- * Implemented by ReadlineInputManager, InkInputManager, and BlessedInputManager.
+ * Implemented by ReadlineInputManager, InkInputManager, and Hybrid adapters.
  */
 
 export interface InputConfig {

@@ -27,16 +27,18 @@ export function LoadingIndicator({
     if (!showAnimation) return
 
     const interval = setInterval(() => {
-      setFrameIndex(prev => prev + 1)
-      
-      // Change processing message less frequently than animation frames
-      if (frameIndex % 6 === 0) {
-        setMessageIndex(prev => prev + 1)
-      }
+      setFrameIndex(prev => {
+        const newIndex = prev + 1;
+        // Change processing message less frequently than animation frames
+        if (newIndex % 6 === 0) {
+          setMessageIndex(prevMsg => prevMsg + 1);
+        }
+        return newIndex;
+      });
     }, defaultTheme.animation.interval)
 
     return () => clearInterval(interval)
-  }, [showAnimation, frameIndex])
+  }, [showAnimation])
 
   if (!showAnimation) {
     return <Text color={color}>{message}</Text>
