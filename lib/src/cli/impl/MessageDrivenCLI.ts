@@ -39,7 +39,7 @@ import type {
 } from '../abstractions/IUIComponent.js';
 
 /**
- * v-0.6.1 Pure Enqueue-Only CLI - Message-driven architecture
+ * v-0.6.1 Pure Message-Driven CLI Architecture
  *
  * This implementation delegates all operations to injected components:
  * - Terminal operations → ITerminal implementation
@@ -51,7 +51,7 @@ import type {
  * - Commands → ICommandRouter implementation
  * - Message coordination → QiAsyncMessageQueue (v-0.6.1)
  */
-export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
+export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   private config: CLIConfig;
   private state: CLIState;
   private isInitialized = false;
@@ -136,8 +136,8 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       return;
     }
 
-    this.terminal.writeLine('🚀 Event-Driven CLI Ready');
-    this.terminal.writeLine('=========================');
+    this.terminal.writeLine('🚀 Message-Driven CLI Ready');
+    this.terminal.writeLine('============================');
     this.terminal.writeLine('💡 Type /exit to quit');
     this.terminal.writeLine('');
 
@@ -202,8 +202,20 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   displayMessage(content: string, type?: CLIMessageType): void {
     // Only responsibility: display (EXACT design specification)
     this.terminal.writeLine(content);
+
+    // CRITICAL: Reset processing state when displaying final message
+    this.state.isProcessing = false;
+
     // Essential: Show prompt for next input
     this.inputManager.showPrompt();
+  }
+
+  /**
+   * CRITICAL: Reset processing state to stop infinite loading
+   * Called by QiPromptCLI after processing messages
+   */
+  resetProcessingState(): void {
+    this.state.isProcessing = false;
   }
 
   displayProgress(phase: string, progress: number, details?: string): void {
@@ -232,37 +244,37 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     this.showPrompt();
   }
 
-  // Event methods (simplified for v-0.6.1 message-driven architecture)
+  // Event methods (deprecated for v-0.6.1 message-driven architecture)
   on<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
     // v-0.6.1: Event system simplified - most events converted to messages
     console.warn(
-      `[EventDrivenCLI] Event '${event}' registration - consider using message queue instead`
+      `[MessageDrivenCLI] Event '${event}' registration - consider using message queue instead`
     );
   }
 
   off<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
     // v-0.6.1: Event system simplified
     console.warn(
-      `[EventDrivenCLI] Event '${event}' removal - consider using message queue instead`
+      `[MessageDrivenCLI] Event '${event}' removal - consider using message queue instead`
     );
   }
 
   emit<K extends keyof CLIEvents>(event: K, data: CLIEvents[K]): void {
     // v-0.6.1: Most events converted to messages
     console.warn(
-      `[EventDrivenCLI] Event '${event}' emission - consider using message queue instead`
+      `[MessageDrivenCLI] Event '${event}' emission - consider using message queue instead`
     );
   }
 
   // IAgentCLIBridge implementation (simplified for v-0.6.1)
   connectAgent(agent: any): void {
     // v-0.6.1: Agent connection handled through message queue
-    console.log('[EventDrivenCLI] Agent connection - handled via message queue');
+    console.log('[MessageDrivenCLI] Agent connection - handled via message queue');
   }
 
   disconnectAgent(): void {
     // v-0.6.1: Agent disconnection handled through message queue
-    console.log('[EventDrivenCLI] Agent disconnection - handled via message queue');
+    console.log('[MessageDrivenCLI] Agent disconnection - handled via message queue');
   }
 
   onAgentProgress(progress: { phase: string; progress: number; details?: string }): void {
@@ -305,6 +317,12 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   // Configuration
 
+  // State Management Integration (required by ICLIFramework)
+  subscribeToStateChanges(stateManager: any): void {
+    // v-0.6.1: MessageDrivenCLI uses message queue for state coordination
+    console.log('[MessageDrivenCLI] StateManager subscription - handled via message queue');
+  }
+
   updateConfig(newConfig: Partial<CLIConfig>): void {
     this.config = { ...this.config, ...newConfig };
 
@@ -327,7 +345,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   // Design specification: handleInput() method
   handleInput(input: string): void {
-    console.log(`[EventDrivenCLI] handleInput called with: "${input}"`);
+    console.log(`[MessageDrivenCLI] handleInput called with: "${input}"`);
     // Handle essential commands directly for functionality
     if (input.trim() === '/exit' || input.trim() === '/quit') {
       this.terminal.writeLine('👋 Goodbye!');
@@ -336,7 +354,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     }
 
     // All other input goes to message queue
-    console.log(`[EventDrivenCLI] Enqueuing to message queue`);
+    console.log(`[MessageDrivenCLI] Enqueuing to message queue`);
     const userInputMessage: UserInputMessage = {
       id: Math.random().toString(36).substring(2, 15),
       type: MessageType.USER_INPUT,
@@ -359,10 +377,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 /**
  * v-0.6.1 Factory function - requires message queue injection
  */
-export function createEventDrivenCLI(
+export function createMessageDrivenCLI(
   messageQueue: QiAsyncMessageQueue<QiMessage>,
   _config?: Partial<CLIConfig>
-): EventDrivenCLI {
+): MessageDrivenCLI {
   // v-0.6.1: Message queue is required for pure enqueue-only architecture
   // The actual implementation will be handled by the factory functions
   throw new Error('Use createCLI() from factories with messageQueue parameter instead');

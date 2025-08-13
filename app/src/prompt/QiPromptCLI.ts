@@ -159,13 +159,14 @@ export class QiPromptCLI {
     }
   }
 
-
   /**
    * Single message processor - EXACT design specification match
    */
   private async processMessage(message: QiMessage): Promise<void> {
-    this.debug.log(`🔄 Processing message: ID=${message.id}, type=${message.type}, input="${(message as any).input || 'N/A'}"`);
-    
+    this.debug.log(
+      `🔄 Processing message: ID=${message.id}, type=${message.type}, input="${(message as any).input || 'N/A'}"`
+    );
+
     switch (message.type) {
       case MessageType.USER_INPUT: {
         this.debug.log(`📝 Processing USER_INPUT: "${(message as any).input}"`);
@@ -174,10 +175,17 @@ export class QiPromptCLI {
           context: { sessionId: 'main', timestamp: new Date(), source: 'cli' },
         });
         this.debug.log(`🤖 LLM response: "${result.content}"`);
-        
+
         // FIX: Display result directly without re-enqueueing to prevent infinite loop
         this.debug.log(`📺 Displaying LLM response directly: "${result.content}"`);
         this.cli.displayMessage(result.content);
+
+        // CRITICAL: Reset processing state in CLI to stop infinite loading
+        if (typeof this.cli.resetProcessingState === 'function') {
+          this.cli.resetProcessingState();
+          this.debug.log(`🔄 Reset processing state in CLI`);
+        }
+
         this.debug.log(`✅ Message processing complete for ID=${message.id}`);
         break;
       }

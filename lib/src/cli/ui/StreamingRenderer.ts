@@ -69,7 +69,7 @@ export class StreamingRenderer {
       this.startCursor();
     }
 
-    this.emit('streamingStarted');
+    // v-0.6.1: Event emission removed - pure message-driven
   }
 
   /**
@@ -209,7 +209,7 @@ export class StreamingRenderer {
     this.isStreaming = false;
     this.clearStreamBuffer();
 
-    this.emit('streamingError', error);
+    // v-0.6.1: Event emission removed - pure message-driven
   }
 
   /**
@@ -227,7 +227,7 @@ export class StreamingRenderer {
     this.isStreaming = false;
     this.clearStreamBuffer();
 
-    this.emit('streamingComplete', this.currentContent);
+    // v-0.6.1: Event emission removed - pure message-driven
   }
 
   /**
@@ -245,7 +245,7 @@ export class StreamingRenderer {
 
     this.isStreaming = false;
 
-    this.emit('streamingCancelled');
+    // v-0.6.1: Event emission removed - pure message-driven
   }
 
   /**
@@ -358,33 +358,7 @@ export class StreamingRenderer {
     this.config = { ...this.config, ...newConfig };
   }
 
-  /**
-   * Basic event emitter functionality
-   */
-  private listeners: Record<string, Function[]> = {};
-
-  private emit(event: string, data?: any): void {
-    const eventListeners = this.listeners[event] || [];
-    for (const listener of eventListeners) {
-      listener(data);
-    }
-  }
-
-  on(event: string, listener: Function): void {
-    if (!this.listeners[event]) {
-      this.listeners[event] = [];
-    }
-    this.listeners[event].push(listener);
-  }
-
-  off(event: string, listener: Function): void {
-    if (!this.listeners[event]) return;
-
-    const index = this.listeners[event].indexOf(listener);
-    if (index > -1) {
-      this.listeners[event].splice(index, 1);
-    }
-  }
+  // v-0.6.1: Custom event emitter functionality completely removed - pure message-driven
 
   /**
    * Clean up resources
@@ -392,7 +366,7 @@ export class StreamingRenderer {
   destroy(): void {
     this.stopCursor();
     this.clearStreamBuffer();
-    this.listeners = {};
+    // v-0.6.1: No listeners to clean up - pure message-driven
   }
 }
 

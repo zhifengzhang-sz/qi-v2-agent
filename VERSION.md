@@ -1,5 +1,54 @@
 # Qi V2 Agent - Version History
 
+## v-0.6.2 - Pure Message-Driven Architecture (COMPLETED)
+
+### 📅 **Release Date**: 2025-08-13
+
+### 🎯 **Overview**
+Complete elimination of EventEmitter patterns in favor of pure message-driven architecture. This release removes all sync event handling, implements sequential message processing, and fixes state synchronization issues through unified message queue communication.
+
+### ✨ **Key Changes**
+
+#### 🔄 **Architecture Transformation**
+- **Pure Message Queue**: Complete removal of EventEmitter inheritance and event listeners ✅
+- **Sequential Processing**: All communication flows through QiAsyncMessageQueue ✅
+- **State Synchronization**: Single source of truth through message-driven state updates ✅
+- **Race Condition Elimination**: Sequential message processing prevents concurrent state conflicts ✅
+
+#### 🏗️ **Component Redesign**
+- **HotkeyManager**: Redesigned to send hotkey messages instead of events ✅
+- **ReadlineInputManager**: Pure message-driven input handling ✅
+- **MessageDrivenCLI**: Complete replacement of EventDrivenCLI ✅
+- **InkCLIFramework**: Added resetProcessingState() for proper state management ✅
+
+#### 🧹 **Cleanup & Removal**
+- **Deleted Files**: EventDrivenCLI, QiCoreEventManager, CLIAgentEvents ✅
+- **Event Imports**: Removed all EventEmitter imports and event handling ✅
+- **Dual Architecture**: Eliminated conflicting sync/async patterns ✅
+- **Processing State**: Fixed infinite loading through proper state reset ✅
+
+#### 🔧 **Technical Improvements**
+- **Message Types**: Comprehensive USER_INPUT, AGENT_OUTPUT, SYSTEM_CONTROL handling ✅
+- **Priority Processing**: HIGH priority for hotkeys, NORMAL for user input ✅
+- **Error Handling**: Graceful message processing with QiCore Result<T> patterns ✅
+- **TypeScript**: Full type safety with proper message queue integration ✅
+
+### 🎯 **Comparison with v-0.5.3**
+Unlike v-0.5.3's sync event-driven approach, v-0.6.2 uses pure async message processing:
+- **Reliability**: Eliminates race conditions through sequential processing
+- **Maintainability**: Loose coupling between components via message queue
+- **Scalability**: Better handling of complex operations and streaming
+- **Debugging**: Clear message flow and audit trail
+
+---
+
+## v-0.6.1 - Message Queue Implementation (SUPERSEDED)
+
+### 📅 **Release Date**: 2025-08-12
+**Note**: This version contained incomplete EventEmitter removal and has been superseded by v-0.6.2.
+
+---
+
 ## v-0.6.0 - Message Queue Structure (COMPLETED)
 
 ### 📅 **Release Date**: 2025-08-12  

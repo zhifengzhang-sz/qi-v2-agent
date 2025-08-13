@@ -4,8 +4,8 @@
 
 // Parser implementations removed - CLI should delegate to lib layer InputClassifier
 
-// Pure CLI implementation (recommended)
-export { type CLIFeedback, type CLIInput, createPureCLI, type ICLI, PureCLI } from './pure-cli.js';
+// v-0.6.1: Pure CLI implementation removed - event-based
+// export { type CLIFeedback, type CLIInput, createPureCLI, type ICLI, PureCLI } from './pure-cli.js';
 
 // Command handler implementations
 // export { CLICommandHandler, createCommandHandler, createCommandHandlerWithShell } from './command-handler.js' // DEPRECATED: Mixes CLI/agent concerns

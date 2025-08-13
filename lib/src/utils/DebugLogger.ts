@@ -1,7 +1,7 @@
 /**
  * Debug Logger Utility - Conditional Debug Logging
- * 
- * Provides consistent debug logging across the application that can be 
+ *
+ * Provides consistent debug logging across the application that can be
  * enabled/disabled via debug flag or environment variable.
  */
 
@@ -56,19 +56,17 @@ export function debugWarn(message: string, ...args: any[]): void {
  */
 export function createDebugLogger(componentName: string) {
   return {
-    log: (message: string, ...args: any[]) => 
-      debugLog(`[${componentName}] ${message}`, ...args),
-    
-    error: (message: string, ...args: any[]) => 
+    log: (message: string, ...args: any[]) => debugLog(`[${componentName}] ${message}`, ...args),
+
+    error: (message: string, ...args: any[]) =>
       debugError(`[${componentName}] ${message}`, ...args),
-    
-    warn: (message: string, ...args: any[]) => 
-      debugWarn(`[${componentName}] ${message}`, ...args),
-    
-    trace: (message: string, ...args: any[]) => 
+
+    warn: (message: string, ...args: any[]) => debugWarn(`[${componentName}] ${message}`, ...args),
+
+    trace: (message: string, ...args: any[]) =>
       debugLog(`🔍 [${componentName}] ${message}`, ...args),
-    
-    info: (message: string, ...args: any[]) => 
-      debugLog(`ℹ️  [${componentName}] ${message}`, ...args)
+
+    info: (message: string, ...args: any[]) =>
+      debugLog(`ℹ️  [${componentName}] ${message}`, ...args),
   };
 }

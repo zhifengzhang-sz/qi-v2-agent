@@ -47,6 +47,10 @@ export interface CLIConfig {
   streamingThrottle: number; // ms between characters
   maxBufferSize: number;
 
+  // State Management
+  stateManager?: any; // StateManager for UI updates
+  messageQueue?: any; // Message queue for communication
+
   // Debugging
   debug: boolean;
 }
@@ -87,10 +91,11 @@ export interface ICLIFramework {
   completeStreaming(message?: string): void;
   cancelStreaming(): void;
 
-  // Events
-  on<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void;
-  off<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void;
-  emit<K extends keyof CLIEvents>(event: K, data: CLIEvents[K]): void;
+  // State Management Integration
+  subscribeToStateChanges(stateManager: any): void;
+
+  // Pure message-driven state reset (v-0.6.1)
+  resetProcessingState?(): void;
 
   // Configuration
   updateConfig(config: Partial<CLIConfig>): void;

@@ -68,7 +68,7 @@ export class HybridCLIFramework extends InkCLIFramework {
   private logger: Logger | null = null; // QiCore logger instance
   private hybridConfig: any | null = null; // QiCore configuration (using any for now until ValidatedConfig is available)
 
-  constructor(config: CLIConfig, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
+  constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     super(config, messageQueue);
     this.initializeInfrastructure(config);
   }
@@ -76,7 +76,7 @@ export class HybridCLIFramework extends InkCLIFramework {
   /**
    * Initialize QiCore infrastructure (logger + config) with proper error handling
    */
-  private initializeInfrastructure(config: CLIConfig): void {
+  private initializeInfrastructure(config: Partial<CLIConfig>): void {
     // Initialize configuration first
     this.initializeConfiguration();
 

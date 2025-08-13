@@ -20,7 +20,6 @@ export {
   checkFrameworkSupport,
   createCLI,
   createCLIAsync,
-  createEventDrivenCLI,
   createValidatedCLI,
   getAvailableFrameworks,
   getFrameworkSupport,

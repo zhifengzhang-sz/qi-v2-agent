@@ -23,76 +23,113 @@ Qi-Prompt v0.6.1 implements a **Pure Message-Driven Architecture** inspired by t
 
 ## System Architecture Overview
 
-### Container Diagram
+### System Architecture Overview
 
 ```mermaid
-C4Container
-    title Qi-Prompt v0.6.1 - Container Diagram
+flowchart TD
+    User([👤 Developer]) --> CLI[🖥️ CLI Framework<br/>React/Ink UI]
     
-    Person(user, "Developer", "User interacting with AI assistant")
+    subgraph "Qi-Prompt Application"
+        CLI --> Queue[📬 Message Queue<br/>h2A Async Iterator]
+        Queue --> App[⚙️ QiPromptApp<br/>Main Coordinator]
+        App --> Orchestrator[🎯 Orchestrator<br/>Request Router]
+        Orchestrator --> Workflows[📋 Workflows<br/>Context Manager]
+        StateManager[🏛️ State Manager<br/>Config & Session Store]
+        App --> StateManager
+        Orchestrator --> StateManager
+        CLI --> StateManager
+    end
     
-    Container_Boundary(qiprompt, "Qi-Prompt Application") {
-        Container(app, "QiPromptApp", "TypeScript/Bun", "Main application coordinator")
-        Container(cli, "CLI Framework", "React/Ink", "User interface and input handling")
-        Container(messagequeue, "Message Queue", "TypeScript", "h2A-inspired async message coordination")
-        Container(orchestrator, "Orchestrator", "TypeScript", "LLM request routing and processing")
-        Container(workflows, "Workflows", "TypeScript", "Context and workflow management")
-    }
+    Orchestrator --> LLM[🤖 LLM Provider<br/>Ollama/OpenAI]
+    StateManager --> Storage[(💾 Context Storage<br/>History & Project Data)]
     
-    System_Ext(llm, "LLM Provider", "Ollama/OpenAI/etc.")
-    SystemDb_Ext(context, "Context Storage", "Conversation history and project context")
+    LLM --> Orchestrator
+    Orchestrator --> CLI
     
-    Rel(user, cli, "Enters prompts and commands")
-    Rel(cli, messagequeue, "Enqueues user messages")
-    Rel(messagequeue, app, "Sequential message processing")
-    Rel(app, orchestrator, "Routes requests")
-    Rel(orchestrator, workflows, "Context management")
-    Rel(orchestrator, llm, "LLM API calls")
-    Rel(orchestrator, context, "Stores/retrieves context")
-    Rel(orchestrator, cli, "Returns responses")
+    classDef userNode fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef appNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef stateNode fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px
+    classDef extNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class User userNode
+    class CLI,Queue,App,Orchestrator,Workflows appNode
+    class StateManager stateNode
+    class LLM,Storage extNode
 ```
 
-### Component Diagram
+### Component Architecture
 
 ```mermaid
-C4Component
-    title Qi-Prompt v0.6.1 - Component Diagram
+graph TB
+    subgraph "🎯 Core Application"
+        App[QiPromptApp<br/>Main Coordinator]
+        CLI[QiPromptCLI<br/>Message Processor]
+        App --> CLI
+    end
     
-    Container_Boundary(app, "Qi-Prompt Application") {
-        Component(qipromptapp, "QiPromptApp", "Main coordinator", "Initializes and coordinates all components")
-        Component(qipromptcli, "QiPromptCLI", "Message processor", "Core message processing loop")
+    subgraph "🖥️ CLI Framework (React/Ink)"
+        Framework[InkCLIFramework<br/>UI Controller]
+        Layout[MainLayout<br/>UI Layout]
+        Output[OutputDisplay<br/>Conversation View]
+        Input[InputBox<br/>User Input]
+        Loading[LoadingIndicator<br/>Progress Display]
         
-        Container_Boundary(cli_framework, "CLI Framework") {
-            Component(inkcli, "InkCLIFramework", "React/Ink UI", "User interface with React components")
-            Component(mainlayout, "MainLayout", "React Component", "Main UI layout and input box")
-            Component(outputdisplay, "OutputDisplay", "React Component", "Conversation display")
-            Component(inputbox, "InputBox", "React Component", "User input handling")
-        }
-        
-        Container_Boundary(messaging, "Message System") {
-            Component(messagequeue, "QiAsyncMessageQueue", "Async Queue", "h2A pattern message coordination")
-            Component(messagetypes, "Message Types", "TypeScript", "USER_INPUT, AGENT_OUTPUT, etc.")
-        }
-        
-        Container_Boundary(processing, "Request Processing") {
-            Component(orchestrator, "PromptAppOrchestrator", "Router", "Input classification and LLM routing")
-            Component(prompthandler, "LangChainPromptHandler", "LLM Interface", "LLM API integration")
-            Component(contextmanager, "ContextManager", "Context", "Conversation history management")
-            Component(workflowhandler, "WorkflowHandler", "Workflows", "File reference and workflow processing")
-        }
-    }
+        Framework --> Layout
+        Layout --> Output
+        Layout --> Input
+        Layout --> Loading
+    end
     
-    Rel(qipromptapp, qipromptcli, "initializes")
-    Rel(qipromptapp, inkcli, "creates")
-    Rel(qipromptcli, messagequeue, "iterates")
-    Rel(inkcli, messagequeue, "enqueues")
-    Rel(qipromptcli, orchestrator, "processes")
-    Rel(orchestrator, prompthandler, "calls LLM")
-    Rel(orchestrator, contextmanager, "manages context")
-    Rel(orchestrator, workflowhandler, "handles workflows")
-    Rel(inkcli, mainlayout, "renders")
-    Rel(mainlayout, outputdisplay, "displays messages")
-    Rel(mainlayout, inputbox, "handles input")
+    subgraph "📬 Message System"
+        Queue[QiAsyncMessageQueue<br/>h2A Iterator]
+        Types[Message Types<br/>USER_INPUT, AGENT_OUTPUT]
+        Queue --> Types
+    end
+    
+    subgraph "🏛️ State Management"
+        StateManager[StateManager<br/>Central State Store]
+        Config[AppConfig<br/>Configuration]
+        Session[SessionData<br/>Conversation History]
+        Models[ModelInfo<br/>LLM Models]
+        Context[AppContext<br/>Environment Data]
+        
+        StateManager --> Config
+        StateManager --> Session
+        StateManager --> Models
+        StateManager --> Context
+    end
+    
+    subgraph "⚙️ Request Processing"
+        Orchestrator[PromptAppOrchestrator<br/>Request Router]
+        PromptHandler[LangChainPromptHandler<br/>LLM Interface]
+        ContextManager[ContextManager<br/>History Management]
+        WorkflowHandler[WorkflowHandler<br/>File Processing]
+        
+        Orchestrator --> PromptHandler
+        Orchestrator --> ContextManager
+        Orchestrator --> WorkflowHandler
+    end
+    
+    CLI -.->|iterates| Queue
+    Framework -->|enqueues| Queue
+    CLI -->|processes| Orchestrator
+    Framework <-->|displays| CLI
+    App -->|initializes| StateManager
+    CLI -->|reads state| StateManager
+    Framework -->|updates state| StateManager
+    Orchestrator -->|manages config| StateManager
+    
+    classDef coreNode fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef uiNode fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef msgNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef stateNode fill:#f1f8e9,stroke:#388e3c,stroke-width:3px
+    classDef procNode fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    
+    class App,CLI coreNode
+    class Framework,Layout,Output,Input,Loading uiNode
+    class Queue,Types msgNode
+    class StateManager,Config,Session,Models,Context stateNode
+    class Orchestrator,PromptHandler,ContextManager,WorkflowHandler procNode
 ```
 
 ### Message Flow Sequence
@@ -104,24 +141,30 @@ sequenceDiagram
     participant F as InkCLIFramework
     participant Q as QiAsyncMessageQueue
     participant C as QiPromptCLI
+    participant S as StateManager
     participant O as PromptAppOrchestrator
     participant L as LLM Provider
     participant D as OutputDisplay
     
     U->>I: Types "hello"
     I->>F: handleInput("hello")
+    F->>S: Update processing state
     F->>D: Add user message to display
     F->>Q: enqueue(USER_INPUT)
     Note over Q: h2A async iterator
     Q->>C: yield message
+    C->>S: Read current model config
     C->>O: process(request)
+    O->>S: Get LLM configuration
     O->>O: classify input as 'prompt'
     O->>L: LLM API call
     L-->>O: Response: "How can I help?"
+    O->>S: Add to conversation history
     O-->>C: Return response
     C->>F: displayMessage(response)
+    F->>S: Reset processing state
     F->>D: Add assistant message to display
-    Note over F: Reset processing state
+    Note over F: Ready for new input
 ```
 
 ### Class Relationship Diagram
@@ -132,6 +175,7 @@ classDiagram
         -messageQueue: QiAsyncMessageQueue
         -orchestrator: PromptAppOrchestrator
         -cli: ICLIFramework
+        -stateManager: IStateManager
         +initialize()
         +run()
     }
@@ -142,6 +186,22 @@ classDiagram
         -cli: ICLIFramework
         +startMessageProcessingLoop()
         -processMessage(message)
+    }
+    
+    class StateManager {
+        -config: AppConfig
+        -currentModel: string
+        -currentMode: AppMode
+        -context: AppContext
+        -session: SessionData
+        -models: Map~string,ModelInfo~
+        +getConfig(): AppConfig
+        +getCurrentModel(): string
+        +setCurrentModel(modelId)
+        +getPromptConfig(): LLMRoleConfig
+        +updatePromptModel(model)
+        +addConversationEntry(entry)
+        +subscribe(listener): function
     }
     
     class QiAsyncMessageQueue {
@@ -174,9 +234,13 @@ classDiagram
     QiPromptApp --> QiAsyncMessageQueue
     QiPromptApp --> PromptAppOrchestrator
     QiPromptApp --> InkCLIFramework
+    QiPromptApp --> StateManager
     QiPromptCLI --> QiAsyncMessageQueue
     QiPromptCLI --> PromptAppOrchestrator
+    QiPromptCLI --> StateManager
     InkCLIFramework --> QiAsyncMessageQueue
+    InkCLIFramework --> StateManager
+    PromptAppOrchestrator --> StateManager
     PromptAppOrchestrator --> IPromptHandler
     PromptAppOrchestrator --> IContextManager
     PromptAppOrchestrator --> IWorkflowHandler
@@ -200,6 +264,13 @@ enum MessageType {
 - `AGENT_OUTPUT`: Created by QiPromptCLI, consumed by InkCLIFramework
 - `SYSTEM_CONTROL`: Created by QiPromptCLI, consumed by system components
 - `CLI_MESSAGE_RECEIVED`: Internal CLI framework communication
+
+**State Management Integration:**
+- `StateManager`: Central store for configuration, session data, and conversation history
+- Components read configuration and current state from StateManager
+- StateManager handles LLM provider configuration and model selection
+- Conversation history is automatically maintained in StateManager
+- State changes trigger notifications to subscribed components
 
 ### 2. Critical Message Flow Patterns
 
@@ -231,7 +302,29 @@ enum MessageType {
 
 **Key Rule**: LLM responses are displayed **directly** without re-enqueueing to prevent loops.
 
-#### Pattern 2: System Control Flow
+#### Pattern 2: State Management Flow
+```
+┌─────────────┐    Config Read    ┌─────────────┐
+│QiPromptCLI  │ ────────────────► │StateManager │
+│             │                   │             │
+└─────────────┘                   └─────────────┘
+       ▲                                  │
+       │                                  ▼
+       │                           ┌─────────────┐
+       │                           │Conversation │
+       │                           │History      │
+       │                           └─────────────┘
+       │                                  │
+       │          State Update            │
+       └──────────────────────────────────┘
+
+┌─────────────┐   Model Config    ┌─────────────┐
+│Orchestrator │ ◄───────────────► │StateManager │
+│             │                   │             │
+└─────────────┘                   └─────────────┘
+```
+
+#### Pattern 3: System Control Flow
 ```
 ┌─────────────┐  SYSTEM_CONTROL  ┌─────────────┐
 │QiPromptCLI  │ ────────────────► │QiAsyncMsgQ  │
@@ -315,7 +408,54 @@ this.messageQueue.enqueue(agentOutputMessage);
 this.cli.displayMessage(result.content);
 ```
 
-### 2. QiAsyncMessageQueue (h2A Message Hub)
+### 2. StateManager (Central State Store)
+
+**Responsibilities:**
+- Manage application configuration (models, providers, settings)
+- Maintain session data and conversation history
+- Handle LLM provider configuration and credentials
+- Provide state change notifications to components
+- Store user preferences and context information
+
+**Core State Components:**
+```typescript
+interface StateManager {
+  // Configuration Management
+  getConfig(): AppConfig
+  updateConfig(updates: Partial<AppConfig>): void
+  loadLLMConfig(configPath: string): Promise<void>
+  
+  // Model Management
+  getCurrentModel(): string
+  setCurrentModel(modelId: string): void
+  getPromptConfig(): LLMRoleConfig | null
+  updatePromptModel(model: string): void
+  updatePromptProvider(provider: string): void
+  
+  // Session Management
+  getCurrentSession(): SessionData
+  createSession(userId?: string): SessionData
+  addConversationEntry(entry): void
+  clearConversationHistory(): void
+  
+  // State Notifications
+  subscribe(listener: StateChangeListener): () => void
+}
+```
+
+**State Change Patterns:**
+- **Configuration Changes**: Model selection, provider switching
+- **Session Updates**: New conversation entries, context changes
+- **Mode Transitions**: Processing state, error states
+- **Notification System**: Observer pattern for component updates
+
+**Integration Points:**
+- `QiPromptApp`: Initializes StateManager during startup
+- `QiPromptCLI`: Reads current model config for request processing
+- `InkCLIFramework`: Updates processing state and UI state
+- `PromptAppOrchestrator`: Gets LLM configuration and adds conversation history
+
+### 3. QiAsyncMessageQueue (h2A Message Hub)
 
 **Design Principles:**
 - **Single Producer, Single Consumer**: One iterator, multiple enqueuers
@@ -458,8 +598,197 @@ private handleUserInput(input: string): void {
 - **Cause**: Multiple processing loops or EventEmitter usage
 - **Solution**: Ensure single message processing loop
 
+## Use Case Scenarios
+
+Understanding how different types of user input flow through the system is crucial for comprehending the architecture. Here are detailed scenarios:
+
+### Scenario 1: Command Execution (`/status`)
+
+**Flow**: User types `/status` → CLI Framework → Message Queue → QiPromptCLI → PromptAppOrchestrator → StateManager → Response
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant I as InputBox
+    participant F as InkCLIFramework
+    participant Q as QiAsyncMessageQueue
+    participant C as QiPromptCLI
+    participant O as PromptAppOrchestrator
+    participant S as StateManager
+    participant D as OutputDisplay
+    
+    U->>I: Types "/status"
+    I->>F: handleInput("/status")
+    F->>D: Add user message to display
+    F->>Q: enqueue(USER_INPUT, content="/status")
+    Note over Q: Message queued with type USER_INPUT
+    Q->>C: yield message (via h2A iterator)
+    C->>O: process(request)
+    Note over O: parseInput() detects "/" → command type
+    O->>O: handleCommand("status")
+    O->>S: getCurrentModel(), getCurrentMode(), getState()
+    S-->>O: Return system status data
+    O->>S: addConversationEntry(command + response)
+    O-->>C: Return CommandResult with formatted status
+    C->>F: displayMessage(statusResult.content)
+    F->>D: Add system response to display
+    Note over F: Command execution complete
+```
+
+**Key Points:**
+1. **Input Classification**: `parseInput()` detects "/" prefix → command type
+2. **Command Routing**: Orchestrator routes to `handleCommand()` method
+3. **State Access**: Command handler directly queries StateManager for current status
+4. **Synchronous Response**: No LLM call needed, immediate response from StateManager
+5. **History Tracking**: Command and response added to conversation history
+
+### Scenario 2: LLM Prompt (`hello`)
+
+**Flow**: User types `hello` → CLI Framework → Message Queue → QiPromptCLI → PromptAppOrchestrator → LLM Provider → Response
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant I as InputBox
+    participant F as InkCLIFramework
+    participant Q as QiAsyncMessageQueue
+    participant C as QiPromptCLI
+    participant O as PromptAppOrchestrator
+    participant S as StateManager
+    participant L as LLM Provider
+    participant D as OutputDisplay
+    
+    U->>I: Types "hello"
+    I->>F: handleInput("hello")
+    F->>S: Update processing state (isProcessing=true)
+    F->>D: Add user message to display
+    F->>Q: enqueue(USER_INPUT, content="hello")
+    Note over Q: Message queued with type USER_INPUT
+    Q->>C: yield message (via h2A iterator)
+    C->>S: Read current model configuration
+    C->>O: process(request)
+    Note over O: parseInput() detects plain text → prompt type
+    O->>O: handlePrompt("hello")
+    O->>S: getPromptConfig() for LLM settings
+    S-->>O: Return model, provider, temperature, etc.
+    O->>L: LLM API call with prompt + config
+    Note over L: LLM processing (async)
+    L-->>O: Response: "How can I help you today?"
+    O->>S: addConversationEntry(prompt + response)
+    O-->>C: Return PromptResult with LLM response
+    C->>F: displayMessage(response.content)
+    F->>S: Reset processing state (isProcessing=false)
+    F->>D: Add assistant message to display
+    Note over F: Ready for next input
+```
+
+**Key Points:**
+1. **Input Classification**: `parseInput()` detects no special prefix → prompt type
+2. **Async Processing**: UI shows loading indicator during LLM call
+3. **Configuration Retrieval**: Orchestrator gets LLM config from StateManager
+4. **External API Call**: Actual LLM provider integration
+5. **State Updates**: Processing state managed through StateManager
+
+### Scenario 3: Workflow Reference (`@src/app.ts`)
+
+**Flow**: User types `@src/app.ts` → CLI Framework → Message Queue → QiPromptCLI → PromptAppOrchestrator → WorkflowHandler → Response
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant I as InputBox
+    participant F as InkCLIFramework
+    participant Q as QiAsyncMessageQueue
+    participant C as QiPromptCLI
+    participant O as PromptAppOrchestrator
+    participant W as WorkflowHandler
+    participant S as StateManager
+    participant D as OutputDisplay
+    
+    U->>I: Types "@src/app.ts"
+    I->>F: handleInput("@src/app.ts")
+    F->>D: Add user message to display
+    F->>Q: enqueue(USER_INPUT, content="@src/app.ts")
+    Note over Q: Message queued with type USER_INPUT
+    Q->>C: yield message (via h2A iterator)
+    C->>O: process(request)
+    Note over O: parseInput() detects "@" + path → workflow type
+    O->>O: handleWorkflow("@src/app.ts")
+    O->>W: processFileReference("src/app.ts")
+    Note over W: Read file, analyze content, prepare context
+    W-->>O: Return file analysis and context
+    O->>S: addConversationEntry(workflow + response)
+    O-->>C: Return WorkflowResult with file info
+    C->>F: displayMessage(fileAnalysis.content)
+    F->>D: Add workflow response to display
+    Note over F: File context now available
+```
+
+**Key Points:**
+1. **Input Classification**: `parseInput()` detects "@" + file path → workflow type
+2. **File Processing**: WorkflowHandler reads and analyzes the referenced file
+3. **Context Building**: File content becomes part of conversation context
+4. **No LLM Call**: File analysis is synchronous, no external API needed
+5. **Context Enrichment**: File information available for subsequent prompts
+
+### Scenario 4: Error Handling
+
+**Flow**: User types `/invalid` → Error Response
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as InkCLIFramework
+    participant Q as QiAsyncMessageQueue
+    participant C as QiPromptCLI
+    participant O as PromptAppOrchestrator
+    participant D as OutputDisplay
+    
+    U->>F: Types "/invalid"
+    F->>Q: enqueue(USER_INPUT, content="/invalid")
+    Q->>C: yield message
+    C->>O: process(request)
+    Note over O: parseInput() → command type
+    O->>O: handleCommand("invalid")
+    Note over O: Command not found
+    O-->>C: Return ErrorResult("Command not found")
+    C->>F: displayMessage(error.content)
+    F->>D: Add error message to display
+    Note over F: Error handled gracefully
+```
+
+## Architecture Flow Patterns Summary
+
+### 1. Message Processing Pipeline
+```
+User Input → InputBox → InkCLIFramework → MessageQueue → QiPromptCLI → PromptAppOrchestrator
+```
+
+### 2. Input Classification Logic
+```typescript
+function parseInput(input: string): ParsedInput {
+  if (input.startsWith('/')) return { type: 'command' }
+  if (input.includes('@') && hasPathPattern) return { type: 'workflow' }
+  return { type: 'prompt' }
+}
+```
+
+### 3. Response Routing
+- **Commands**: StateManager → Immediate response
+- **Prompts**: LLM Provider → Async response  
+- **Workflows**: WorkflowHandler → File system → Context response
+- **Errors**: ErrorHandler → Error response
+
+### 4. State Management Touch Points
+- **Input Processing**: Read current model configuration
+- **Command Execution**: Access system state and configuration
+- **Response Handling**: Update conversation history
+- **UI Updates**: Manage processing state indicators
+
 ## Conclusion
 
 The v0.6.1 architecture successfully eliminates race conditions through pure message-driven coordination while maintaining responsive user experience. The key insight is that **message flow topology** is as important as individual component design - circular dependencies in message flow create subtle but critical bugs that are hard to detect and debug.
+
+The use case scenarios demonstrate how the same message queue infrastructure handles different types of user input through intelligent routing and classification, while maintaining consistent state management throughout the system.
 
 Future development should maintain these architectural principles while extending functionality through additional message types and processing patterns.

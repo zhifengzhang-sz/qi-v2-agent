@@ -182,14 +182,34 @@ class QiPromptApp {
       // v-0.6.1: Use proper CLI framework with message queue injection
       const { createCLI } = await import('../../../lib/src/cli/index.js');
 
-      this.cli = createCLI({
+      const cliResult = createCLI({
         framework: this.framework || 'hybrid',
         enableHotkeys: true,
         enableStreaming: true,
         debug: this.debugMode,
         messageQueue: this.messageQueue, // v-0.6.1: Pass message queue to framework
+        stateManager: this.stateManager, // v-0.6.1: Pass state manager for UI updates
       });
-      console.log('✅ CLI framework created');
+
+      // Check if this is already a CLI object (not a Result)
+      if (typeof (cliResult as any)?.initialize === 'function') {
+        console.log('✅ CLI framework created');
+        this.cli = cliResult as any;
+      } else {
+        // Use QiCore functional pattern to unwrap the Result
+        this.cli = match(
+          (cli) => {
+            console.log('✅ CLI framework created');
+            return cli;
+          },
+          (error) => {
+            throw new Error(
+              `Failed to create CLI framework: ${error instanceof Error ? error.message : String(error)}`
+            );
+          },
+          cliResult as any
+        );
+      }
 
       // CLI will be initialized by QiPromptCore
 
