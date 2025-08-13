@@ -202,6 +202,11 @@ export class StateManager implements IStateManager {
                 this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider
               ]?.models?.[0]?.defaultParameters?.max_tokens,
           };
+
+          // CRITICAL FIX: Synchronize currentModel with promptConfig.model during initialization
+          if (this.promptConfig.model) {
+            this.currentModel = this.promptConfig.model;
+          }
         }
 
         // Update app config with the config path

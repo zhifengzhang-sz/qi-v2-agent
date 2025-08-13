@@ -1,34 +1,60 @@
 /**
- * QiPrompt Core - v-0.6.1 Pure Message-Driven Architecture
+ * QiPrompt Core - v-0.6.3 Pure Message-Driven Architecture with QiCore Integration
  *
  * Simple message processing loop following h2A pattern and QiCore functional patterns.
  * Matches the exact design specification in docs/qi-prompt/architecture.md
  */
 
-import type { ICommandHandler } from '@qi/agent/command';
-import type { IContextManager } from '@qi/agent/context';
-import type { IPromptHandler } from '@qi/agent/prompt';
-import type { IStateManager } from '@qi/agent/state';
-import { create, failure, flatMap, match, type QiError, type Result, success } from '@qi/base';
-import type { AgentRequest } from '../../../lib/src/agent/abstractions/index.js';
-import type { PromptAppOrchestrator } from '../../../lib/src/agent/PromptAppOrchestrator.js';
-import type { ICLIFramework } from '../../../lib/src/cli/abstractions/ICLIFramework.js';
-import type { QiAsyncMessageQueue } from '../../../lib/src/messaging/impl/QiAsyncMessageQueue.js';
-import type {
-  CLIMessageReceivedMessage,
-  CLIUserInputMessage,
-} from '../../../lib/src/messaging/types/CLIMessageTypes.js';
-import type {
-  AgentOutputMessage,
-  QiMessage,
-  SystemControlMessage,
-} from '../../../lib/src/messaging/types/MessageTypes.js';
-import { MessagePriority, MessageType } from '../../../lib/src/messaging/types/MessageTypes.js';
-import type { IWorkflowHandler } from '../../../lib/src/workflows/interfaces/IWorkflowHandler.js';
-import { createDebugLogger } from '../../../lib/src/utils/DebugLogger.js';
+import type { PromptAppOrchestrator } from '@qi/agent/agent/PromptAppOrchestrator';
+import type { ICLIFramework } from '@qi/agent/cli/abstractions/ICLIFramework';
+import type { QiAsyncMessageQueue } from '@qi/agent/messaging/impl/QiAsyncMessageQueue';
+import type { QiMessage, SystemControlMessage } from '@qi/agent/messaging/types/MessageTypes';
+import { MessagePriority, MessageType } from '@qi/agent/messaging/types/MessageTypes';
+import {
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+  systemError,
+} from '@qi/base';
+
+// Simple logger interface (fallback for @qi/core/logger)
+interface SimpleLogger {
+  info: (message: string, data?: any, metadata?: any) => void;
+  error: (message: string, data?: any, metadata?: any) => void;
+  warn: (message: string, data?: any, metadata?: any) => void;
+  debug: (message: string, data?: any, metadata?: any) => void;
+}
+
+const createLogger = (config: {
+  level: string;
+  pretty: boolean;
+}): Result<SimpleLogger, QiError> => {
+  const levels = { debug: 0, info: 1, warn: 2, error: 3 };
+  const currentLevel = levels[config.level as keyof typeof levels] || 1;
+
+  const log = (logLevel: string, message: string, _data?: any, metadata?: any) => {
+    if (levels[logLevel as keyof typeof levels] >= currentLevel) {
+      const timestamp = new Date().toISOString();
+      if (config.pretty && metadata) {
+        console.log(`[${timestamp}] ${logLevel.toUpperCase()}: ${message}`, metadata);
+      } else {
+        console.log(`[${timestamp}] ${logLevel.toUpperCase()}: ${message}`);
+      }
+    }
+  };
+
+  return success({
+    info: (msg, data, meta) => log('info', msg, data, meta),
+    error: (msg, data, meta) => log('error', msg, data, meta),
+    warn: (msg, data, meta) => log('warn', msg, data, meta),
+    debug: (msg, data, meta) => log('debug', msg, data, meta),
+  });
+};
 
 /**
- * QiPrompt Core - Simple message processor matching v-0.6.1 design exactly
+ * QiPrompt Core - Simple message processor matching v-0.6.3 design exactly
  */
 export class QiPromptCLI {
   private messageQueue: QiAsyncMessageQueue<QiMessage>;
@@ -36,7 +62,7 @@ export class QiPromptCLI {
   private orchestrator: PromptAppOrchestrator;
   private isRunning = false;
   private processingStarted = false;
-  private debug = createDebugLogger('QiPromptCLI');
+  private logger!: SimpleLogger;
 
   constructor(
     cli: ICLIFramework,
@@ -46,154 +72,249 @@ export class QiPromptCLI {
     this.cli = cli;
     this.orchestrator = orchestrator;
     this.messageQueue = messageQueue;
+
+    // Initialize QiCore logger with fallback
+    const loggerResult = createLogger({ level: 'info', pretty: true });
+    this.logger = match(
+      (logger) => logger,
+      () => ({
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      }),
+      loggerResult
+    );
   }
 
   /**
    * Initialize and start the message processing loop
    */
   async initialize(): Promise<Result<void, QiError>> {
-    try {
-      // Initialize CLI
-      await this.cli.initialize();
+    return fromAsyncTryCatch(
+      async () => {
+        // Initialize CLI
+        await this.cli.initialize();
 
-      // Initialize orchestrator
-      await this.orchestrator.initialize();
+        // Initialize orchestrator
+        await this.orchestrator.initialize();
 
-      // v-0.6.1: No CLI event handlers - pure message queue communication only
+        // v-0.6.3: No CLI event handlers - pure message queue communication only
 
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        create(
-          'INITIALIZATION_FAILED',
-          `Failed to initialize: ${error instanceof Error ? error.message : String(error)}`,
-          'SYSTEM'
-        )
-      );
-    }
+        return undefined;
+      },
+      (error) =>
+        systemError('Failed to initialize QiPromptCLI', {
+          originalError: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          component: 'QiPromptCLI',
+          step: 'initialization',
+        })
+    );
   }
 
   /**
    * Start message processing loop (h2A pattern)
    */
   async start(): Promise<Result<void, QiError>> {
-    try {
-      this.isRunning = true;
-      await this.cli.start();
+    return fromAsyncTryCatch(
+      async () => {
+        this.isRunning = true;
+        await this.cli.start();
 
-      // Start message processing loop
-      this.startMessageProcessingLoop();
+        // Start message processing loop
+        this.startMessageProcessingLoop();
 
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        create(
-          'START_FAILED',
-          `Failed to start: ${error instanceof Error ? error.message : String(error)}`,
-          'SYSTEM'
-        )
-      );
-    }
+        return undefined;
+      },
+      (error) =>
+        systemError('Failed to start QiPromptCLI', {
+          originalError: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          component: 'QiPromptCLI',
+          step: 'start',
+        })
+    );
   }
 
   /**
    * Shutdown message processing
    */
   async shutdown(): Promise<Result<void, QiError>> {
-    try {
-      this.isRunning = false;
+    return fromAsyncTryCatch(
+      async () => {
+        this.isRunning = false;
 
-      // Send shutdown signal
-      const shutdownMessage: SystemControlMessage = {
-        id: Math.random().toString(36).substring(2, 15),
-        type: MessageType.SYSTEM_CONTROL,
-        timestamp: new Date(),
-        priority: MessagePriority.HIGH,
-        action: 'shutdown',
-        reason: 'QiPromptCLI shutdown requested',
-        immediate: true,
-      };
-      this.messageQueue.enqueue(shutdownMessage);
-      this.messageQueue.done();
+        // Send shutdown signal
+        const shutdownMessage: SystemControlMessage = {
+          id: Math.random().toString(36).substring(2, 15),
+          type: MessageType.SYSTEM_CONTROL,
+          timestamp: new Date(),
+          priority: MessagePriority.HIGH,
+          action: 'shutdown',
+          reason: 'QiPromptCLI shutdown requested',
+          immediate: true,
+        };
+        this.messageQueue.enqueue(shutdownMessage);
+        this.messageQueue.done();
 
-      await this.cli.shutdown();
-      await this.orchestrator.shutdown();
+        await this.cli.shutdown();
+        await this.orchestrator.shutdown();
 
-      return success(undefined);
-    } catch (error) {
-      return failure(
-        create(
-          'SHUTDOWN_FAILED',
-          `Shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
-          'SYSTEM'
-        )
-      );
-    }
+        return undefined;
+      },
+      (error) =>
+        systemError('QiPromptCLI shutdown failed', {
+          originalError: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          component: 'QiPromptCLI',
+          step: 'shutdown',
+        })
+    );
   }
 
   /**
-   * Core message processing loop - matches design.v-0.6.1.md exactly
+   * Core message processing loop - matches design.v-0.6.3.md exactly
    */
   private async startMessageProcessingLoop(): Promise<void> {
     if (this.processingStarted) {
-      this.debug.warn('Message processing loop already started - preventing duplicate');
+      this.logger.warn(
+        'Message processing loop already started - preventing duplicate',
+        undefined,
+        {
+          component: 'QiPromptCLI',
+          method: 'startMessageProcessingLoop',
+        }
+      );
       return;
     }
     this.processingStarted = true;
 
-    try {
-      this.debug.log('🔁 Starting message processing loop');
-      for await (const message of this.messageQueue) {
-        if (!this.isRunning) {
-          this.debug.log('🛑 Breaking loop - not running');
-          break;
+    const loopResult = await fromAsyncTryCatch(
+      async () => {
+        this.logger.info('🔁 Starting message processing loop', undefined, {
+          component: 'QiPromptCLI',
+          method: 'startMessageProcessingLoop',
+        });
+
+        for await (const message of this.messageQueue) {
+          if (!this.isRunning) {
+            this.logger.debug('🛑 Breaking loop - not running', undefined, {
+              component: 'QiPromptCLI',
+              reason: 'isRunning_false',
+            });
+            break;
+          }
+
+          this.logger.debug('⏳ About to process message', undefined, {
+            messageId: message.id,
+            messageType: message.type,
+            component: 'QiPromptCLI',
+          });
+
+          await this.processMessage(message);
+
+          this.logger.debug('✅ Finished processing message', undefined, {
+            messageId: message.id,
+            component: 'QiPromptCLI',
+          });
         }
 
-        this.debug.log(`⏳ About to process message ID=${message.id}`);
-        await this.processMessage(message);
-        this.debug.log(`✅ Finished processing message ID=${message.id}`);
-      }
-      this.debug.log('🏁 Message processing loop ended');
-    } catch (error) {
-      console.error('Message processing loop error:', error);
-    }
+        this.logger.info('🏁 Message processing loop ended', undefined, {
+          component: 'QiPromptCLI',
+        });
+
+        return undefined;
+      },
+      (error) =>
+        systemError('Message processing loop failed', {
+          originalError: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          component: 'QiPromptCLI',
+          step: 'message_processing_loop',
+        })
+    );
+
+    // Log error if the loop failed
+    match(
+      () => {}, // Success - no action needed
+      (error) =>
+        this.logger.error('Message processing loop error', undefined, {
+          component: 'QiPromptCLI',
+          error: error.message,
+          errorContext: error.context,
+        }),
+      loopResult
+    );
   }
 
   /**
    * Single message processor - EXACT design specification match
    */
   private async processMessage(message: QiMessage): Promise<void> {
-    this.debug.log(
-      `🔄 Processing message: ID=${message.id}, type=${message.type}, input="${(message as any).input || 'N/A'}"`
-    );
+    this.logger.debug('🔄 Processing message', undefined, {
+      messageId: message.id,
+      messageType: message.type,
+      userInput: (message as any).input || 'N/A',
+      component: 'QiPromptCLI',
+    });
 
     switch (message.type) {
       case MessageType.USER_INPUT: {
-        this.debug.log(`📝 Processing USER_INPUT: "${(message as any).input}"`);
+        const userInput = (message as any).input;
+        this.logger.debug('📝 Processing USER_INPUT', undefined, {
+          userInput,
+          messageId: message.id,
+          component: 'QiPromptCLI',
+        });
+
         const result = await this.orchestrator.process({
-          input: (message as any).input,
+          input: userInput,
           context: { sessionId: 'main', timestamp: new Date(), source: 'cli' },
         });
-        this.debug.log(`🤖 LLM response: "${result.content}"`);
+
+        this.logger.debug('🤖 LLM response received', undefined, {
+          responseLength: result.content.length,
+          messageId: message.id,
+          component: 'QiPromptCLI',
+        });
 
         // FIX: Display result directly without re-enqueueing to prevent infinite loop
-        this.debug.log(`📺 Displaying LLM response directly: "${result.content}"`);
+        this.logger.debug('📺 Displaying LLM response directly', undefined, {
+          messageId: message.id,
+          component: 'QiPromptCLI',
+        });
         this.cli.displayMessage(result.content);
 
         // CRITICAL: Reset processing state in CLI to stop infinite loading
         if (typeof this.cli.resetProcessingState === 'function') {
           this.cli.resetProcessingState();
-          this.debug.log(`🔄 Reset processing state in CLI`);
+          this.logger.debug('🔄 Reset processing state in CLI', undefined, {
+            messageId: message.id,
+            component: 'QiPromptCLI',
+          });
         }
 
-        this.debug.log(`✅ Message processing complete for ID=${message.id}`);
+        this.logger.debug('✅ Message processing complete', undefined, {
+          messageId: message.id,
+          component: 'QiPromptCLI',
+        });
         break;
       }
-      case MessageType.AGENT_OUTPUT:
-        this.debug.log(`📺 Displaying AGENT_OUTPUT: "${(message as any).content}"`);
-        this.cli.displayMessage((message as any).content);
-        this.debug.log(`✅ Message processing complete for ID=${message.id}`);
+      case MessageType.AGENT_OUTPUT: {
+        const agentContent = (message as any).content;
+        this.logger.debug('📺 Displaying AGENT_OUTPUT', undefined, {
+          contentLength: agentContent.length,
+          messageId: message.id,
+          component: 'QiPromptCLI',
+        });
+        this.cli.displayMessage(agentContent);
+        this.logger.debug('✅ Message processing complete', undefined, {
+          messageId: message.id,
+          component: 'QiPromptCLI',
+        });
         break;
+      }
     }
   }
 

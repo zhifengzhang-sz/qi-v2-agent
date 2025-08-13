@@ -35,9 +35,9 @@ export {
   getDefaultReadlineConfig,
 } from './factories/createReadlineCLI.js';
 export * from './frameworks/index.js';
+export * from './impl/index.js';
 // NEW: Refactored CLI Framework with Dependency Injection
 export { MessageDrivenCLI } from './impl/MessageDrivenCLI.js';
-export * from './impl/index.js';
 // v-0.6.1: Event-based exports removed
 // export { type CLIFeedback, type CLIInput, createPureCLI, type ICLI } from './impl/index.js';
 export type { HotkeyConfig } from './keyboard/HotkeyManager.js';

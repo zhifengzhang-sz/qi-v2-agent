@@ -59,9 +59,12 @@ const cliFactoryError = (
 export function createCLI(
   config: Partial<CLIConfigWithFramework> = {}
 ): Result<ICLIFramework, QiError> {
-  console.log('🔍 [DEBUG] createCLI - received config keys:', Object.keys(config));
-  console.log('🔍 [DEBUG] createCLI - stateManager:', !!config.stateManager);
-  console.log('🔍 [DEBUG] createCLI - messageQueue:', !!config.messageQueue);
+  const debugMode = (config as any).debug || false;
+  if (debugMode) {
+    console.log('🔍 [DEBUG] createCLI - received config keys:', Object.keys(config));
+    console.log('🔍 [DEBUG] createCLI - stateManager:', !!config.stateManager);
+    console.log('🔍 [DEBUG] createCLI - messageQueue:', !!config.messageQueue);
+  }
 
   const framework = config.framework || 'readline';
 
@@ -409,8 +412,11 @@ function createHybridCLI(
     }
 
     // Create hybrid CLI implementation with shared message queue and state manager
-    console.log('🔍 [DEBUG] createHybridCLI - config keys:', Object.keys(config));
-    console.log('🔍 [DEBUG] createHybridCLI - stateManager:', !!config.stateManager);
+    const debugMode = (config as any).debug || false;
+    if (debugMode) {
+      console.log('🔍 [DEBUG] createHybridCLI - config keys:', Object.keys(config));
+      console.log('🔍 [DEBUG] createHybridCLI - stateManager:', !!config.stateManager);
+    }
     const cli = new HybridCLIFramework(config, config.messageQueue || messageQueue);
 
     return Ok(cli);

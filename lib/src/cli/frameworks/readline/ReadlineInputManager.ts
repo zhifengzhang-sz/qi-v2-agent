@@ -8,7 +8,7 @@
 import { createInterface, type Interface } from 'node:readline';
 import type { QiAsyncMessageQueue } from '../../../messaging/impl/QiAsyncMessageQueue';
 import type { QiMessage } from '../../../messaging/types/MessageTypes';
-import { MessageType, MessagePriority } from '../../../messaging/types/MessageTypes';
+import { MessagePriority, MessageType } from '../../../messaging/types/MessageTypes';
 import { createDebugLogger } from '../../../utils/DebugLogger';
 
 export interface ReadlineConfig {

@@ -21,9 +21,9 @@ import {
 import type { IPromptHandler, PromptOptions, PromptResponse } from '@qi/agent/prompt';
 import type { IStateManager } from '@qi/agent/state';
 import { create, type ErrorCategory, type QiError } from '@qi/base';
-import { createDebugLogger } from '../utils/DebugLogger.js';
 import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../messaging/types/MessageTypes.js';
+import { createDebugLogger } from '../utils/DebugLogger.js';
 import type {
   IWorkflowHandler,
   WorkflowOptions,

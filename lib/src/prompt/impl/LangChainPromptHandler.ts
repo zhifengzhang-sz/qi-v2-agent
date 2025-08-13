@@ -8,6 +8,7 @@
 import { AIMessage, type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import type { ContextMessage, ConversationContext } from '../../context/index.js';
+import { isDebugEnabled } from '../../utils/DebugLogger.js';
 import type {
   IPromptHandler,
   PromptOptions,
@@ -71,10 +72,12 @@ export class LangChainPromptHandler implements IPromptHandler {
       // TODO: Future improvement - update multi-llm-ts to accept Message objects directly
       const formattedPrompt = this.messagesToString(messages);
 
-      console.log(`📝 [DEBUG] Final formatted prompt being sent to LLM:`);
-      console.log(`--- START PROMPT ---`);
-      console.log(formattedPrompt);
-      console.log(`--- END PROMPT ---`);
+      if (isDebugEnabled()) {
+        console.log(`📝 [DEBUG] Final formatted prompt being sent to LLM:`);
+        console.log(`--- START PROMPT ---`);
+        console.log(formattedPrompt);
+        console.log(`--- END PROMPT ---`);
+      }
 
       // Execute with base handler
       const result = await this.baseHandler.complete(formattedPrompt, options);

@@ -5,7 +5,7 @@
  * for internal qicore complexity
  */
 
-import { match } from '@qi/base';
+import { fromAsyncTryCatch, match } from '@qi/base';
 import type {
   IWorkflowHandler,
   ToolInfo,
@@ -49,31 +49,31 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
    * Execute a workflow with the specified input
    */
   async executeWorkflow(input: string, options: WorkflowOptions = {}): Promise<WorkflowResponse> {
-    try {
-      if (!this.initialized) {
-        return { success: false, error: 'Handler not initialized. Call initialize() first.' };
-      }
+    if (!this.initialized) {
+      return { success: false, error: 'Handler not initialized. Call initialize() first.' };
+    }
 
-      // Determine workflow type from options or detect from input
-      const workflowType = this.determineWorkflowType(input, options.type);
+    // Determine workflow type from options or detect from input
+    const workflowType = this.determineWorkflowType(input, options.type);
 
-      // If no workflow detected, return success with original input (passthrough)
-      if (workflowType === null) {
-        return {
-          success: true,
-          data: {
-            output: input, // Pass through original input unchanged
-            metadata: { workflowType: 'none', passthrough: true },
-          },
-        };
-      }
-
-      const workflowInput: WorkflowInput = {
-        type: workflowType,
-        content: input,
-        context: options.context || {},
+    // If no workflow detected, return success with original input (passthrough)
+    if (workflowType === null) {
+      return {
+        success: true,
+        data: {
+          output: input, // Pass through original input unchanged
+          metadata: { workflowType: 'none', passthrough: true },
+        },
       };
+    }
 
+    const workflowInput: WorkflowInput = {
+      type: workflowType,
+      content: input,
+      context: options.context || {},
+    };
+
+    try {
       const result = await this.manager.executeWorkflow(workflowInput);
 
       return match(
@@ -91,10 +91,6 @@ export class DefaultWorkflowHandler implements IWorkflowHandler {
       );
     } catch (error) {
       // Catch any unexpected errors (e.g., cancellation, network issues, etc.)
-      console.warn(
-        'DefaultWorkflowHandler.executeWorkflow caught error:',
-        error instanceof Error ? error.message : error
-      );
       return {
         success: false,
         error: `Workflow execution failed: ${error instanceof Error ? error.message : String(error)}`,

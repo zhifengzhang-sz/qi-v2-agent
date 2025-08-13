@@ -66,12 +66,18 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   private stateManager: any = null;
   private stateUnsubscribe: (() => void) | null = null;
   private setMessages: ((updater: (prev: OutputMessage[]) => OutputMessage[]) => void) | null = null;
+  private debugMode: boolean = false;
 
   constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     this.messageQueue = messageQueue;
     
-    console.log('🔍 [DEBUG] InkCLIFramework constructor - config keys:', Object.keys(config));
-    console.log('🔍 [DEBUG] InkCLIFramework constructor - stateManager:', !!config.stateManager);
+    // Store debug mode from config
+    this.debugMode = (config as any).debug || false;
+    
+    if (this.debugMode) {
+      console.log('🔍 [DEBUG] InkCLIFramework constructor - config keys:', Object.keys(config));
+      console.log('🔍 [DEBUG] InkCLIFramework constructor - stateManager:', !!config.stateManager);
+    }
     
     this.config = { ...defaultInkConfig, ...config };
     this.state = {
@@ -96,7 +102,9 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     }
     if (stateManager?.subscribe) {
       this.stateUnsubscribe = stateManager.subscribe((change: any) => {
-        console.log('🔄 [DEBUG] StateChange received in InkCLI:', change.type, change.field);
+        if (this.debugMode) {
+          console.log('🔄 [DEBUG] StateChange received in InkCLI:', change.type, change.field);
+        }
         // Trigger UI updates for state changes that affect display
         if (change.type === 'config' && (change.field === 'promptModel' || change.field === 'promptProvider')) {
           // Force UI re-render for model/provider changes
@@ -110,7 +118,9 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   private forceUIUpdate(): void {
     // The React component will automatically re-render when state changes
     // This method is here for any explicit UI refresh needs
-    console.log('🔄 [DEBUG] Forcing UI update');
+    if (this.debugMode) {
+      console.log('🔄 [DEBUG] Forcing UI update');
+    }
   }
 
   // ==============================================
@@ -178,7 +188,9 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     this.state.lastActivity = new Date();
     
     // Mode changes are now handled through StateManager if needed
-    console.log('🔄 [DEBUG] Mode changed:', previousMode, '->', mode);
+    if (this.debugMode) {
+      console.log('🔄 [DEBUG] Mode changed:', previousMode, '->', mode);
+    }
   }
 
   getMode(): CLIMode {
@@ -206,7 +218,9 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     if (input.trim() === '/exit' || input.trim() === '/quit') {
       // Clear input box in UI before exiting
       this.state.currentInput = '';
-      console.log('🔄 [DEBUG] Clearing input for exit command');
+      if (this.debugMode) {
+        console.log('🔄 [DEBUG] Clearing input for exit command');
+      }
 
       if (this.messageQueue) {
         this.messageQueue.enqueue({
@@ -472,27 +486,38 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
   const { exit } = useApp();
   
 
-  // Get real provider/model info from connected agent
+  // Get real provider/model info from StateManager
   useEffect(() => {
     const getAgentInfo = () => {
       try {
+        // CRITICAL FIX: Get StateManager directly from framework config first
+        const stateManager = (framework as any).config?.stateManager || (framework as any).stateManager;
+        const debugMode = (framework as any).debugMode || false;
+        
+        if (debugMode) {
+          console.log('🔍 [DEBUG] getAgentInfo - stateManager found:', !!stateManager);
+        }
+        
+        if (stateManager?.getPromptConfig) {
+          const promptConfig = stateManager.getPromptConfig();
+          if (debugMode) {
+            console.log('🔍 [DEBUG] getAgentInfo - promptConfig:', promptConfig);
+          }
+          if (promptConfig?.provider && promptConfig?.model) {
+            if (debugMode) {
+              console.log('🔍 [DEBUG] getAgentInfo - updating UI:', promptConfig.provider, promptConfig.model);
+            }
+            setProviderInfo({
+              provider: promptConfig.provider,
+              model: promptConfig.model
+            });
+            return;
+          }
+        }
+        
+        // Fallback: Try to get from connected agent if StateManager approach fails
         const agent = (framework as any).connectedAgent;
         if (agent) {
-          // Try to get provider and model from state manager's prompt config
-          const stateManager = (framework as any).config?.stateManager || agent.stateManager;
-          console.log('🔍 [DEBUG] getAgentInfo - stateManager found:', !!stateManager);
-          if (stateManager?.getPromptConfig) {
-            const promptConfig = stateManager.getPromptConfig();
-            console.log('🔍 [DEBUG] getAgentInfo - promptConfig:', promptConfig);
-            if (promptConfig?.provider && promptConfig?.model) {
-              console.log('🔍 [DEBUG] getAgentInfo - updating UI:', promptConfig.provider, promptConfig.model);
-              setProviderInfo({
-                provider: promptConfig.provider,
-                model: promptConfig.model
-              });
-              return;
-            }
-          }
 
           // Fallback to getting from prompt handler
           if (agent.promptHandler?.getCurrentModel) {
@@ -512,10 +537,15 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     
     // Listen for state changes to refresh immediately
     const handleStateChange = (event: any) => {
-      console.log('🔍 [DEBUG] StateChange received:', event.type, event.field);
+      const debugMode = (framework as any).debugMode || false;
+      if (debugMode) {
+        console.log('🔍 [DEBUG] StateChange received:', event.type, event.field);
+      }
       // Refresh provider info when config changes (provider/model switches)
       if (event.type === 'config') {
-        console.log('🔍 [DEBUG] Config change detected, refreshing agent info');
+        if (debugMode) {
+          console.log('🔍 [DEBUG] Config change detected, refreshing agent info');
+        }
         getAgentInfo();
       }
     };
@@ -523,17 +553,30 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     // Subscribe to state changes from the state manager
     let unsubscribe: (() => void) | null = null;
     try {
-      const stateManager = (framework as any).config?.stateManager;
-      console.log('🔍 [DEBUG] Subscription setup - stateManager found:', !!stateManager);
+      const stateManager = (framework as any).config?.stateManager || (framework as any).stateManager;
+      const debugMode = (framework as any).debugMode || false;
+      
+      if (debugMode) {
+        console.log('🔍 [DEBUG] Subscription setup - stateManager found:', !!stateManager);
+      }
       if (stateManager?.subscribe) {
-        console.log('🔍 [DEBUG] Setting up StateManager subscription');
+        if (debugMode) {
+          console.log('🔍 [DEBUG] Setting up StateManager subscription');
+        }
         unsubscribe = stateManager.subscribe(handleStateChange);
-        console.log('🔍 [DEBUG] StateManager subscription active');
+        if (debugMode) {
+          console.log('🔍 [DEBUG] StateManager subscription active');
+        }
       } else {
-        console.log('🔍 [DEBUG] No stateManager.subscribe method found');
+        if (debugMode) {
+          console.log('🔍 [DEBUG] No stateManager.subscribe method found');
+        }
       }
     } catch (error) {
-      console.log('🔍 [DEBUG] Subscription setup error:', error);
+      const debugMode = (framework as any).debugMode || false;
+      if (debugMode) {
+        console.log('🔍 [DEBUG] Subscription setup error:', error);
+      }
     }
     
     // Set up an interval to refresh agent info periodically as fallback

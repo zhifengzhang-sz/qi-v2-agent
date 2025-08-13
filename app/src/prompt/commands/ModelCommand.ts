@@ -35,9 +35,9 @@ export function createModelCommand(stateManager: IStateManager): {
 
     try {
       if (!modelName) {
-        // Show current model and available models
+        // Show current model and available models - use getCurrentModel() as single source of truth
+        const currentModel = stateManager.getCurrentModel();
         const promptConfig = stateManager.getPromptConfig();
-        const currentModel = promptConfig?.model || stateManager.getCurrentModel();
         const availableModels = stateManager.getAvailablePromptModels();
 
         let content = `Current model: ${currentModel}\n`;
@@ -68,8 +68,7 @@ export function createModelCommand(stateManager: IStateManager): {
 
       // Switch to new model
       const availableModels = stateManager.getAvailablePromptModels();
-      const promptConfig = stateManager.getPromptConfig();
-      const currentModel = promptConfig?.model || stateManager.getCurrentModel();
+      const currentModel = stateManager.getCurrentModel();
 
       // Validate model availability
       if (availableModels.length > 0 && !availableModels.includes(modelName)) {

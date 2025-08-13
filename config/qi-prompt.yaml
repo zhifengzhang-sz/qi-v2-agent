@@ -1,0 +1,32 @@
+# Qi Prompt v-0.6.3 Configuration
+# QiCore-based configuration with schema validation and environment overrides
+
+app:
+  name: "Qi Prompt CLI"
+  version: "v-0.6.3"
+  debug: false
+  framework: "hybrid"
+  autoDetect: false
+
+ui:
+  enableHotkeys: true
+  enableStreaming: true
+  enableColors: true
+  enableTTYDetection: true
+
+messaging:
+  queueTTL: 300000  # 5 minutes
+  maxConcurrentMessages: 10
+  messageTimeout: 120000  # 2 minutes
+
+logging:
+  level: "info"
+  pretty: true
+  structured: true
+  component: "QiPromptApp"
+
+workflows:
+  enableFileReference: true
+  enableProjectScanner: true
+  enableSessionManager: true
+  maxOperationsPerWorkflow: 3
