@@ -361,7 +361,7 @@ export class ToolExecutor implements IToolExecutor {
           // Check if error is retryable
           if (attempt < retryPolicy.maxAttempts && this.isRetryableError(lastError, retryPolicy)) {
             const delay = Math.min(
-              retryPolicy.initialDelay * Math.pow(retryPolicy.backoffMultiplier, attempt - 1),
+              retryPolicy.initialDelay * retryPolicy.backoffMultiplier ** (attempt - 1),
               retryPolicy.maxDelay
             );
 
@@ -369,7 +369,6 @@ export class ToolExecutor implements IToolExecutor {
             yield success(progress);
 
             await new Promise((resolve) => setTimeout(resolve, delay));
-            continue;
           } else {
             // No more retries or non-retryable error
             break;

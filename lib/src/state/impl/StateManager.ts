@@ -1,14 +1,14 @@
 /**
- * State Manager Implementation
+ * XState v5-based State Manager Implementation
  *
- * Passive data store for application configuration, state, and context.
- * Internal to state module - other modules cannot access this directly.
+ * Modern state management using XState v5 actors while maintaining
+ * the existing IStateManager interface for compatibility.
  */
 
-import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { fromAsyncTryCatch, match, type QiError, type Result, validationError } from '@qi/base';
 import { ConfigBuilder } from '@qi/core';
+import { createActor } from 'xstate';
 import { createQiLogger, logError, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   AppConfig,
@@ -22,70 +22,24 @@ import type {
   StateChange,
   StateChangeListener,
 } from '../abstractions/index.js';
+import {
+  type AgentStateActor,
+  type AgentStateContext,
+  agentStateMachine,
+  createInitialAgentContext,
+  getAgentStateDescription,
+} from '../machines/index.js';
+import { initializePersistence, StatePersistence } from '../persistence/index.js';
 
 /**
- * Default configuration
- */
-const DEFAULT_CONFIG: AppConfig = {
-  version: '0.2.7',
-  defaultModel: 'ollama',
-  availableModels: ['ollama', 'groq', 'openai'],
-  enableDebugMode: false,
-  maxHistorySize: 100,
-  sessionTimeout: 30 * 60 * 1000, // 30 minutes
-  preferences: new Map(),
-};
-
-/**
- * Default models
- */
-const DEFAULT_MODELS: ModelInfo[] = [
-  {
-    id: 'ollama',
-    name: 'Ollama (qwen2.5:7b)',
-    provider: 'ollama',
-    available: true,
-    description: 'Local Ollama model',
-  },
-  {
-    id: 'groq',
-    name: 'Groq (llama-3.1-70b)',
-    provider: 'groq',
-    available: false,
-    description: 'Fast inference via Groq',
-  },
-  {
-    id: 'openai',
-    name: 'OpenAI (gpt-4)',
-    provider: 'openai',
-    available: false,
-    description: 'OpenAI GPT-4',
-  },
-];
-
-/**
- * State Manager implementation
+ * XState v5-based State Manager implementation
  */
 export class StateManager implements IStateManager {
-  private config: AppConfig;
-  private currentModel: string;
-  private currentMode: AppMode;
-  private context: AppContext;
-  private session: SessionData;
-  private models: Map<string, ModelInfo>;
+  private actor: AgentStateActor;
   private listeners: Set<StateChangeListener> = new Set();
   private logger: SimpleLogger;
 
-  // LLM configuration
-  private llmConfig: any = null;
-  private classifierConfig: LLMRoleConfig | null = null;
-  private promptConfig: LLMRoleConfig | null = null;
-
   constructor() {
-    this.config = { ...DEFAULT_CONFIG };
-    this.currentModel = DEFAULT_CONFIG.defaultModel;
-    this.currentMode = 'ready';
-
     // Initialize QiCore logger
     this.logger = createQiLogger({
       level: 'info',
@@ -93,58 +47,62 @@ export class StateManager implements IStateManager {
       pretty: true,
     });
 
-    // Initialize models
-    this.models = new Map();
-    for (const model of DEFAULT_MODELS) {
-      this.models.set(model.id, model);
-    }
+    // Initialize persistence system
+    this.initializePersistence();
 
-    // Initialize context
-    this.context = {
-      sessionId: randomUUID(),
-      currentDirectory: process.cwd(),
-      environment: new Map(
-        Object.entries(process.env).filter(([_, v]) => v !== undefined) as [string, string][]
-      ),
-      metadata: new Map(),
-    };
+    // Create and start the XState actor
+    this.actor = createActor(agentStateMachine, {
+      input: createInitialAgentContext(),
+    });
 
-    // Initialize session
-    this.session = this.createSession();
+    // Subscribe to state changes and notify listeners
+    this.actor.subscribe((snapshot) => {
+      // Always notify on state transitions
+      this.notifyStateChange(snapshot.context);
+    });
+
+    // Start the actor
+    this.actor.start();
   }
 
+  // ==========================================================================
   // Configuration management
+  // ==========================================================================
+
   getConfig(): AppConfig {
-    return { ...this.config };
+    return { ...this.actor.getSnapshot().context.config };
   }
 
   updateConfig(updates: Partial<AppConfig>): void {
-    const oldConfig = { ...this.config };
-    this.config = { ...this.config, ...updates };
+    const oldConfig = this.getConfig();
+    this.actor.send({ type: 'UPDATE_CONFIG', updates });
 
     this.notifyChange({
       type: 'config',
       field: 'config',
       oldValue: oldConfig,
-      newValue: this.config,
+      newValue: this.getConfig(),
       timestamp: new Date(),
     });
   }
 
   resetConfig(): void {
-    const oldConfig = { ...this.config };
-    this.config = { ...DEFAULT_CONFIG };
+    const oldConfig = this.getConfig();
+    this.actor.send({ type: 'RESET_CONFIG' });
 
     this.notifyChange({
       type: 'config',
       field: 'config',
       oldValue: oldConfig,
-      newValue: this.config,
+      newValue: this.getConfig(),
       timestamp: new Date(),
     });
   }
 
-  // LLM configuration management (qicore internal, simple interface for agent)
+  // ==========================================================================
+  // LLM configuration management
+  // ==========================================================================
+
   async loadLLMConfig(configPath: string): Promise<void> {
     const result = await fromAsyncTryCatch(
       async () => {
@@ -184,39 +142,14 @@ export class StateManager implements IStateManager {
           (config as { get: (key: string) => Result<any, QiError> }).get('llm')
         );
 
-        this.llmConfig = { llm: llmSection };
-
-        // Extract classifier configuration from validated config
-        if (this.llmConfig.llm?.classifier) {
-          this.classifierConfig = {
-            provider: this.llmConfig.llm.classifier.provider,
-            model: this.llmConfig.llm.classifier.model,
-            temperature: this.llmConfig.llm.classifier.temperature,
-            maxTokens: this.llmConfig.llm.classifier.maxTokens,
-          };
-        }
-
-        // Extract prompt configuration from validated config
-        if (this.llmConfig.llm?.prompt) {
-          this.promptConfig = {
-            provider:
-              this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider,
-            model: this.llmConfig.llm.prompt.currentModel,
-            temperature:
-              this.llmConfig.llm.providers?.[
-                this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider
-              ]?.models?.[0]?.defaultParameters?.temperature,
-            maxTokens:
-              this.llmConfig.llm.providers?.[
-                this.llmConfig.llm.prompt.defaultProvider || this.llmConfig.llm.defaultProvider
-              ]?.models?.[0]?.defaultParameters?.max_tokens,
-          };
-
-          // CRITICAL FIX: Synchronize currentModel with promptConfig.model during initialization
-          if (this.promptConfig.model) {
-            this.currentModel = this.promptConfig.model;
-          }
-        }
+        // Update the state machine with loaded config
+        const { classifierConfig, promptConfig } = this.extractLLMConfigs({ llm: llmSection });
+        this.actor.send({
+          type: 'SET_LLM_CONFIG',
+          llmConfig: { llm: llmSection },
+          classifierConfig,
+          promptConfig,
+        });
 
         // Update app config with the config path
         this.updateConfig({ configPath });
@@ -225,7 +158,7 @@ export class StateManager implements IStateManager {
           type: 'config',
           field: 'llmConfig',
           oldValue: null,
-          newValue: this.llmConfig,
+          newValue: { llm: llmSection },
           timestamp: new Date(),
         });
 
@@ -246,83 +179,77 @@ export class StateManager implements IStateManager {
   }
 
   getClassifierConfig(): LLMRoleConfig | null {
-    return this.classifierConfig ? { ...this.classifierConfig } : null;
+    const context = this.actor.getSnapshot().context;
+    return context.classifierConfig ? { ...context.classifierConfig } : null;
   }
 
   getPromptConfig(): LLMRoleConfig | null {
-    return this.promptConfig ? { ...this.promptConfig } : null;
+    const context = this.actor.getSnapshot().context;
+    return context.promptConfig ? { ...context.promptConfig } : null;
   }
 
   updatePromptModel(model: string): void {
-    if (!this.promptConfig) {
-      throw new Error('Prompt configuration not loaded');
-    }
-
     const availableModels = this.getAvailablePromptModels();
     if (!availableModels.includes(model)) {
       throw new Error(`Model '${model}' not available for prompts`);
     }
 
-    const oldConfig = { ...this.promptConfig };
-    this.promptConfig = { ...this.promptConfig, model };
-
-    // Also update the current model to keep it in sync
-    const _oldCurrentModel = this.currentModel;
-    this.currentModel = model;
-
-    // Update the underlying config
-    if (this.llmConfig?.llm?.prompt) {
-      this.llmConfig.llm.prompt.currentModel = model;
-    }
+    const oldConfig = this.getPromptConfig();
+    this.actor.send({ type: 'UPDATE_PROMPT_MODEL', model });
 
     this.notifyChange({
       type: 'config',
       field: 'promptModel',
       oldValue: oldConfig,
-      newValue: this.promptConfig,
+      newValue: this.getPromptConfig(),
       timestamp: new Date(),
     });
   }
 
   updatePromptMaxTokens(maxTokens: number): void {
-    if (!this.promptConfig) {
-      throw new Error('Prompt configuration not loaded');
-    }
-
     if (maxTokens < 1 || maxTokens > 32768) {
       throw new Error('Max tokens must be between 1 and 32768');
     }
 
-    const oldConfig = { ...this.promptConfig };
-    this.promptConfig = { ...this.promptConfig, maxTokens };
-
-    // Update the underlying config if possible
-    if (this.llmConfig?.llm?.providers?.[this.promptConfig.provider]?.models) {
-      // Find the current model in the provider's models and update its maxTokens
-      const models = this.llmConfig.llm.providers[this.promptConfig.provider].models;
-      const currentModel = models.find((m: any) => m.name === this.promptConfig?.model);
-      if (currentModel?.defaultParameters) {
-        currentModel.defaultParameters.max_tokens = maxTokens;
-      }
-    }
+    const oldConfig = this.getPromptConfig();
+    this.actor.send({ type: 'UPDATE_PROMPT_MAX_TOKENS', maxTokens });
 
     this.notifyChange({
       type: 'config',
       field: 'promptMaxTokens',
       oldValue: oldConfig,
-      newValue: this.promptConfig,
+      newValue: this.getPromptConfig(),
+      timestamp: new Date(),
+    });
+  }
+
+  updatePromptProvider(provider: string): void {
+    const availableProviders = this.getAvailablePromptProviders();
+    if (!availableProviders.includes(provider)) {
+      throw new Error(`Provider '${provider}' not available for prompts`);
+    }
+
+    const oldConfig = this.getPromptConfig();
+    this.actor.send({ type: 'UPDATE_PROMPT_PROVIDER', provider });
+
+    this.notifyChange({
+      type: 'config',
+      field: 'promptProvider',
+      oldValue: oldConfig,
+      newValue: this.getPromptConfig(),
       timestamp: new Date(),
     });
   }
 
   getAvailablePromptModels(): readonly string[] {
-    if (!this.llmConfig?.llm?.providers || !this.promptConfig?.provider) {
+    const context = this.actor.getSnapshot().context;
+    if (!context.llmConfig?.llm?.providers || !context.promptConfig?.provider) {
       return [];
     }
 
     // Get models for the current provider
-    const currentProvider = this.promptConfig.provider;
-    const providerConfig = this.llmConfig.llm.providers[currentProvider];
+    const currentProvider = context.promptConfig.provider;
+    const providerConfig = context.llmConfig.llm.providers[currentProvider];
 
     if (!providerConfig?.models) {
       return [];
@@ -332,84 +259,48 @@ export class StateManager implements IStateManager {
     return providerConfig.models.map((model: any) => model.name);
   }
 
-  updatePromptProvider(provider: string): void {
-    if (!this.promptConfig) {
-      throw new Error('Prompt configuration not loaded');
-    }
-    const availableProviders = this.getAvailablePromptProviders();
-    if (!availableProviders.includes(provider)) {
-      throw new Error(`Provider '${provider}' not available for prompts`);
-    }
-    const oldConfig = { ...this.promptConfig };
-
-    // Get available models for the new provider (before updating this.promptConfig)
-    const providerConfig = this.llmConfig?.llm?.providers?.[provider];
-    const availableModels = providerConfig?.models?.map((model: any) => model.name) || [];
-    const newModel = availableModels.length > 0 ? availableModels[0] : this.promptConfig.model;
-
-    this.promptConfig = {
-      ...this.promptConfig,
-      provider,
-      model: newModel,
-    };
-
-    this.currentModel = newModel;
-
-    // Update the underlying config
-    if (this.llmConfig?.llm?.prompt) {
-      this.llmConfig.llm.prompt.currentModel = newModel;
-    }
-
-    // Emit state change
-    this.notifyChange({
-      type: 'config',
-      field: 'promptProvider',
-      oldValue: oldConfig,
-      newValue: this.promptConfig,
-      timestamp: new Date(),
-    });
-  }
-
   getAvailablePromptProviders(): readonly string[] {
-    if (!this.llmConfig?.llm?.providers) {
+    const context = this.actor.getSnapshot().context;
+    if (!context.llmConfig?.llm?.providers) {
       return [];
     }
     // Return list of enabled providers
-    return Object.keys(this.llmConfig.llm.providers).filter(
-      (providerId) => this.llmConfig?.llm?.providers?.[providerId]?.enabled === true
+    return Object.keys(context.llmConfig.llm.providers).filter(
+      (providerId) => context.llmConfig?.llm?.providers?.[providerId]?.enabled === true
     );
   }
 
-  /**
-   * Extract LLMConfig structure that the prompt module expects
-   * This removes our classifier/prompt sections and returns the traditional structure
-   */
   getLLMConfigForPromptModule(): any | null {
-    if (!this.llmConfig?.llm) {
+    const context = this.actor.getSnapshot().context;
+    if (!context.llmConfig?.llm) {
       return null;
     }
 
     // Return the LLMConfig structure the prompt module expects
     // Remove our custom classifier/prompt sections
-    const { classifier, prompt, ...llmCore } = this.llmConfig.llm;
+    const { classifier, prompt, ...llmCore } = context.llmConfig.llm;
 
     return {
       llm: llmCore,
     };
   }
 
+  // ==========================================================================
   // Model management
+  // ==========================================================================
+
   getCurrentModel(): string {
-    return this.currentModel;
+    return this.actor.getSnapshot().context.currentModel;
   }
 
   setCurrentModel(modelId: string): void {
-    if (!this.models.has(modelId)) {
+    const context = this.actor.getSnapshot().context;
+    if (!context.models.has(modelId)) {
       throw new Error(`Model '${modelId}' not found`);
     }
 
-    const oldModel = this.currentModel;
-    this.currentModel = modelId;
+    const oldModel = this.getCurrentModel();
+    this.actor.send({ type: 'SET_CURRENT_MODEL', modelId });
 
     this.notifyChange({
       type: 'model',
@@ -421,15 +312,17 @@ export class StateManager implements IStateManager {
   }
 
   getAvailableModels(): readonly ModelInfo[] {
-    return Array.from(this.models.values());
+    const context = this.actor.getSnapshot().context;
+    return Array.from(context.models.values());
   }
 
   getModelInfo(modelId: string): ModelInfo | null {
-    return this.models.get(modelId) || null;
+    const context = this.actor.getSnapshot().context;
+    return context.models.get(modelId) || null;
   }
 
   addModel(model: ModelInfo): void {
-    this.models.set(model.id, model);
+    this.actor.send({ type: 'ADD_MODEL', model });
 
     this.notifyChange({
       type: 'model',
@@ -441,14 +334,10 @@ export class StateManager implements IStateManager {
   }
 
   removeModel(modelId: string): void {
-    const model = this.models.get(modelId);
+    const context = this.actor.getSnapshot().context;
+    const model = context.models.get(modelId);
     if (model) {
-      this.models.delete(modelId);
-
-      // If this was the current model, switch to default
-      if (this.currentModel === modelId) {
-        this.setCurrentModel(this.config.defaultModel);
-      }
+      this.actor.send({ type: 'REMOVE_MODEL', modelId });
 
       this.notifyChange({
         type: 'model',
@@ -460,14 +349,17 @@ export class StateManager implements IStateManager {
     }
   }
 
+  // ==========================================================================
   // Mode management
+  // ==========================================================================
+
   getCurrentMode(): AppMode {
-    return this.currentMode;
+    return this.actor.getSnapshot().context.currentMode;
   }
 
   setCurrentMode(mode: AppMode): void {
-    const oldMode = this.currentMode;
-    this.currentMode = mode;
+    const oldMode = this.getCurrentMode();
+    this.actor.send({ type: 'SET_MODE', mode });
 
     this.notifyChange({
       type: 'mode',
@@ -478,62 +370,51 @@ export class StateManager implements IStateManager {
     });
   }
 
+  // ==========================================================================
   // Context management
+  // ==========================================================================
+
   getContext(): AppContext {
-    return { ...this.context };
+    return { ...this.actor.getSnapshot().context.context };
   }
 
   updateContext(updates: Partial<AppContext>): void {
-    const oldContext = { ...this.context };
-    this.context = { ...this.context, ...updates };
+    const oldContext = this.getContext();
+    this.actor.send({ type: 'UPDATE_CONTEXT', updates });
 
     this.notifyChange({
       type: 'context',
       field: 'context',
       oldValue: oldContext,
-      newValue: this.context,
+      newValue: this.getContext(),
       timestamp: new Date(),
     });
   }
 
   resetContext(): void {
-    const oldContext = { ...this.context };
-    this.context = {
-      sessionId: randomUUID(),
-      currentDirectory: process.cwd(),
-      environment: new Map(
-        Object.entries(process.env).filter(([_, v]) => v !== undefined) as [string, string][]
-      ),
-      metadata: new Map(),
-    };
+    const oldContext = this.getContext();
+    this.actor.send({ type: 'RESET_CONTEXT' });
 
     this.notifyChange({
       type: 'context',
       field: 'context',
       oldValue: oldContext,
-      newValue: this.context,
+      newValue: this.getContext(),
       timestamp: new Date(),
     });
   }
 
+  // ==========================================================================
   // Session management
+  // ==========================================================================
+
   getCurrentSession(): SessionData {
-    return { ...this.session };
+    return { ...this.actor.getSnapshot().context.session };
   }
 
   createSession(userId?: string): SessionData {
-    const now = new Date();
-    const newSession: SessionData = {
-      id: randomUUID(),
-      userId,
-      createdAt: now,
-      lastActiveAt: now,
-      conversationHistory: [],
-      context: this.getContext(),
-      metadata: new Map(),
-    };
-
-    this.session = newSession;
+    this.actor.send({ type: 'CREATE_SESSION', userId });
+    const newSession = this.getCurrentSession();
 
     this.notifyChange({
       type: 'session',
@@ -546,58 +427,65 @@ export class StateManager implements IStateManager {
     return { ...newSession };
   }
 
-  loadSession(_sessionId: string): SessionData | null {
-    // TODO: Implement session persistence
-    // For now, just return null (session not found)
-    return null;
+  loadSession(sessionId: string): SessionData | null {
+    // Use synchronous approach for interface compatibility
+    // The actual loading will be done asynchronously in background
+    StatePersistence.loadSession(sessionId)
+      .then((result) => {
+        match(
+          (sessionData) => {
+            if (sessionData) {
+              // TODO: Implement proper session restoration in state machine
+              this.logger.info(`Session ${sessionId} loaded from persistence`);
+            }
+          },
+          (error) => {
+            this.logger.error(`Failed to load session ${sessionId}:`, error.message);
+          },
+          result
+        );
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to load session ${sessionId}:`, error);
+      });
+
+    return null; // Return null for now, async loading happens in background
   }
 
   saveSession(): void {
-    // Update the session with new lastActiveAt timestamp
-    this.session = {
-      ...this.session,
-      lastActiveAt: new Date(),
-    };
+    this.actor.send({ type: 'SAVE_SESSION' });
 
-    // TODO: Implement session persistence
+    // Save current session to persistence
+    const currentSession = this.getCurrentSession();
+    StatePersistence.saveSession(currentSession).then((result) => {
+      match(
+        () => {
+          this.logger.info(`Session ${currentSession.id} saved to persistence`);
+        },
+        (error) => {
+          this.logger.error(`Failed to save session ${currentSession.id}:`, error.message);
+        },
+        result
+      );
+    });
   }
 
   addConversationEntry(entry: Omit<ConversationEntry, 'id' | 'timestamp'>): void {
-    const newEntry: ConversationEntry = {
-      id: randomUUID(),
-      timestamp: new Date(),
-      ...entry,
-    };
-
-    const updatedHistory = [...this.session.conversationHistory, newEntry];
-
-    // Limit history size
-    if (updatedHistory.length > this.config.maxHistorySize) {
-      updatedHistory.splice(0, updatedHistory.length - this.config.maxHistorySize);
-    }
-
-    this.session = {
-      ...this.session,
-      conversationHistory: updatedHistory,
-      lastActiveAt: new Date(),
-    };
+    this.actor.send({ type: 'ADD_CONVERSATION_ENTRY', entry });
 
     this.notifyChange({
       type: 'session',
       field: 'conversationHistory',
       oldValue: null,
-      newValue: newEntry,
+      newValue: entry,
       timestamp: new Date(),
     });
   }
 
   clearConversationHistory(): void {
-    const oldHistory = this.session.conversationHistory;
-    this.session = {
-      ...this.session,
-      conversationHistory: [],
-      lastActiveAt: new Date(),
-    };
+    const context = this.actor.getSnapshot().context;
+    const oldHistory = context.session.conversationHistory;
+    this.actor.send({ type: 'CLEAR_CONVERSATION_HISTORY' });
 
     this.notifyChange({
       type: 'session',
@@ -608,22 +496,95 @@ export class StateManager implements IStateManager {
     });
   }
 
+  // ==========================================================================
   // State persistence
+  // ==========================================================================
+
   async save(): Promise<void> {
-    // TODO: Implement state persistence to file system
-    // For now, this is a no-op
+    this.actor.send({ type: 'SAVE_STATE' });
+
+    // Save current state to persistence
+    const currentContext = this.actor.getSnapshot().context;
+    const result = await StatePersistence.saveState(currentContext);
+
+    return match(
+      () => {
+        this.logger.info('Agent state saved to persistence');
+        return Promise.resolve();
+      },
+      (error) => {
+        this.logger.error('Failed to save agent state:', error.message);
+        return Promise.reject(new Error(error.message));
+      },
+      result
+    );
   }
 
   async load(): Promise<void> {
-    // TODO: Implement state loading from file system
-    // For now, this is a no-op
+    this.actor.send({ type: 'LOAD_STATE' });
+
+    // Load state from persistence
+    const result = await StatePersistence.loadState();
+
+    return match(
+      (persistedState) => {
+        if (persistedState) {
+          // TODO: Implement proper state restoration in state machine
+          // For now, we just log that state was found
+          this.logger.info(`Agent state loaded from persistence (${persistedState.timestamp})`);
+        } else {
+          // No saved state found, continue with default state
+          this.logger.info('No saved agent state found, using defaults');
+        }
+        return Promise.resolve();
+      },
+      (error) => {
+        this.logger.error('Failed to load agent state:', error.message);
+        return Promise.reject(new Error(error.message));
+      },
+      result
+    );
   }
 
+  // ==========================================================================
   // State change notifications
+  // ==========================================================================
+
   subscribe(listener: StateChangeListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
+
+  // ==========================================================================
+  // Utility methods
+  // ==========================================================================
+
+  getState() {
+    const context = this.actor.getSnapshot().context;
+    return {
+      config: this.getConfig(),
+      currentModel: context.currentModel,
+      currentMode: context.currentMode,
+      context: this.getContext(),
+      session: this.getCurrentSession(),
+    };
+  }
+
+  reset(): void {
+    this.actor.send({ type: 'RESET_ALL' });
+
+    this.notifyChange({
+      type: 'config',
+      field: 'reset',
+      oldValue: null,
+      newValue: null,
+      timestamp: new Date(),
+    });
+  }
+
+  // ==========================================================================
+  // Private helper methods
+  // ==========================================================================
 
   private notifyChange(change: StateChange): void {
     for (const listener of this.listeners) {
@@ -641,36 +602,94 @@ export class StateManager implements IStateManager {
     }
   }
 
-  // Utility methods
-  getState() {
+  private notifyStateChange(context: AgentStateContext): void {
+    // Log state changes for debugging
+    this.logger.info(`State changed: ${getAgentStateDescription(context)}`);
+  }
+
+  private extractLLMConfigs(llmConfig: any): {
+    classifierConfig: LLMRoleConfig | null;
+    promptConfig: LLMRoleConfig | null;
+  } {
+    // Extract classifier configuration from validated config
+    let classifierConfig: LLMRoleConfig | null = null;
+    if (llmConfig.llm?.classifier) {
+      classifierConfig = {
+        provider: llmConfig.llm.classifier.provider,
+        model: llmConfig.llm.classifier.model,
+        temperature: llmConfig.llm.classifier.temperature,
+        maxTokens: llmConfig.llm.classifier.maxTokens,
+      };
+    }
+
+    // Extract prompt configuration from validated config
+    let promptConfig: LLMRoleConfig | null = null;
+    if (llmConfig.llm?.prompt) {
+      promptConfig = {
+        provider: llmConfig.llm.prompt.defaultProvider || llmConfig.llm.defaultProvider,
+        model: llmConfig.llm.prompt.currentModel,
+        temperature:
+          llmConfig.llm.providers?.[
+            llmConfig.llm.prompt.defaultProvider || llmConfig.llm.defaultProvider
+          ]?.models?.[0]?.defaultParameters?.temperature,
+        maxTokens:
+          llmConfig.llm.providers?.[
+            llmConfig.llm.prompt.defaultProvider || llmConfig.llm.defaultProvider
+          ]?.models?.[0]?.defaultParameters?.max_tokens,
+      };
+
+      // Synchronize currentModel with promptConfig.model during initialization
+      if (promptConfig.model) {
+        this.actor.send({ type: 'SET_CURRENT_MODEL', modelId: promptConfig.model });
+      }
+    }
+
+    return { classifierConfig, promptConfig };
+  }
+
+  // ==========================================================================
+  // Debug methods
+  // ==========================================================================
+
+  /**
+   * Get current state machine snapshot for debugging
+   */
+  getDebugSnapshot() {
+    const snapshot = this.actor.getSnapshot();
     return {
-      config: this.getConfig(),
-      currentModel: this.getCurrentModel(),
-      currentMode: this.getCurrentMode(),
-      context: this.getContext(),
-      session: this.getCurrentSession(),
+      value: snapshot.value,
+      context: snapshot.context,
+      can: (eventType: keyof typeof snapshot.can) => snapshot.can({ type: eventType as any }),
+      description: getAgentStateDescription(snapshot.context),
     };
   }
 
-  reset(): void {
-    this.config = { ...DEFAULT_CONFIG };
-    this.currentModel = DEFAULT_CONFIG.defaultModel;
-    this.currentMode = 'ready';
-    this.resetContext();
-    this.session = this.createSession();
+  /**
+   * Stop the state manager (cleanup)
+   */
+  stop(): void {
+    this.actor.stop();
+    this.listeners.clear();
+  }
 
-    // Clear all models and re-add defaults
-    this.models.clear();
-    for (const model of DEFAULT_MODELS) {
-      this.models.set(model.id, model);
+  // ==========================================================================
+  // Private initialization methods
+  // ==========================================================================
+
+  private async initializePersistence(): Promise<void> {
+    try {
+      const result = await initializePersistence();
+      match(
+        () => {
+          this.logger.info('Persistence system initialized');
+        },
+        (error) => {
+          this.logger.error('Failed to initialize persistence:', error.message);
+        },
+        result
+      );
+    } catch (error) {
+      this.logger.error('Failed to initialize persistence:', error);
     }
-
-    this.notifyChange({
-      type: 'config',
-      field: 'reset',
-      oldValue: null,
-      newValue: null,
-      timestamp: new Date(),
-    });
   }
 }
