@@ -10,7 +10,7 @@
  * Based on Claude Code's useArrowKeyHistory.ts
  */
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 interface UseHybridHistoryProps {
   onSetInput: (value: string) => void;

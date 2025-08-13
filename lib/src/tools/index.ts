@@ -6,8 +6,11 @@
  */
 
 export * from './context/index.js';
+// Export core tool interfaces and registry
+export * from './core/interfaces/index.js';
+export * from './core/registry/ToolRegistry.js';
 // Export tool implementations
-export * from './files/index.js';
+export * from './impl/file/index.js';
 export * from './parsing/index.js';
 
 /**

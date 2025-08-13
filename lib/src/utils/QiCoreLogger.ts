@@ -5,7 +5,7 @@
  * for all qi-prompt components.
  */
 
-import { match, type QiError, type Result } from '@qi/base';
+import { match, type QiError } from '@qi/base';
 import { type Logger, createLogger as qiCreateLogger } from '@qi/core';
 
 /**
@@ -129,7 +129,7 @@ const createFallbackLogger = (config: LoggerConfig): SimpleLogger => {
   const currentLevel = levels[config.level as keyof typeof levels] || 1;
   const componentName = config.name || 'unknown';
 
-  const log = (logLevel: string, message: string, data?: any, metadata?: any) => {
+  const log = (logLevel: string, message: string, _data?: any, metadata?: any) => {
     if (levels[logLevel as keyof typeof levels] >= currentLevel) {
       const timestamp = new Date().toISOString();
       const component = metadata?.component || componentName;
@@ -197,7 +197,7 @@ export const createQiLogger = (config: LoggerConfig = {}): SimpleLogger => {
       },
       qiLoggerResult
     );
-  } catch (error) {
+  } catch (_error) {
     // If QiCore is not available, use fallback
     return createFallbackLogger(loggerConfig);
   }

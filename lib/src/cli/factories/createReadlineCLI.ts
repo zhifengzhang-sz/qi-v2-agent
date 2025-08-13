@@ -11,11 +11,7 @@ import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQue
 import { QiAsyncMessageQueue as QiAsyncMessageQueueImpl } from '../../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../../messaging/types/MessageTypes.js';
 import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
-import type {
-  IAgentConnector,
-  ICommandRouter,
-  IEventManager,
-} from '../abstractions/ICLIServices.js';
+import type { ICommandRouter } from '../abstractions/ICLIServices.js';
 import type { IInputManager } from '../abstractions/IInputManager.js';
 // Import interface types for dependency resolution
 import type { ITerminal } from '../abstractions/ITerminal.js';

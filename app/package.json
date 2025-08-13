@@ -1,6 +1,6 @@
 {
   "name": "@qi/app",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "Qi V2 Agent - CLI + Agent with Command, Prompt & Context Continuation",
   "type": "module",
   "scripts": {
