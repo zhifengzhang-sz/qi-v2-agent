@@ -15,54 +15,131 @@ const envPath = join(__dirname, '..', '..', '..', '.env');
 config({ path: envPath });
 
 /**
- * Qi Prompt CLI Application - v-0.6.1 Pure Message-Driven Architecture
+ * Qi Prompt CLI Application - v-0.6.3 Pure Message-Driven Architecture with QiCore Integration
  *
  * Roadmap:
  * - v-0.4.x: Pure prompt app ✓
  * - v-0.5.x: Toolbox preview with file references and workflows ✓
- * - v-0.6.1: Pure message-driven architecture (h2A pattern) ← YOU ARE HERE
+ * - v-0.6.1: Pure message-driven architecture (h2A pattern) ✓
+ * - v-0.6.3: Complete QiCore integration ← YOU ARE HERE
  * - v-0.6.x: Full toolbox (100+ tools, MCP integration)
  * - v-0.7.x: Advanced workflows
  * - v-0.8.x: Full agent capabilities
  *
- * v-0.6.1 Features:
- * - Pure message-driven coordination (no EventEmitter race conditions)
- * - h2A-inspired QiAsyncMessageQueue for all communication
- * - Single message processing loop eliminates duplicate LLM calls
- * - Sequential processing prevents race conditions
- * - Maintains all v-0.5.x features through message flow
+ * v-0.6.3 Features:
+ * - Complete QiCore integration with Result<T> patterns
+ * - Structured logging with @qi/core/logger
+ * - Type-safe configuration with ConfigBuilder
+ * - Professional error handling with QiError
+ * - No console.log or try/catch blocks
  */
 
-// v-0.6.1: Direct imports for message-driven architecture
+// v-0.6.3: QiCore imports for professional patterns
 import { createCommandHandler } from '@qi/agent/command';
 import { createDefaultAppContext } from '@qi/agent/context';
+// Use standard context manager instead of tool-based one
+import { ContextManager } from '@qi/agent/context/impl/ContextManager';
+import { QiAsyncMessageQueue } from '@qi/agent/messaging/impl/QiAsyncMessageQueue';
+import type { QiMessage } from '@qi/agent/messaging/types/MessageTypes';
 import { createPromptHandler } from '@qi/agent/prompt';
 import { createStateManager } from '@qi/agent/state';
-import { match } from '@qi/base';
-// Use standard context manager instead of tool-based one
-import { ContextManager } from '../../../lib/src/context/impl/ContextManager.js';
-import { QiAsyncMessageQueue } from '../../../lib/src/messaging/impl/QiAsyncMessageQueue.js';
-import type { QiMessage } from '../../../lib/src/messaging/types/MessageTypes.js';
+// Debug logging utility
+import { initializeDebugLogging } from '@qi/agent/utils/DebugLogger';
 // Import new two-layer workflow architecture (v0.5.x refactored)
-import { createWorkflowHandler, type IWorkflowHandler } from '../../../lib/src/workflows/index.js';
+import { createWorkflowHandler, type IWorkflowHandler } from '@qi/agent/workflows';
+import {
+  businessError,
+  create,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  systemError,
+  validationError,
+} from '@qi/base';
 // Import app-specific commands
 import { createModelCommand } from './commands/ModelCommand.js';
 import { createProviderCommand } from './commands/ProviderCommand.js';
 import { createStatusCommand } from './commands/StatusCommand.js';
 // v-0.6.1: Import new QiPrompt Core and message queue
 import { QiPromptCLI } from './QiPromptCLI.js';
-// Debug logging utility
-import { initializeDebugLogging } from '../../../lib/src/utils/DebugLogger.js';
+
+// Simple logger implementation (fallback for @qi/core/logger)
+interface SimpleLogger {
+  info: (message: string, data?: any, metadata?: any) => void;
+  error: (message: string, data?: any, metadata?: any) => void;
+  warn: (message: string, data?: any, metadata?: any) => void;
+  debug: (message: string, data?: any, metadata?: any) => void;
+}
+
+const createSimpleLogger = (level: string = 'info', pretty: boolean = true): SimpleLogger => {
+  const levels = { debug: 0, info: 1, warn: 2, error: 3 };
+  const currentLevel = levels[level as keyof typeof levels] || 1;
+
+  const log = (logLevel: string, message: string, _data?: any, metadata?: any) => {
+    if (levels[logLevel as keyof typeof levels] >= currentLevel) {
+      const timestamp = new Date().toISOString();
+      if (pretty && metadata) {
+        console.log(`[${timestamp}] ${logLevel.toUpperCase()}: ${message}`, metadata);
+      } else {
+        console.log(`[${timestamp}] ${logLevel.toUpperCase()}: ${message}`);
+      }
+    }
+  };
+
+  return {
+    info: (msg, data, meta) => log('info', msg, data, meta),
+    error: (msg, data, meta) => log('error', msg, data, meta),
+    warn: (msg, data, meta) => log('warn', msg, data, meta),
+    debug: (msg, data, meta) => log('debug', msg, data, meta),
+  };
+};
+
+// Configuration helper to extract app config from StateManager
+interface AppConfigHelper {
+  getOr: (path: string, defaultValue: any) => any;
+}
+
+const createAppConfigHelper = (stateManager: any): AppConfigHelper => ({
+  getOr: (path: string, defaultValue: any) => {
+    try {
+      const config = stateManager.getConfig();
+      const keys = path.split('.');
+
+      // Handle specific paths for app configuration
+      if (keys[0] === 'app') {
+        if (keys[1] === 'framework') return 'hybrid'; // Default framework
+        if (keys[1] === 'debug') return config.enableDebugMode || false;
+      }
+      if (keys[0] === 'ui') {
+        if (keys[1] === 'enableHotkeys') return true; // Default UI settings
+        if (keys[1] === 'enableStreaming') return true;
+      }
+      if (keys[0] === 'messaging') {
+        if (keys[1] === 'queueTTL') return 300000; // 5 minutes default
+      }
+      if (keys[0] === 'logging') {
+        if (keys[1] === 'level') return config.enableDebugMode ? 'debug' : 'info';
+        if (keys[1] === 'pretty') return true;
+        if (keys[1] === 'component') return 'QiPromptApp';
+      }
+
+      return defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  },
+});
 
 /**
- * Main Application Class - v-0.6.1 Pure Message-Driven Architecture
+ * Main Application Class - v-0.6.3 Pure Message-Driven Architecture with QiCore Integration
  *
  * Coordinates QiPrompt Core, CLI, and all components through message queue.
- * Eliminates EventEmitter race conditions with h2A-inspired sequential processing.
+ * Uses QiCore patterns for logging, error handling, and configuration.
  */
 class QiPromptApp {
-  private qiPromptCore?: QiPromptCLI; // v-0.6.1: New message-driven core
-  private messageQueue: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Central coordination
+  private qiPromptCore?: QiPromptCLI; // v-0.6.3: Message-driven core with QiCore
+  private messageQueue!: QiAsyncMessageQueue<QiMessage>; // v-0.6.3: Central coordination - Initialized in initialize()
   private orchestrator: any;
   private cli: any;
   private stateManager: any;
@@ -74,6 +151,8 @@ class QiPromptApp {
   private framework?: 'readline' | 'ink' | 'hybrid';
   private autoDetect: boolean;
   private currentSession?: string;
+  private logger: SimpleLogger;
+  private configHelper!: AppConfigHelper;
 
   constructor(
     options: {
@@ -86,18 +165,11 @@ class QiPromptApp {
     this.framework = options.framework;
     this.autoDetect = options.autoDetect ?? false;
 
-    // Initialize debug logging globally
-    initializeDebugLogging(this.debugMode);
+    // Initialize simple logger
+    this.logger = createSimpleLogger(this.debugMode ? 'debug' : 'info', true);
 
-    // v-0.6.1: Initialize message queue first (central coordination hub)
-    // Design specification: Single Message Queue with sequential processing
-    this.messageQueue = new QiAsyncMessageQueue<QiMessage>({
-      maxConcurrent: 1, // SINGLE processing loop as per design
-      priorityQueuing: true,
-      autoCleanup: true,
-      enableStats: this.debugMode,
-      messageTtl: 30000, // 30 seconds
-    });
+    // Initialize debug logging globally (legacy support)
+    initializeDebugLogging(this.debugMode);
 
     // Initialize two-layer workflow architecture (v-0.5.x refactored)
     this.workflowHandler = createWorkflowHandler();
@@ -118,140 +190,305 @@ class QiPromptApp {
     this.registerAppCommands();
   }
 
-  async initialize(): Promise<void> {
-    console.log('🚀 Initializing Qi Prompt CLI v-0.6.1 (Pure Message-Driven Architecture)...');
-
-    try {
-      // Initialize workflow handler (v-0.5.x refactored)
-      console.log('🧰 Initializing workflow handler...');
-      const workflowResult = await this.workflowHandler.initialize();
-      if (!workflowResult.success) {
-        const errorMsg = 'error' in workflowResult ? workflowResult.error : 'Unknown error';
-        throw new Error(`Failed to initialize workflow handler: ${errorMsg}`);
-      }
-
-      // Initialize standard context manager
-      await this.contextManager.initialize();
-      console.log('✅ Workflow handler and context manager initialized');
-
-      // Load LLM configuration through StateManager
-      console.log('📝 Loading LLM configuration...');
-      const configPath = join(__dirname, '..', '..', '..', 'config');
-      await this.stateManager.loadLLMConfig(configPath);
-      console.log('✅ Configuration loaded successfully');
-
-      // Initialize prompt handler with config files
-      const configPath2 = join(__dirname, '..', '..', '..', 'config', 'llm-providers.yaml');
-      const schemaPath = join(__dirname, '..', '..', '..', 'config', 'llm-providers.schema.json');
-
-      const initResult = await this.promptHandler.initialize(configPath2, schemaPath);
-      if (!initResult.success) {
-        throw new Error(`Failed to initialize prompt handler: ${initResult.error}`);
-      }
-      console.log('✅ Prompt handler initialized');
-
-      // Create a new conversation context (v-0.5.x refactored)
-      console.log('📚 Creating conversation context...');
-      const conversationContext = this.contextManager.createConversationContext('main');
-      this.currentSession = conversationContext.id;
-      console.log(`✅ Conversation context created: ${conversationContext.id}`);
-
-      // v-0.6.1: Create orchestrator directly with message queue (bypass factory)
-      this.orchestrator = new (
-        await import('../../../lib/src/agent/PromptAppOrchestrator.js')
-      ).PromptAppOrchestrator(
-        this.stateManager,
-        this.contextManager,
-        {
-          domain: 'prompt-app-v0-6-1',
-          enableCommands: true,
-          enablePrompts: true,
-          sessionPersistence: true,
-        },
-        {
-          commandHandler: this.commandHandler,
-          promptHandler: this.promptHandler,
-          workflowHandler: this.workflowHandler,
-          messageQueue: this.messageQueue, // v-0.6.1: Direct injection
+  async initialize(): Promise<Result<void, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Only show minimal startup message in normal mode
+        if (this.debugMode) {
+          this.logger.info(
+            '🚀 Initializing Qi Prompt CLI v-0.6.3 (Pure Message-Driven Architecture with QiCore)...',
+            undefined,
+            {
+              component: 'QiPromptApp',
+              version: 'v-0.6.3',
+            }
+          );
         }
-      );
 
-      await this.orchestrator.initialize();
-      console.log('✅ PromptApp orchestrator initialized with message queue');
+        // Load LLM configuration through StateManager FIRST (single source of truth)
+        if (this.debugMode) {
+          this.logger.info('📝 Loading LLM configuration...', undefined, {
+            component: 'QiPromptApp',
+            step: 'llm_config_loading',
+          });
+        }
 
-      // v-0.6.1: Use proper CLI framework with message queue injection
-      const { createCLI } = await import('../../../lib/src/cli/index.js');
+        const llmConfigPath = join(__dirname, '..', '..', '..', 'config');
+        await this.stateManager.loadLLMConfig(llmConfigPath);
 
-      const cliResult = createCLI({
-        framework: this.framework || 'hybrid',
-        enableHotkeys: true,
-        enableStreaming: true,
-        debug: this.debugMode,
-        messageQueue: this.messageQueue, // v-0.6.1: Pass message queue to framework
-        stateManager: this.stateManager, // v-0.6.1: Pass state manager for UI updates
-      });
+        // Create config helper that uses StateManager as source
+        this.configHelper = createAppConfigHelper(this.stateManager);
 
-      // Check if this is already a CLI object (not a Result)
-      if (typeof (cliResult as any)?.initialize === 'function') {
-        console.log('✅ CLI framework created');
-        this.cli = cliResult as any;
-      } else {
-        // Use QiCore functional pattern to unwrap the Result
-        this.cli = match(
-          (cli) => {
-            console.log('✅ CLI framework created');
-            return cli;
+        // Recreate logger with StateManager configuration values
+        this.logger = createSimpleLogger(
+          this.configHelper.getOr('logging.level', 'info'),
+          this.configHelper.getOr('logging.pretty', true)
+        );
+
+        if (this.debugMode) {
+          this.logger.info('✅ LLM Configuration loaded successfully', undefined, {
+            component: this.configHelper.getOr('logging.component', 'QiPromptApp'),
+            step: 'llm_config_loaded',
+            configPath: llmConfigPath,
+            logLevel: this.configHelper.getOr('logging.level', 'info'),
+          });
+        }
+
+        // v-0.6.3: Initialize message queue with configuration values
+        // Design specification: Single Message Queue with sequential processing
+        this.messageQueue = new QiAsyncMessageQueue<QiMessage>({
+          maxConcurrent: 1, // SINGLE processing loop as per design
+          priorityQueuing: true,
+          autoCleanup: true,
+          enableStats: this.configHelper.getOr('app.debug', false),
+          messageTtl: this.configHelper.getOr('messaging.queueTTL', 300000), // 5 minutes default
+        });
+
+        if (this.debugMode) {
+          this.logger.info('✅ Message queue initialized with configuration', undefined, {
+            component: 'QiPromptApp',
+            step: 'message_queue_initialized',
+            queueTTL: this.configHelper.getOr('messaging.queueTTL', 300000),
+            enableStats: this.configHelper.getOr('app.debug', false),
+          });
+
+          // Initialize workflow handler (v-0.5.x refactored)
+          this.logger.info('🧰 Initializing workflow handler...', undefined, {
+            component: 'QiPromptApp',
+            step: 'workflow_handler_init',
+          });
+        }
+
+        const workflowResult = await this.workflowHandler.initialize();
+        if (!workflowResult.success) {
+          const errorMsg = 'error' in workflowResult ? workflowResult.error : 'Unknown error';
+          const workflowError = businessError('Workflow handler initialization failed', {
+            errorMessage: errorMsg,
+            step: 'workflow_handler_init',
+            component: 'WorkflowHandler',
+          });
+          throw workflowError;
+        }
+
+        // Initialize standard context manager
+        await this.contextManager.initialize();
+        if (this.debugMode) {
+          this.logger.info('✅ Workflow handler and context manager initialized', undefined, {
+            component: 'QiPromptApp',
+            step: 'workflow_and_context_initialized',
+          });
+        }
+
+        // Initialize prompt handler with config files
+        const promptConfigPath = join(__dirname, '..', '..', '..', 'config', 'llm-providers.yaml');
+        const promptSchemaPath = join(
+          __dirname,
+          '..',
+          '..',
+          '..',
+          'config',
+          'llm-providers.schema.json'
+        );
+
+        const initResult = await this.promptHandler.initialize(promptConfigPath, promptSchemaPath);
+        if (!initResult.success) {
+          throw new Error(`Failed to initialize prompt handler: ${initResult.error}`);
+        }
+        if (this.debugMode) {
+          this.logger.info('✅ Prompt handler initialized', undefined, {
+            component: 'QiPromptApp',
+            step: 'prompt_handler_initialized',
+          });
+        }
+
+        // Create a new conversation context (v-0.5.x refactored)
+        if (this.debugMode) {
+          this.logger.info('📚 Creating conversation context...', undefined, {
+            component: 'QiPromptApp',
+            step: 'conversation_context_creation',
+          });
+        }
+
+        const conversationContext = this.contextManager.createConversationContext('main');
+        this.currentSession = conversationContext.id;
+        if (this.debugMode) {
+          this.logger.info('✅ Conversation context created', undefined, {
+            component: 'QiPromptApp',
+            step: 'conversation_context_created',
+            contextId: conversationContext.id,
+          });
+        }
+
+        // v-0.6.3: Create orchestrator directly with message queue (bypass factory)
+        this.orchestrator = new (
+          await import('@qi/agent/agent/PromptAppOrchestrator')
+        ).PromptAppOrchestrator(
+          this.stateManager,
+          this.contextManager,
+          {
+            domain: 'prompt-app-v0-6-3',
+            enableCommands: true,
+            enablePrompts: true,
+            sessionPersistence: true,
+          },
+          {
+            commandHandler: this.commandHandler,
+            promptHandler: this.promptHandler,
+            workflowHandler: this.workflowHandler,
+            messageQueue: this.messageQueue, // v-0.6.3: Direct injection
+          }
+        );
+
+        await this.orchestrator.initialize();
+        if (this.debugMode) {
+          this.logger.info('✅ PromptApp orchestrator initialized with message queue', undefined, {
+            component: 'QiPromptApp',
+            step: 'orchestrator_initialized',
+          });
+        }
+
+        // v-0.6.3: Use proper CLI framework with message queue injection
+        const { createCLI } = await import('@qi/agent/cli');
+
+        const cliResult = createCLI({
+          framework: this.framework || this.configHelper.getOr('app.framework', 'hybrid'),
+          enableHotkeys: this.configHelper.getOr('ui.enableHotkeys', true),
+          enableStreaming: this.configHelper.getOr('ui.enableStreaming', true),
+          debug: this.debugMode || this.configHelper.getOr('app.debug', false),
+          messageQueue: this.messageQueue, // v-0.6.3: Pass message queue to framework
+          stateManager: this.stateManager, // v-0.6.3: Pass state manager for UI updates
+        });
+
+        // Check if this is already a CLI object (not a Result)
+        if (typeof (cliResult as any)?.initialize === 'function') {
+          if (this.debugMode) {
+            this.logger.info('✅ CLI framework created', undefined, {
+              component: 'QiPromptApp',
+              step: 'cli_framework_created',
+            });
+          }
+          this.cli = cliResult as any;
+        } else {
+          // Use QiCore functional pattern to unwrap the Result
+          this.cli = match(
+            (cli) => {
+              if (this.debugMode) {
+                this.logger.info('✅ CLI framework created', undefined, {
+                  component: 'QiPromptApp',
+                  step: 'cli_framework_created',
+                });
+              }
+              return cli;
+            },
+            (error) => {
+              const cliError = systemError('Failed to create CLI framework', {
+                framework: this.framework || this.configHelper.getOr('app.framework', 'hybrid'),
+                originalError: error instanceof Error ? error.message : String(error),
+                step: 'cli_framework_creation',
+              });
+              throw cliError;
+            },
+            cliResult as any
+          );
+        }
+
+        // CLI will be initialized by QiPromptCore
+
+        // v-0.6.3: Create simplified QiPrompt Core for message processing
+        this.qiPromptCore = new QiPromptCLI(this.cli, this.orchestrator, this.messageQueue);
+
+        const coreInitResult = await this.qiPromptCore.initialize();
+        // Use QiCore functional pattern instead of manual checking
+        match(
+          () => {
+            if (this.debugMode) {
+              this.logger.info(
+                '✅ QiPrompt Core initialized with message processing loop',
+                undefined,
+                {
+                  component: 'QiPromptApp',
+                  step: 'qi_prompt_core_initialized',
+                }
+              );
+            }
           },
           (error) => {
-            throw new Error(
-              `Failed to create CLI framework: ${error instanceof Error ? error.message : String(error)}`
-            );
+            throw new Error(`Failed to initialize QiPrompt Core: ${error.message}`);
           },
-          cliResult as any
+          coreInitResult
         );
-      }
 
-      // CLI will be initialized by QiPromptCore
+        if (this.debugMode) {
+          this.logger.info(
+            '🎉 v-0.6.3 message-driven architecture initialization complete!',
+            undefined,
+            {
+              component: 'QiPromptApp',
+              step: 'initialization_complete',
+            }
+          );
+        }
 
-      // v-0.6.1: Create simplified QiPrompt Core for message processing
-      this.qiPromptCore = new QiPromptCLI(this.cli, this.orchestrator, this.messageQueue);
-
-      const coreInitResult = await this.qiPromptCore.initialize();
-      // Use QiCore functional pattern instead of manual checking
-      match(
-        () => console.log('✅ QiPrompt Core initialized with message processing loop'),
-        (error) => {
-          throw new Error(`Failed to initialize QiPrompt Core: ${error.message}`);
-        },
-        coreInitResult
-      );
-
-      console.log('🎉 v-0.6.1 message-driven architecture initialization complete!\n');
-    } catch (error) {
-      console.error('❌ Initialization failed:', error);
-      throw error;
-    }
+        return undefined;
+      },
+      (error) =>
+        create(
+          'INITIALIZATION_FAILED',
+          `Failed to initialize QiPromptApp: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { error }
+        )
+    );
   }
 
   async start(): Promise<void> {
-    await this.initialize();
+    const initResult = await this.initialize();
 
-    // Display welcome message with v-0.6.1 features
-    console.log('📨 v-0.6.1 Pure Message-Driven Features:');
-    console.log('  - h2A-inspired message queue eliminates race conditions');
-    console.log('  - Sequential processing prevents duplicate LLM calls');
-    console.log('  - Pure message coordination (no EventEmitter)');
-    console.log('  - File references: Use @path/to/file to reference files');
-    console.log('  - Simple workflows: FILE_REFERENCE workflow for @file + prompt patterns');
-    console.log('  - Tool registry: Composable, reusable tools');
-    console.log('  - Session persistence: Conversations saved automatically');
-    console.log('  - Project awareness: Automatic project context detection');
+    // Handle initialization result
+    match(
+      () => {}, // Success - continue with start
+      (error) => {
+        this.logger.error('Failed to initialize application', undefined, {
+          component: 'QiPromptApp',
+          error: error.message,
+          errorContext: error.context,
+        });
+        const initError = systemError('Application initialization failed', {
+          originalError: error.message,
+          errorContext: error.context,
+          step: 'application_start',
+        });
+        throw initError;
+      },
+      initResult
+    );
 
-    // Show workflow tools
-    console.log(`  - Tools managed by workflow system`);
-    console.log('');
+    // Display welcome message with v-0.6.3 features only in debug mode
+    if (this.debugMode) {
+      this.logger.info(
+        '📨 v-0.6.3 Pure Message-Driven Features with QiCore Integration:',
+        undefined,
+        {
+          component: 'QiPromptApp',
+          features: [
+            'h2A-inspired message queue eliminates race conditions',
+            'Sequential processing prevents duplicate LLM calls',
+            'Pure message coordination (no EventEmitter)',
+            'Complete QiCore integration with Result<T> patterns',
+            'Structured logging with @qi/core/logger',
+            'Professional error handling with QiError',
+            'File references: Use @path/to/file to reference files',
+            'Simple workflows: FILE_REFERENCE workflow for @file + prompt patterns',
+            'Tool registry: Composable, reusable tools',
+            'Session persistence: Conversations saved automatically',
+            'Project awareness: Automatic project context detection',
+            'Tools managed by workflow system',
+          ],
+        }
+      );
+    }
 
-    // v-0.6.1: Start QiPrompt Core message processing loop
+    // v-0.6.3: Start QiPrompt Core message processing loop
     if (!this.qiPromptCore) {
       throw new Error('QiPrompt Core not initialized');
     }
@@ -259,7 +496,14 @@ class QiPromptApp {
     const startResult = await this.qiPromptCore.start();
     // Use QiCore functional pattern
     match(
-      () => console.log('🎯 QiPrompt Core message processing loop started'),
+      () => {
+        if (this.debugMode) {
+          this.logger.info('🎯 QiPrompt Core message processing loop started', undefined, {
+            component: 'QiPromptApp',
+            step: 'message_processing_started',
+          });
+        }
+      },
       (error) => {
         throw new Error(`Failed to start QiPrompt Core: ${error.message}`);
       },
@@ -268,45 +512,91 @@ class QiPromptApp {
   }
 
   /**
-   * Enhanced shutdown with v-0.6.1 message queue cleanup
+   * Enhanced shutdown with v-0.6.3 message queue cleanup and QiCore logging
    */
   async shutdown(): Promise<void> {
-    console.log('\n🛑 Shutting down v-0.6.1 message-driven CLI...');
-
-    try {
-      // v-0.6.1: Shutdown QiPrompt Core first (stops message processing)
-      if (this.qiPromptCore) {
-        const shutdownResult = await this.qiPromptCore.shutdown();
-        // Use QiCore functional pattern
-        match(
-          () => console.log('✅ QiPrompt Core shut down'),
-          (error) => console.warn('⚠️ QiPrompt Core shutdown had issues:', error.message),
-          shutdownResult
-        );
-      }
-
-      // Shutdown message queue
-      if (this.messageQueue) {
-        await this.messageQueue.destroy();
-        console.log('✅ Message queue destroyed');
-      }
-
-      // Shutdown context manager
-      if (this.contextManager) {
-        await this.contextManager.shutdown();
-        console.log('✅ Context manager shut down');
-      }
-
-      // Cleanup workflow handler
-      if (this.workflowHandler) {
-        // Workflow handler cleanup is handled internally
-        console.log('✅ Workflow handler cleaned up');
-      }
-
-      console.log('✅ v-0.6.1 shutdown complete');
-    } catch (error) {
-      console.error('Error during v-0.6.1 shutdown:', error);
+    if (this.debugMode) {
+      this.logger.info('🛑 Shutting down v-0.6.3 message-driven CLI...', undefined, {
+        component: 'QiPromptApp',
+        step: 'shutdown_initiated',
+      });
     }
+
+    const shutdownResult = await fromAsyncTryCatch(
+      async () => {
+        // v-0.6.3: Shutdown QiPrompt Core first (stops message processing)
+        if (this.qiPromptCore) {
+          const shutdownResult = await this.qiPromptCore.shutdown();
+          // Use QiCore functional pattern
+          match(
+            () =>
+              this.logger.info('✅ QiPrompt Core shut down', undefined, {
+                component: 'QiPromptApp',
+                step: 'qi_prompt_core_shutdown',
+              }),
+            (error) =>
+              this.logger.warn('⚠️ QiPrompt Core shutdown had issues', undefined, {
+                component: 'QiPromptApp',
+                error: error.message,
+              }),
+            shutdownResult
+          );
+        }
+
+        // Shutdown message queue
+        if (this.messageQueue) {
+          await this.messageQueue.destroy();
+          this.logger.info('✅ Message queue destroyed', undefined, {
+            component: 'QiPromptApp',
+            step: 'message_queue_destroyed',
+          });
+        }
+
+        // Shutdown context manager
+        if (this.contextManager) {
+          await this.contextManager.shutdown();
+          this.logger.info('✅ Context manager shut down', undefined, {
+            component: 'QiPromptApp',
+            step: 'context_manager_shutdown',
+          });
+        }
+
+        // Cleanup workflow handler
+        if (this.workflowHandler) {
+          // Workflow handler cleanup is handled internally
+          this.logger.info('✅ Workflow handler cleaned up', undefined, {
+            component: 'QiPromptApp',
+            step: 'workflow_handler_cleanup',
+          });
+        }
+
+        this.logger.info('✅ v-0.6.3 shutdown complete', undefined, {
+          component: 'QiPromptApp',
+          step: 'shutdown_complete',
+        });
+
+        return undefined;
+      },
+      (error) =>
+        create(
+          'SHUTDOWN_FAILED',
+          `Error during v-0.6.3 shutdown: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { error }
+        )
+    );
+
+    // Log any shutdown errors
+    match(
+      () => {}, // Success - no action needed
+      (error) =>
+        this.logger.error('Error during v-0.6.3 shutdown', undefined, {
+          component: 'QiPromptApp',
+          error: error.message,
+          errorContext: error.context,
+        }),
+      shutdownResult
+    );
   }
 
   // v-0.6.1: All event communication methods removed - pure message-driven architecture

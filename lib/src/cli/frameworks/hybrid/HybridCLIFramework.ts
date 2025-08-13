@@ -80,8 +80,8 @@ export class HybridCLIFramework extends InkCLIFramework {
     // Initialize configuration first
     this.initializeConfiguration();
 
-    // Initialize logger (depends on config)
-    this.initializeLogger();
+    // Initialize logger (depends on config) - pass config for debug mode
+    this.initializeLogger(config);
   }
 
   /**
@@ -130,9 +130,10 @@ export class HybridCLIFramework extends InkCLIFramework {
   /**
    * Initialize QiCore logger with proper error handling
    */
-  private initializeLogger(): void {
+  private initializeLogger(config: Partial<CLIConfig>): void {
+    const debugMode = (config as any).debug || false;
     const loggerResult = createLogger({
-      level: 'info',
+      level: debugMode ? 'debug' : 'info',
       name: 'hybrid-cli-framework',
       pretty: process.env.NODE_ENV === 'development',
     });
@@ -140,12 +141,15 @@ export class HybridCLIFramework extends InkCLIFramework {
     match(
       (logger) => {
         this.logger = logger;
-        this.logger.info('Hybrid CLI Framework initialized', {
-          isHybridEnabled: this.isHybridEnabled,
-          framework: 'hybrid',
-          parent: 'ink',
-          configLoaded: this.hybridConfig !== null,
-        });
+        // Only log initialization message in debug mode
+        if (debugMode) {
+          this.logger.info('Hybrid CLI Framework initialized', {
+            isHybridEnabled: this.isHybridEnabled,
+            framework: 'hybrid',
+            parent: 'ink',
+            configLoaded: this.hybridConfig !== null,
+          });
+        }
       },
       (error) => {
         // Fallback: if logger creation fails, we'll use null and handle gracefully
