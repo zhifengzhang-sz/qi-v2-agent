@@ -42,12 +42,53 @@ case MessageType.USER_INPUT:
 
 ### 3. Component Responsibility Matrix
 
-| Component | Creates Messages | Consumes Messages | Direct Calls |
-|-----------|-----------------|-------------------|--------------|
-| **InkCLIFramework** | USER_INPUT | CLI_MESSAGE_RECEIVED | displayMessage() |
-| **QiPromptCLI** | SYSTEM_CONTROL | USER_INPUT, AGENT_OUTPUT | orchestrator.process() |
-| **PromptAppOrchestrator** | *(none)* | *(none)* | All internal processing |
-| **QiAsyncMessageQueue** | *(none)* | *(all)* | Event emission only |
+| Component | Creates Messages | Consumes Messages | Direct Calls | Logging Level |
+|-----------|-----------------|-------------------|--------------|---------------|
+| **InkCLIFramework** | USER_INPUT | CLI_MESSAGE_RECEIVED | displayMessage() | Info/Debug |
+| **QiPromptCLI** | SYSTEM_CONTROL | USER_INPUT, AGENT_OUTPUT | orchestrator.process() | Info/Debug |
+| **PromptAppOrchestrator** | *(none)* | *(none)* | All internal processing | Info/Error |
+| **QiAsyncMessageQueue** | *(none)* | *(all)* | Event emission only | Debug only |
+
+### 4. Logging in Message-Driven Architecture
+
+#### Logging Levels by Message Flow
+
+- **Debug**: Message enqueueing, processing start/end, detailed state
+- **Info**: Major state changes, component initialization, user actions
+- **Warn**: Degraded conditions, retries, fallback behaviors
+- **Error**: Processing failures, system errors, unrecoverable states
+
+#### Structured Message Logging
+
+```typescript
+// Message creation logging
+this.logger.debug('📤 Creating message', undefined, {
+  messageType: message.type,
+  messageId: message.id,
+  component: 'MessageProducer',
+});
+
+// Message processing logging
+this.logger.debug('⏳ Processing message', undefined, {
+  messageId: message.id,
+  messageType: message.type,
+  component: 'MessageProcessor',
+  queueSize: this.messageQueue.size,
+});
+
+// Message completion logging
+this.logger.debug('✅ Message processing complete', undefined, {
+  messageId: message.id,
+  component: 'MessageProcessor',
+  processingTime: Date.now() - startTime,
+});
+```
+
+#### Performance Impact Considerations
+
+- Use conditional debug logging for verbose message tracing
+- Include timing data only when performance monitoring is enabled
+- Avoid expensive serialization in hot message processing paths
 
 ## Development Guidelines
 
@@ -82,31 +123,68 @@ Every message flow must have:
 
 ### 1. Message Flow Tracing
 
-Add comprehensive logging for message lifecycle:
+Add comprehensive logging for message lifecycle using QiCore logger:
 ```typescript
 // At message creation
-console.log(`📤 [TRACE] Creating ${messageType} message: ID=${id}`);
+this.logger.debug('📤 Creating message', undefined, {
+  messageType,
+  messageId: id,
+  component: 'MessageFactory',
+  trace: 'creation',
+});
 
 // At message processing start
-console.log(`⏳ [TRACE] Processing ${messageType}: ID=${id}`);
+this.logger.debug('⏳ Processing message', undefined, {
+  messageType,
+  messageId: id,
+  component: 'MessageProcessor',
+  trace: 'processing_start',
+});
 
 // At message processing completion
-console.log(`✅ [TRACE] Completed ${messageType}: ID=${id}`);
+this.logger.debug('✅ Message processing complete', undefined, {
+  messageType,
+  messageId: id,
+  component: 'MessageProcessor',
+  trace: 'processing_complete',
+  processingTime: Date.now() - startTime,
+});
 
 // At message enqueueing
-console.log(`📥 [TRACE] Enqueuing ${messageType}: ID=${id}`);
+this.logger.debug('📥 Enqueuing message', undefined, {
+  messageType,
+  messageId: id,
+  component: 'MessageQueue',
+  trace: 'enqueueing',
+  queueSize: this.messageQueue.size,
+});
 ```
 
 ### 2. Loop Detection Utilities
 
 ```typescript
+import { createLogger } from '@qi/core';
+import { match } from '@qi/base';
+
 class MessageLoopDetector {
   private processedMessages = new Set<string>();
   private processingStack: string[] = [];
+  private logger: Logger;
+
+  constructor() {
+    const loggerResult = createLogger({ level: 'error', pretty: true });
+    this.logger = match(logger => logger, () => fallbackLogger, loggerResult);
+  }
 
   checkForLoop(messageId: string, messageType: string): boolean {
     if (this.processingStack.includes(messageId)) {
-      console.error(`🔄 LOOP DETECTED: ${messageType} message ${messageId} already in processing stack:`, this.processingStack);
+      this.logger.error('🔄 Message processing loop detected', undefined, {
+        component: 'MessageLoopDetector',
+        messageType,
+        messageId,
+        processingStack: this.processingStack,
+        stackDepth: this.processingStack.length,
+      });
       return true;
     }
     return false;

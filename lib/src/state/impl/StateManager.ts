@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { fromAsyncTryCatch, match, type QiError, type Result, validationError } from '@qi/base';
 import { ConfigBuilder } from '@qi/core';
+import { createQiLogger, logError, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   AppConfig,
   AppContext,
@@ -73,6 +74,7 @@ export class StateManager implements IStateManager {
   private session: SessionData;
   private models: Map<string, ModelInfo>;
   private listeners: Set<StateChangeListener> = new Set();
+  private logger: SimpleLogger;
 
   // LLM configuration
   private llmConfig: any = null;
@@ -83,6 +85,13 @@ export class StateManager implements IStateManager {
     this.config = { ...DEFAULT_CONFIG };
     this.currentModel = DEFAULT_CONFIG.defaultModel;
     this.currentMode = 'ready';
+
+    // Initialize QiCore logger
+    this.logger = createQiLogger({
+      level: 'info',
+      name: 'StateManager',
+      pretty: true,
+    });
 
     // Initialize models
     this.models = new Map();
@@ -621,7 +630,13 @@ export class StateManager implements IStateManager {
       try {
         listener(change);
       } catch (error) {
-        console.error('State change listener error:', error);
+        logError(this.logger, error, {
+          component: 'StateManager',
+          method: 'notifyChange',
+          changeType: change.type,
+          changeField: change.field,
+          errorContext: 'state_change_listener_failed',
+        });
       }
     }
   }

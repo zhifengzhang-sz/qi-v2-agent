@@ -24,6 +24,7 @@ import { create, type ErrorCategory, type QiError } from '@qi/base';
 import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../messaging/types/MessageTypes.js';
 import { createDebugLogger } from '../utils/DebugLogger.js';
+import { createQiLogger, logError, logWarning, type SimpleLogger } from '../utils/QiCoreLogger.js';
 import type {
   IWorkflowHandler,
   WorkflowOptions,
@@ -146,6 +147,7 @@ export class PromptAppOrchestrator implements IAgent {
   private workflowHandler?: IWorkflowHandler;
   private messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Message coordination
   private debug = createDebugLogger('PromptAppOrchestrator');
+  private logger: SimpleLogger; // QiCore logger
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -179,6 +181,13 @@ export class PromptAppOrchestrator implements IAgent {
     this.promptHandler = dependencies.promptHandler;
     this.workflowHandler = dependencies.workflowHandler;
     this.messageQueue = dependencies.messageQueue; // v-0.6.1: Store message queue
+
+    // Initialize QiCore logger
+    this.logger = createQiLogger({
+      level: 'info',
+      name: 'PromptAppOrchestrator',
+      pretty: true,
+    });
 
     // v-0.6.1: Remove CLI event handlers - communication through message queue only
   }
@@ -738,8 +747,15 @@ export class PromptAppOrchestrator implements IAgent {
       const availableModels = this.stateManager.getAvailablePromptModels();
       if (availableModels.length > 0 && !availableModels.includes(modelName)) {
         // v-0.6.1: No emit - deprecated method
-        console.warn(
-          `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`
+        logWarning(
+          this.logger,
+          `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`,
+          {
+            component: 'PromptAppOrchestrator',
+            method: 'handleModelChangeRequest',
+            requestedModel: modelName,
+            availableModels,
+          }
         );
         return;
       }
@@ -751,7 +767,12 @@ export class PromptAppOrchestrator implements IAgent {
       // This method is deprecated - model changes should be handled through message queue
     } catch (error) {
       // v-0.6.1: No emit - deprecated method
-      console.warn('Model change failed:', error);
+      logError(this.logger, error, {
+        component: 'PromptAppOrchestrator',
+        method: 'handleModelChangeRequest',
+        requestedModel: modelName,
+        errorContext: 'model_change_failed',
+      });
     }
   }
 
@@ -762,7 +783,12 @@ export class PromptAppOrchestrator implements IAgent {
   private async handleModeChangeRequest(event: ModeChangeEvent): Promise<void> {
     const { mode } = event;
     // v-0.6.1: This method is deprecated - mode changes should be handled through message queue
-    console.log(`Mode change request: ${mode} (deprecated)`);
+    this.logger.warn(`Mode change request: ${mode} (deprecated)`, undefined, {
+      component: 'PromptAppOrchestrator',
+      method: 'handleModeChangeRequest',
+      mode,
+      reason: 'deprecated_method',
+    });
   }
 
   /**
@@ -786,7 +812,11 @@ export class PromptAppOrchestrator implements IAgent {
       await this.process(agentRequest);
     } catch (error) {
       // v-0.6.1: No emit - deprecated method
-      console.error('Prompt processing failed:', error);
+      logError(this.logger, error, {
+        component: 'PromptAppOrchestrator',
+        method: 'handlePromptRequest',
+        errorContext: 'prompt_processing_failed',
+      });
     }
   }
 
@@ -796,7 +826,11 @@ export class PromptAppOrchestrator implements IAgent {
    */
   private async handleStatusRequest(_event: StatusEvent): Promise<void> {
     // v-0.6.1: This method is deprecated - status should be handled through message queue
-    console.log('Status request (deprecated)');
+    this.logger.warn('Status request (deprecated)', undefined, {
+      component: 'PromptAppOrchestrator',
+      method: 'handleStatusRequest',
+      reason: 'deprecated_method',
+    });
   }
 
   /**

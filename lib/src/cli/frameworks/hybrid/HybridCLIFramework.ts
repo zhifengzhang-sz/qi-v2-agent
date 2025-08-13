@@ -11,8 +11,7 @@
  * - QiCore integration with proper logging and error handling
  */
 
-import { create, failure, match, type QiError, type Result, success } from '@qi/base';
-import { ConfigBuilder, createLogger, type Logger, type ValidatedConfig } from '@qi/core';
+import { create, failure, type QiError, type Result, success } from '@qi/base';
 import type { QiAsyncMessageQueue } from '../../../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../../../messaging/types/MessageTypes.js';
 import { Cursor } from '../../../utils/Cursor.js';
@@ -39,20 +38,6 @@ const hybridError = (
   create(code, message, 'SYSTEM', { framework: 'hybrid', ...context }) as HybridFrameworkError;
 
 /**
- * Default configuration for hybrid framework
- */
-const defaultHybridConfig = {
-  hybrid: {
-    enableTTYDetection: true,
-    fallbackToInk: true,
-    cursorBehavior: {
-      enableClaudeCodeNavigation: true,
-      twoStepDownArrow: true,
-    },
-  },
-};
-
-/**
  * Hybrid CLI Framework that enhances Ink with Claude Code-style navigation
  *
  * Key Features:
@@ -65,8 +50,6 @@ const defaultHybridConfig = {
 export class HybridCLIFramework extends InkCLIFramework {
   public isHybridEnabled = true; // Public flag for InputBox detection
   private cursorAtEndState = false; // Track if cursor moved to end on last down arrow
-  private logger: Logger | null = null; // QiCore logger instance
-  private hybridConfig: any | null = null; // QiCore configuration (using any for now until ValidatedConfig is available)
 
   constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     super(config, messageQueue);
@@ -74,119 +57,16 @@ export class HybridCLIFramework extends InkCLIFramework {
   }
 
   /**
-   * Initialize QiCore infrastructure (logger + config) with proper error handling
+   * Initialize QiCore infrastructure
+   * Note: Logger is already initialized by parent InkCLIFramework
    */
-  private initializeInfrastructure(config: Partial<CLIConfig>): void {
-    // Initialize configuration first
-    this.initializeConfiguration();
-
-    // Initialize logger (depends on config) - pass config for debug mode
-    this.initializeLogger(config);
-  }
-
-  /**
-   * Initialize configuration using simple defaults and environment variables
-   * Following QiCore patterns but simplified until full API is available
-   */
-  private initializeConfiguration(): void {
-    // For now, use a simple configuration approach with environment variable overrides
-    this.hybridConfig = {
-      get: <T>(path: string): Result<T, QiError> => {
-        const keys = path.split('.');
-        let value: any = defaultHybridConfig;
-
-        // Navigate through the config object
-        for (const key of keys) {
-          if (value && typeof value === 'object' && key in value) {
-            value = value[key];
-          } else {
-            return failure(
-              create('CONFIG_NOT_FOUND', `Configuration key not found: ${path}`, 'VALIDATION')
-            );
-          }
-        }
-
-        // Check for environment variable overrides
-        const envKey = `HYBRID_${keys.join('_').toUpperCase()}`;
-        const envValue = process.env[envKey];
-        if (envValue !== undefined) {
-          // Simple type conversion
-          if (envValue === 'true') return success(true as T);
-          if (envValue === 'false') return success(false as T);
-          if (!isNaN(Number(envValue))) return success(Number(envValue) as T);
-          return success(envValue as T);
-        }
-
-        return success(value as T);
-      },
-    };
-
-    this.logger?.debug('Configuration initialized', {
-      hasConfig: true,
-      environmentPrefix: 'HYBRID_',
+  private initializeInfrastructure(_config: Partial<CLIConfig>): void {
+    // Basic hybrid framework initialization
+    this.logger.debug('Hybrid CLI Framework initialized', {
+      isHybridEnabled: this.isHybridEnabled,
+      framework: 'hybrid',
+      parent: 'ink',
     });
-  }
-
-  /**
-   * Initialize QiCore logger with proper error handling
-   */
-  private initializeLogger(config: Partial<CLIConfig>): void {
-    const debugMode = (config as any).debug || false;
-    const loggerResult = createLogger({
-      level: debugMode ? 'debug' : 'info',
-      name: 'hybrid-cli-framework',
-      pretty: process.env.NODE_ENV === 'development',
-    });
-
-    match(
-      (logger) => {
-        this.logger = logger;
-        // Only log initialization message in debug mode
-        if (debugMode) {
-          this.logger.info('Hybrid CLI Framework initialized', {
-            isHybridEnabled: this.isHybridEnabled,
-            framework: 'hybrid',
-            parent: 'ink',
-            configLoaded: this.hybridConfig !== null,
-          });
-        }
-      },
-      (error) => {
-        // Fallback: if logger creation fails, we'll use null and handle gracefully
-        this.logger = null;
-        // Note: Following QiCore patterns - no console usage, graceful degradation
-      },
-      loggerResult
-    );
-  }
-
-  /**
-   * Get configuration value using QiCore patterns
-   */
-  private getConfigValue<T>(path: string, defaultValue: T): T {
-    if (!this.hybridConfig) return defaultValue;
-
-    // Use QiCore config pattern
-    const result = this.hybridConfig.get(path);
-    return match(
-      (value: T) => value,
-      () => defaultValue,
-      result
-    );
-  }
-
-  /**
-   * Check if Claude Code navigation is enabled
-   */
-  private isClaudeCodeNavigationEnabled(): boolean {
-    return this.getConfigValue('hybrid.cursorBehavior.enableClaudeCodeNavigation', true);
-  }
-
-  /**
-   * Check if two-step down arrow is enabled
-   */
-  private isTwoStepDownArrowEnabled(): boolean {
-    return this.getConfigValue('hybrid.cursorBehavior.twoStepDownArrow', true);
   }
 
   /**
@@ -206,7 +86,7 @@ export class HybridCLIFramework extends InkCLIFramework {
     },
     HybridFrameworkError
   > {
-    this.logger?.info('Handling navigation input', {
+    this.logger.info('Handling navigation input', {
       keyName: key.name,
       cursorOffset,
       textLength: text.length,
@@ -218,14 +98,14 @@ export class HybridCLIFramework extends InkCLIFramework {
     } else if (key.name === 'up') {
       // Reset cursor end state on up arrow
       this.cursorAtEndState = false;
-      this.logger?.debug('Reset cursor state on up arrow', {
+      this.logger.debug('Reset cursor state on up arrow', {
         cursorAtEndState: this.cursorAtEndState,
       });
       return success({ shouldTriggerHistory: false, resetCursorEndState: true });
     } else {
       // Reset cursor end state on any other key
       this.cursorAtEndState = false;
-      this.logger?.debug('Reset cursor state on key press', {
+      this.logger.debug('Reset cursor state on key press', {
         keyName: key.name,
         cursorAtEndState: this.cursorAtEndState,
       });
@@ -255,7 +135,7 @@ export class HybridCLIFramework extends InkCLIFramework {
         cursorOffset,
         textLength: text.length,
       });
-      this.logger?.warn('Invalid cursor offset detected', {
+      this.logger.warn('Invalid cursor offset detected', {
         cursorOffset,
         textLength: text.length,
         error: error.message,
@@ -269,7 +149,7 @@ export class HybridCLIFramework extends InkCLIFramework {
         cursorOffset,
         textLength: text.length,
       });
-      this.logger?.warn('Invalid column width', {
+      this.logger.warn('Invalid column width', {
         columns,
         error: error.message,
       });
@@ -285,7 +165,7 @@ export class HybridCLIFramework extends InkCLIFramework {
     // Check if cursor movement succeeded (Claude Code logic)
     if (cursorDown.equals(cursor)) {
       // Cursor can't move down - we're on the last line
-      this.logger?.debug('Cursor on last line, applying Claude Code behavior', {
+      this.logger.debug('Cursor on last line, applying Claude Code behavior', {
         cursorAtEndState: this.cursorAtEndState,
         cursorOffset,
         textLength: text.length,
@@ -294,7 +174,7 @@ export class HybridCLIFramework extends InkCLIFramework {
       if (!this.cursorAtEndState && cursorOffset < text.length) {
         // STEP 1: Move cursor to end of input
         this.cursorAtEndState = true;
-        this.logger?.info('Step 1: Moving cursor to end of input', {
+        this.logger.info('Step 1: Moving cursor to end of input', {
           oldOffset: cursorOffset,
           newOffset: text.length,
         });
@@ -305,7 +185,7 @@ export class HybridCLIFramework extends InkCLIFramework {
       } else {
         // STEP 2: Cursor already at end - trigger history navigation
         this.cursorAtEndState = false;
-        this.logger?.info('Step 2: Triggering history navigation', {
+        this.logger.info('Step 2: Triggering history navigation', {
           cursorOffset,
           textLength: text.length,
         });
@@ -314,7 +194,7 @@ export class HybridCLIFramework extends InkCLIFramework {
     } else {
       // Cursor moved successfully to next line - normal navigation
       this.cursorAtEndState = false;
-      this.logger?.debug('Normal cursor down movement', {
+      this.logger.debug('Normal cursor down movement', {
         oldOffset: cursorOffset,
         newOffset: cursorDown.offset,
       });
@@ -356,7 +236,7 @@ export class HybridCLIFramework extends InkCLIFramework {
     // QiCore: operations that can succeed, we just do directly
     const cursor = Cursor.fromText(text, columns, offset);
 
-    this.logger?.debug('Cursor created successfully', {
+    this.logger.debug('Cursor created successfully', {
       textLength: text.length,
       columns,
       offset: cursor.offset,
