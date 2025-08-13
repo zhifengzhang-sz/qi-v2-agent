@@ -24,7 +24,7 @@ import { create, type ErrorCategory, type QiError } from '@qi/base';
 import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../messaging/types/MessageTypes.js';
 import { createDebugLogger } from '../utils/DebugLogger.js';
-import { createQiLogger, logError, logWarning, type SimpleLogger } from '../utils/QiCoreLogger.js';
+import { createQiLogger } from '../utils/QiCoreLogger.js';
 import type {
   IWorkflowHandler,
   WorkflowOptions,
@@ -81,7 +81,7 @@ export interface AgentEvents {
 /**
  * Agent error factory using QiCore patterns
  */
-const createAgentError = (
+const _createAgentError = (
   code: string,
   message: string,
   category: ErrorCategory,
@@ -147,7 +147,7 @@ export class PromptAppOrchestrator implements IAgent {
   private workflowHandler?: IWorkflowHandler;
   private messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Message coordination
   private debug = createDebugLogger('PromptAppOrchestrator');
-  private logger: SimpleLogger; // QiCore logger
+  private logger: any; // QiCore logger instance
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -728,128 +728,6 @@ export class PromptAppOrchestrator implements IAgent {
         error: error instanceof Error ? error.message : String(error),
       };
     }
-  }
-
-  // ===========================================
-  // v-0.6.1: Removed CLI Event Handlers - Communication through message queue only
-  // ===========================================
-
-  /**
-   * Handle model change requests from CLI (DEPRECATED in v-0.6.1)
-   * @deprecated Use message queue communication instead
-   */
-  private async handleModelChangeRequest(event: ModelChangeEvent): Promise<void> {
-    const { modelName } = event;
-    const currentModel = this.stateManager.getCurrentModel();
-
-    try {
-      // Validate model is available
-      const availableModels = this.stateManager.getAvailablePromptModels();
-      if (availableModels.length > 0 && !availableModels.includes(modelName)) {
-        // v-0.6.1: No emit - deprecated method
-        logWarning(
-          this.logger,
-          `Model '${modelName}' not available. Available: ${availableModels.join(', ')}`,
-          {
-            component: 'PromptAppOrchestrator',
-            method: 'handleModelChangeRequest',
-            requestedModel: modelName,
-            availableModels,
-          }
-        );
-        return;
-      }
-
-      // Update model via StateManager
-      this.stateManager.updatePromptModel(modelName);
-
-      // v-0.6.1: Enqueue model changed message instead of emit (deprecated)
-      // This method is deprecated - model changes should be handled through message queue
-    } catch (error) {
-      // v-0.6.1: No emit - deprecated method
-      logError(this.logger, error, {
-        component: 'PromptAppOrchestrator',
-        method: 'handleModelChangeRequest',
-        requestedModel: modelName,
-        errorContext: 'model_change_failed',
-      });
-    }
-  }
-
-  /**
-   * Handle mode change requests from CLI (DEPRECATED in v-0.6.1)
-   * @deprecated Use message queue communication instead
-   */
-  private async handleModeChangeRequest(event: ModeChangeEvent): Promise<void> {
-    const { mode } = event;
-    // v-0.6.1: This method is deprecated - mode changes should be handled through message queue
-    this.logger.warn(`Mode change request: ${mode} (deprecated)`, undefined, {
-      component: 'PromptAppOrchestrator',
-      method: 'handleModeChangeRequest',
-      mode,
-      reason: 'deprecated_method',
-    });
-  }
-
-  /**
-   * Handle prompt requests from CLI
-   */
-  private async handlePromptRequest(event: PromptEvent): Promise<void> {
-    const { prompt, context } = event;
-
-    try {
-      // Create traditional AgentRequest and process it
-      const agentRequest: AgentRequest = {
-        input: prompt,
-        context: {
-          sessionId: context?.sessionId || 'cli-session',
-          timestamp: new Date(),
-          source: 'cli',
-        },
-      };
-
-      // Process through traditional flow (will emit progress, complete events)
-      await this.process(agentRequest);
-    } catch (error) {
-      // v-0.6.1: No emit - deprecated method
-      logError(this.logger, error, {
-        component: 'PromptAppOrchestrator',
-        method: 'handlePromptRequest',
-        errorContext: 'prompt_processing_failed',
-      });
-    }
-  }
-
-  /**
-   * Handle status requests from CLI (DEPRECATED in v-0.6.1)
-   * @deprecated Use message queue communication instead
-   */
-  private async handleStatusRequest(_event: StatusEvent): Promise<void> {
-    // v-0.6.1: This method is deprecated - status should be handled through message queue
-    this.logger.warn('Status request (deprecated)', undefined, {
-      component: 'PromptAppOrchestrator',
-      method: 'handleStatusRequest',
-      reason: 'deprecated_method',
-    });
-  }
-
-  /**
-   * Handle cancel requests from CLI
-   */
-  private async handleCancelRequest(_event: CancelEvent): Promise<void> {
-    this.cancel();
-  }
-
-  // ===========================================
-  // Workflow Processing Methods (Race Condition Fix)
-  // ===========================================
-
-  /**
-   * Detect if input contains patterns that require workflow processing
-   * Currently detects file reference patterns (@file.ext or @path/to/file)
-   */
-  private detectWorkflowPattern(input: string): boolean {
-    return input.includes('@') && (input.includes('.') || input.includes('/'));
   }
 
   /**

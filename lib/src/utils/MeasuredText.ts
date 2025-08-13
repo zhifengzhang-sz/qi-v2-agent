@@ -133,9 +133,9 @@ export class MeasuredText {
             for (let i = 0; i < word.length; i += width) {
               wrappedLines.push(word.slice(i, i + width));
             }
-          } else if ((currentLine + ' ' + word).length <= width) {
+          } else if (`${currentLine} ${word}`.length <= width) {
             // Word fits on current line
-            currentLine = currentLine ? currentLine + ' ' + word : word;
+            currentLine = currentLine ? `${currentLine} ${word}` : word;
           } else {
             // Word doesn't fit, start new line
             if (currentLine) {
@@ -215,7 +215,7 @@ export class MeasuredText {
     const line = lines.length - 1;
     return {
       line,
-      column: this.wrappedLines[line]!.text.length,
+      column: this.wrappedLines[line]?.text.length,
     };
   }
 

@@ -82,7 +82,7 @@ export function createPromptApp(
     domain: config.domain || 'prompt-app',
     enableCommands: config.enableCommands ?? true,
     enablePrompts: config.enablePrompts ?? true,
-    enableWorkflows: config.workflowHandler ? true : false, // Enable workflows if handler provided
+    enableWorkflows: !!config.workflowHandler, // Enable workflows if handler provided
     sessionPersistence: config.sessionPersistence ?? false,
   };
 

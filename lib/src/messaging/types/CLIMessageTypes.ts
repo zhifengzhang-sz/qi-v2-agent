@@ -10,8 +10,6 @@ import { create } from '@qi/base';
 import type {
   AgentErrorMessage,
   AgentOutputMessage,
-  BaseMessage,
-  QiMessage,
   StreamDataMessage,
   StreamEndMessage,
   StreamErrorMessage,
@@ -218,10 +216,6 @@ export class CLIMessageFactory {
     return `cli_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  private static generateCorrelationId(): string {
-    return `corr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  }
-
   static createReadyMessage(config: {
     framework: string;
     enableHotkeys: boolean;
@@ -379,7 +373,7 @@ export class CLIMessageFactory {
   static createStreamingCompleteMessage(
     streamId: string,
     totalChunks: number,
-    totalSize: number,
+    _totalSize: number,
     duration: number,
     finalMessage?: string
   ): CLIStreamingCompleteMessage {

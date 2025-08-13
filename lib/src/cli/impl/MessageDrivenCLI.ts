@@ -28,7 +28,7 @@ import type {
   IAgentCLIBridge,
   ICLIFramework,
 } from '../abstractions/ICLIFramework.js';
-import type { IAgentConnector, ICommandRouter } from '../abstractions/ICLIServices.js';
+import type { ICommandRouter } from '../abstractions/ICLIServices.js';
 import type { IInputManager } from '../abstractions/IInputManager.js';
 // Injected dependencies interfaces
 import type { ITerminal } from '../abstractions/ITerminal.js';
@@ -63,11 +63,10 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     private progressRenderer: IProgressRenderer,
     private modeRenderer: IModeRenderer,
     private streamRenderer: IStreamRenderer,
-    // v-0.6.1: IEventManager removed - pure message-driven
-    private commandRouter: ICommandRouter,
+    _commandRouter: ICommandRouter,
     private messageQueue: QiAsyncMessageQueue<QiMessage>, // v-0.6.1: Replace agentConnector
     config: Partial<CLIConfig> = {},
-    private commandHandler?: ICommandHandler
+    _commandHandler?: ICommandHandler
   ) {
     // Default configuration
     this.config = {
@@ -199,7 +198,7 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   // v-0.6.1: handleInput moved to line 351 to follow design specification
 
-  displayMessage(content: string, type?: CLIMessageType): void {
+  displayMessage(content: string, _type?: CLIMessageType): void {
     // Only responsibility: display (EXACT design specification)
     this.terminal.writeLine(content);
 
@@ -245,21 +244,21 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   // Event methods (deprecated for v-0.6.1 message-driven architecture)
-  on<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
+  on<K extends keyof CLIEvents>(event: K, _listener: (data: CLIEvents[K]) => void): void {
     // v-0.6.1: Event system simplified - most events converted to messages
     console.warn(
       `[MessageDrivenCLI] Event '${event}' registration - consider using message queue instead`
     );
   }
 
-  off<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
+  off<K extends keyof CLIEvents>(event: K, _listener: (data: CLIEvents[K]) => void): void {
     // v-0.6.1: Event system simplified
     console.warn(
       `[MessageDrivenCLI] Event '${event}' removal - consider using message queue instead`
     );
   }
 
-  emit<K extends keyof CLIEvents>(event: K, data: CLIEvents[K]): void {
+  emit<K extends keyof CLIEvents>(event: K, _data: CLIEvents[K]): void {
     // v-0.6.1: Most events converted to messages
     console.warn(
       `[MessageDrivenCLI] Event '${event}' emission - consider using message queue instead`
@@ -267,7 +266,7 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   // IAgentCLIBridge implementation (simplified for v-0.6.1)
-  connectAgent(agent: any): void {
+  connectAgent(_agent: any): void {
     // v-0.6.1: Agent connection handled through message queue
     console.log('[MessageDrivenCLI] Agent connection - handled via message queue');
   }
@@ -318,7 +317,7 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   // Configuration
 
   // State Management Integration (required by ICLIFramework)
-  subscribeToStateChanges(stateManager: any): void {
+  subscribeToStateChanges(_stateManager: any): void {
     // v-0.6.1: MessageDrivenCLI uses message queue for state coordination
     console.log('[MessageDrivenCLI] StateManager subscription - handled via message queue');
   }
@@ -378,7 +377,7 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
  * v-0.6.1 Factory function - requires message queue injection
  */
 export function createMessageDrivenCLI(
-  messageQueue: QiAsyncMessageQueue<QiMessage>,
+  _messageQueue: QiAsyncMessageQueue<QiMessage>,
   _config?: Partial<CLIConfig>
 ): MessageDrivenCLI {
   // v-0.6.1: Message queue is required for pure enqueue-only architecture

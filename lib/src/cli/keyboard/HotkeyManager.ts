@@ -186,7 +186,7 @@ export class HotkeyManager {
   /**
    * Send hotkey message to queue (v-0.6.1 pure message-driven approach)
    */
-  private sendHotkeyMessage(hotkeyType: string, data: { key: string; raw: Buffer }): void {
+  private sendHotkeyMessage(hotkeyType: string, _data: { key: string; raw: Buffer }): void {
     const message: QiMessage = {
       id: Math.random().toString(36).substring(2, 15),
       type: MessageType.USER_INPUT, // Hotkeys are treated as special user input

@@ -5,7 +5,7 @@
  * for internal qicore complexity
  */
 
-import { fromAsyncTryCatch, match } from '@qi/base';
+import { match } from '@qi/base';
 import type {
   IWorkflowHandler,
   ToolInfo,

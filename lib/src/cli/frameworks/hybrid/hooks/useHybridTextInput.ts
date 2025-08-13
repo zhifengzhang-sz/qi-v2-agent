@@ -12,18 +12,17 @@
 
 import chalk from 'chalk';
 import type { Key } from 'ink';
-import { useState } from 'react';
 import { Cursor } from '../../../../utils/Cursor.js';
 import type { HybridCLIFramework } from '../HybridCLIFramework.js';
 
-type MaybeCursor = void | Cursor;
+type MaybeCursor = undefined | Cursor;
 type InputHandler = (input: string) => MaybeCursor;
 type InputMapper = (input: string) => MaybeCursor;
 
 // Claude Code's mapInput pattern
 function mapInput(input_map: Array<[string, InputHandler]>): InputMapper {
   return (input: string): MaybeCursor => {
-    const handler = new Map(input_map).get(input) ?? (() => {});
+    const handler = new Map(input_map).get(input) ?? (() => undefined);
     return handler(input);
   };
 }

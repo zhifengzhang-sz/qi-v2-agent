@@ -8,7 +8,6 @@
 import type {
   BaseMessage,
   MessageStats,
-  MessageStatus,
   MessageValidationResult,
   QiMessage,
 } from '@qi/agent/messaging/types/MessageTypes';

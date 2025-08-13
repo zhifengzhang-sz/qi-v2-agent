@@ -12,7 +12,7 @@ import type {
 } from '@qi/agent/messaging/interfaces/IAsyncMessageQueue';
 // v-0.6.1: QueueEventCallback and QueueEventType removed - pure message-driven
 import type { MessageStats, QiMessage } from '@qi/agent/messaging/types/MessageTypes';
-import { MessagePriority, MessageStatus } from '@qi/agent/messaging/types/MessageTypes';
+import { MessageStatus } from '@qi/agent/messaging/types/MessageTypes';
 import { create, failure, match, type QiError, type Result, success } from '@qi/base';
 import { createDebugLogger } from '../../utils/DebugLogger.js';
 
@@ -451,7 +451,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     if (this.options.cleanupFn) {
       try {
         await this.options.cleanupFn();
-      } catch (error) {
+      } catch (_error) {
         return failure(
           queueError('CLEANUP_FAILED', 'Cleanup function failed', {
             operation: 'destroy',
