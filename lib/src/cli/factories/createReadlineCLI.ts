@@ -33,13 +33,13 @@ import {
   ReadlineStreamRenderer,
   ReadlineTerminal,
 } from '../frameworks/readline/index.js';
-// Will be implemented when we refactor EventDrivenCLI
-import { EventDrivenCLI } from '../impl/EventDrivenCLI.js';
+// v-0.6.1: Pure message-driven CLI implementation
+import { MessageDrivenCLI } from '../impl/MessageDrivenCLI.js';
 // Shared QiCore services
 import {
-  QiCoreAgentConnector,
+  // QiCoreAgentConnector, // v-0.6.1: Event-based service removed
   QiCoreCommandRouter,
-  QiCoreEventManager,
+  // QiCoreEventManager, // v-0.6.1: Event-based service removed
 } from '../services/index.js';
 
 /**
@@ -162,7 +162,12 @@ function registerServices(
   const inputResult = container.register(
     'inputManager',
     () => {
-      return new ReadlineInputManager();
+      // v-0.6.1: ReadlineInputManager requires message queue
+      const messageQueueResult = container.resolve('messageQueue');
+      if (messageQueueResult.tag === 'failure') {
+        throw new Error('Failed to resolve messageQueue');
+      }
+      return new ReadlineInputManager(messageQueueResult.value as any);
     },
     { singleton: true, destroyer: (instance) => (instance as ReadlineInputManager).close() }
   );
@@ -220,15 +225,17 @@ function registerServices(
   }
 
   // Register shared QiCore services
-  const eventManagerResult = container.register(
-    'eventManager',
-    () => new QiCoreEventManager({ trackHistory: config.debug }),
-    { singleton: true, destroyer: (instance) => (instance as QiCoreEventManager).destroy() }
-  );
+  // v-0.6.1: Event manager removed - pure message-driven
+  // const eventManagerResult = container.register(
+  //   'eventManager',
+  //   () => new QiCoreEventManager({ trackHistory: config.debug }),
+  //   { singleton: true, destroyer: (instance) => (instance as QiCoreEventManager).destroy() }
+  // );
 
-  if (eventManagerResult.tag === 'failure') {
-    return eventManagerResult;
-  }
+  // v-0.6.1: Event manager result check removed
+  // if (eventManagerResult.tag === 'failure') {
+  //   return eventManagerResult;
+  // }
 
   // Use QiCoreCommandRouter - if commandHandler provided, it will be used directly by CLI
   const commandRouterResult = container.register('commandRouter', () => new QiCoreCommandRouter(), {
@@ -239,20 +246,22 @@ function registerServices(
     return commandRouterResult;
   }
 
-  const agentConnectorResult = container.register(
-    'agentConnector',
-    () => new QiCoreAgentConnector(),
-    {
-      singleton: true,
-      destroyer: (instance) => {
-        (instance as QiCoreAgentConnector).dispose();
-      },
-    }
-  );
+  // v-0.6.1: Agent connector removed - pure message-driven
+  // const agentConnectorResult = container.register(
+  //   'agentConnector',
+  //   () => new QiCoreAgentConnector(),
+  //   {
+  //     singleton: true,
+  //     destroyer: (instance) => {
+  //       (instance as QiCoreAgentConnector).dispose();
+  //     },
+  //   }
+  // );
 
-  if (agentConnectorResult.tag === 'failure') {
-    return agentConnectorResult;
-  }
+  // v-0.6.1: Agent connector result check removed
+  // if (agentConnectorResult.tag === 'failure') {
+  //   return agentConnectorResult;
+  // }
 
   return Ok(void 0);
 }
@@ -304,7 +313,7 @@ function createCLIInstance(
 
     // Create CLI instance with resolved dependencies
     // Type assertion is safe here since we already checked all deps succeeded
-    const cli = new EventDrivenCLI(
+    const cli = new MessageDrivenCLI(
       (terminal as any).value,
       (inputManager as any).value,
       (progressRenderer as any).value,

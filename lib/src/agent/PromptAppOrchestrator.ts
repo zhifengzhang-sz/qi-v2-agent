@@ -242,7 +242,9 @@ export class PromptAppOrchestrator implements IAgent {
           response = await this.handleCommand(request, parsed.content);
           break;
         case 'workflow':
-          this.debug.warn(`Input "${parsed.content}" classified as workflow - this should not happen for simple prompts!`);
+          this.debug.warn(
+            `Input "${parsed.content}" classified as workflow - this should not happen for simple prompts!`
+          );
           response = await this.handleWorkflow(request, parsed.content);
           break;
         case 'prompt':
@@ -444,7 +446,7 @@ export class PromptAppOrchestrator implements IAgent {
 
   private async handleWorkflow(request: AgentRequest, content: string): Promise<AgentResponse> {
     this.debug.warn(`handleWorkflow called with: "${content}" - WHY IS THIS A WORKFLOW?`);
-    
+
     if (!this.workflowHandler) {
       return this.createDisabledResponse('workflow', 'Workflow processing is disabled');
     }
@@ -456,7 +458,7 @@ export class PromptAppOrchestrator implements IAgent {
     }
 
     const enhanced = wf.data.output ?? content;
-    
+
     // Check if this was a passthrough (no actual workflow processing)
     if (wf.data.output === content || (wf.data as any).metadata?.passthrough) {
       // This was passthrough - route directly to prompt handler without re-classification
@@ -469,7 +471,7 @@ export class PromptAppOrchestrator implements IAgent {
 
   private async handlePrompt(request: AgentRequest, promptContent: string): Promise<AgentResponse> {
     this.debug.log(`🔍 handlePrompt called with: "${promptContent}"`);
-    
+
     if (!this.config.enablePrompts) {
       return this.createDisabledResponse('prompt', 'Prompt processing is disabled');
     }
@@ -507,7 +509,9 @@ export class PromptAppOrchestrator implements IAgent {
         }
 
         // Execute with context continuation
-        this.debug.log(`🚀 About to call LLM with contextAwarePromptHandler for: "${promptContent}"`);
+        this.debug.log(
+          `🚀 About to call LLM with contextAwarePromptHandler for: "${promptContent}"`
+        );
         const startTime = Date.now();
         result = await this.contextAwarePromptHandler.completeWithContext(
           promptContent,

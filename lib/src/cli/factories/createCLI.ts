@@ -59,6 +59,10 @@ const cliFactoryError = (
 export function createCLI(
   config: Partial<CLIConfigWithFramework> = {}
 ): Result<ICLIFramework, QiError> {
+  console.log('🔍 [DEBUG] createCLI - received config keys:', Object.keys(config));
+  console.log('🔍 [DEBUG] createCLI - stateManager:', !!config.stateManager);
+  console.log('🔍 [DEBUG] createCLI - messageQueue:', !!config.messageQueue);
+
   const framework = config.framework || 'readline';
 
   switch (framework) {
@@ -271,8 +275,8 @@ function createInkCLI(
       );
     }
 
-    // Create actual Ink CLI implementation
-    const cli = new InkCLIFramework(config, messageQueue);
+    // Create actual Ink CLI implementation with messageQueue and stateManager from config
+    const cli = new InkCLIFramework(config, config.messageQueue || messageQueue);
 
     return Ok(cli);
   } catch (error: any) {
@@ -353,13 +357,6 @@ function checkHybridSupport(): { available: boolean; reason: string; dependencie
 // Use the imported function
 
 /**
- * Backward compatibility function
- */
-export function createEventDrivenCLI(config?: Partial<CLIConfig>): Result<ICLIFramework, QiError> {
-  return createReadlineCLI(config);
-}
-
-/**
  * Get all available frameworks
  */
 export function getAvailableFrameworks(): CLIFramework[] {
@@ -411,8 +408,10 @@ function createHybridCLI(
       );
     }
 
-    // Create hybrid CLI implementation with shared message queue
-    const cli = new HybridCLIFramework(config as CLIConfig, messageQueue);
+    // Create hybrid CLI implementation with shared message queue and state manager
+    console.log('🔍 [DEBUG] createHybridCLI - config keys:', Object.keys(config));
+    console.log('🔍 [DEBUG] createHybridCLI - stateManager:', !!config.stateManager);
+    const cli = new HybridCLIFramework(config, config.messageQueue || messageQueue);
 
     return Ok(cli);
   } catch (error: any) {

@@ -15,7 +15,8 @@ export type {
   IEventManager,
   IStateManager,
 } from '../abstractions/ICLIServices.js';
-export { QiCoreAgentConnector } from './QiCoreAgentConnector.js';
+// v-0.6.1: Event-based services removed
+// export { QiCoreAgentConnector } from './QiCoreAgentConnector.js';
 export { QiCoreCommandRouter } from './QiCoreCommandRouter.js';
-// QiCore service implementations
-export { QiCoreEventManager } from './QiCoreEventManager.js';
+// v-0.6.1: QiCore event manager removed - pure message-driven
+// export { QiCoreEventManager } from './QiCoreEventManager.js';

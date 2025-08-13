@@ -36,10 +36,11 @@ export {
 } from './factories/createReadlineCLI.js';
 export * from './frameworks/index.js';
 // NEW: Refactored CLI Framework with Dependency Injection
-export { EventDrivenCLI } from './impl/EventDrivenCLI.js';
+export { MessageDrivenCLI } from './impl/MessageDrivenCLI.js';
 export * from './impl/index.js';
-export { type CLIFeedback, type CLIInput, createPureCLI, type ICLI } from './impl/index.js';
-export type { HotkeyConfig, HotkeyEvents } from './keyboard/HotkeyManager.js';
+// v-0.6.1: Event-based exports removed
+// export { type CLIFeedback, type CLIInput, createPureCLI, type ICLI } from './impl/index.js';
+export type { HotkeyConfig } from './keyboard/HotkeyManager.js';
 // Keyboard management
 export { createHotkeyManager, debugKeypress, HotkeyManager } from './keyboard/HotkeyManager.js';
 
@@ -123,6 +124,7 @@ export function createCLI(
     args?: string[];
     autoDetect?: boolean; // Auto-detect best framework
     messageQueue?: any; // v-0.6.1: Message queue for pure async messaging
+    stateManager?: any; // v-0.6.1: State manager for UI updates
   } = {}
 ) {
   // Always load configuration to get all settings
@@ -160,6 +162,9 @@ export function createCLI(
     ...(options.enableHotkeys !== undefined && { enableHotkeys: options.enableHotkeys }),
     ...(options.enableStreaming !== undefined && { enableStreaming: options.enableStreaming }),
     ...(options.debug !== undefined && { debug: options.debug }),
+    // v-0.6.1: Pass through messageQueue and stateManager
+    ...(options.messageQueue !== undefined && { messageQueue: options.messageQueue }),
+    ...(options.stateManager !== undefined && { stateManager: options.stateManager }),
   };
 
   if (config.debug) {
@@ -172,13 +177,13 @@ export function createCLI(
   switch (framework) {
     case 'ink': {
       const { createInkCLI } = require('./factories/createCLI.js');
-      result = createInkCLI(config, options.messageQueue);
+      result = createInkCLI(config, config.messageQueue);
       break;
     }
 
     case 'hybrid': {
       const { createHybridCLI } = require('./factories/createCLI.js');
-      result = createHybridCLI(config, options.messageQueue);
+      result = createHybridCLI(config, config.messageQueue);
       break;
     }
     default: {
@@ -197,23 +202,9 @@ export function createCLI(
   const cli = result.value;
 
   if (options.agent) {
-    // Cast to include bridge methods since EventDrivenCLI implements both interfaces
+    // v-0.6.1: Agent communication handled through message queue only
+    // EventEmitter patterns removed - no more dual architecture
     (cli as any).connectAgent(options.agent);
-
-    // Setup bidirectional communication
-    cli.on('userInput', ({ input }: { input: any }) => {
-      (cli as any).sendToAgent(input);
-    });
-
-    cli.on('command', ({ command, args }: { command: string; args: string[] }) => {
-      // Handle commands by formatting them as input and sending to agent
-      const commandInput = `/${command} ${args.join(' ')}`.trim();
-      (cli as any).handleInput(commandInput);
-    });
-
-    cli.on('cancelRequested', () => {
-      (cli as any).cancelAgent();
-    });
   }
 
   return cli;

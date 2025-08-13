@@ -1,22 +1,17 @@
 /**
- * Hotkey Manager for CLI
+ * Hotkey Manager for CLI - v-0.6.1 Pure Message-Driven
  *
- * Handles keyboard input detection including special key combinations:
+ * Handles keyboard input detection and sends hotkey messages to message queue:
  * - Shift+Tab: Mode cycling
  * - Esc: Cancel current operation
  * - Ctrl+C: Graceful exit (SIGINT)
  *
- * Uses raw mode for precise key detection while preserving normal readline functionality.
+ * COMPLETELY REDESIGNED: No events, no EventEmitter - pure message queue communication
  */
 
-import { EventEmitter } from 'node:events';
-
-export interface HotkeyEvents {
-  shiftTab: undefined;
-  escape: undefined;
-  ctrlC: undefined;
-  keypress: { key: string; raw: Buffer };
-}
+import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue';
+import type { QiMessage } from '../../messaging/types/MessageTypes';
+import { MessageType, MessagePriority } from '../../messaging/types/MessageTypes';
 
 export interface HotkeyConfig {
   enableShiftTab: boolean;
@@ -27,14 +22,17 @@ export interface HotkeyConfig {
 
 /**
  * Manages keyboard input and hotkey detection
+ * v-0.6.1: Pure message-driven - sends hotkey messages to queue
  */
-export class HotkeyManager extends EventEmitter {
+export class HotkeyManager {
   private isRawMode = false;
   private config: HotkeyConfig;
   private originalStdinListeners: Array<(...args: any[]) => void> = [];
+  private messageQueue: QiAsyncMessageQueue<QiMessage>;
 
-  constructor(config: Partial<HotkeyConfig> = {}) {
-    super();
+  constructor(messageQueue: QiAsyncMessageQueue<QiMessage>, config: Partial<HotkeyConfig> = {}) {
+    // v-0.6.1: Pure message-driven constructor - requires message queue
+    this.messageQueue = messageQueue;
 
     this.config = {
       enableShiftTab: true,
@@ -70,7 +68,7 @@ export class HotkeyManager extends EventEmitter {
     process.stdin.on('data', this.handleKeypress.bind(this));
 
     this.isRawMode = true;
-    this.emit('enabled');
+    // v-0.6.1: Event emission removed - pure message-driven
   }
 
   /**
@@ -95,7 +93,7 @@ export class HotkeyManager extends EventEmitter {
     }
 
     this.isRawMode = false;
-    this.emit('disabled');
+    // v-0.6.1: Event emission removed - pure message-driven
   }
 
   /**
@@ -105,27 +103,26 @@ export class HotkeyManager extends EventEmitter {
     const key = chunk.toString();
     const raw = chunk;
 
-    // Emit raw keypress for debugging/logging
-    this.emit('keypress', { key, raw });
+    // v-0.6.1: Send hotkey messages to queue instead of events
 
     // Check for hotkey combinations
     if (this.detectShiftTab(chunk)) {
       if (this.config.enableShiftTab) {
-        this.emit('shiftTab');
+        this.sendHotkeyMessage('SHIFT_TAB', { key, raw });
         return; // Don't pass through hotkey
       }
     }
 
     if (this.detectEscape(chunk)) {
       if (this.config.enableEscape) {
-        this.emit('escape');
+        this.sendHotkeyMessage('ESCAPE', { key, raw });
         return; // Don't pass through hotkey
       }
     }
 
     if (this.detectCtrlC(chunk)) {
       if (this.config.enableCtrlC) {
-        this.emit('ctrlC');
+        this.sendHotkeyMessage('CTRL_C', { key, raw });
         // Note: Ctrl+C should still be passed through for SIGINT
       }
     }
@@ -183,7 +180,24 @@ export class HotkeyManager extends EventEmitter {
    */
   updateConfig(newConfig: Partial<HotkeyConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    this.emit('configUpdated', this.config);
+    // v-0.6.1: Event emission removed - pure message-driven
+  }
+
+  /**
+   * Send hotkey message to queue (v-0.6.1 pure message-driven approach)
+   */
+  private sendHotkeyMessage(hotkeyType: string, data: { key: string; raw: Buffer }): void {
+    const message: QiMessage = {
+      id: Math.random().toString(36).substring(2, 15),
+      type: MessageType.USER_INPUT, // Hotkeys are treated as special user input
+      timestamp: new Date(),
+      priority: MessagePriority.HIGH,
+      input: `__HOTKEY_${hotkeyType}__`, // Special input format for hotkeys
+      raw: true,
+      source: 'cli' as const,
+    };
+
+    this.messageQueue.enqueue(message);
   }
 
   /**
@@ -198,15 +212,19 @@ export class HotkeyManager extends EventEmitter {
    */
   destroy(): void {
     this.disable();
-    this.removeAllListeners();
+    // v-0.6.1: No listeners to remove - pure message-driven
   }
 }
 
 /**
  * Utility function to create a HotkeyManager with common settings
+ * v-0.6.1: Requires message queue parameter
  */
-export function createHotkeyManager(config?: Partial<HotkeyConfig>): HotkeyManager {
-  return new HotkeyManager(config);
+export function createHotkeyManager(
+  messageQueue: QiAsyncMessageQueue<QiMessage>,
+  config?: Partial<HotkeyConfig>
+): HotkeyManager {
+  return new HotkeyManager(messageQueue, config);
 }
 
 /**

@@ -94,18 +94,8 @@ export function InputBox({
       }
     };
 
-    // Listen to framework events
-    framework.on('clearInput', handleClearInput);
-    if (isHybridMode) {
-      framework.on('inputUpdate', handleInputUpdate);
-    }
-    
-    return () => {
-      framework.off('clearInput', handleClearInput);
-      if (isHybridMode) {
-        framework.off('inputUpdate', handleInputUpdate);
-      }
-    };
+    // Event listeners removed - input clearing handled through direct callbacks
+    // Hybrid mode input updates handled through StateManager subscriptions
   }, [framework, onClear, isHybridMode]);
   
   const handleSubmit = (value: string) => {

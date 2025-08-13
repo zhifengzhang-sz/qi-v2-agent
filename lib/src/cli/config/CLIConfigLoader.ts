@@ -16,6 +16,8 @@ export type CLIFramework = 'readline' | 'ink' | 'hybrid';
 
 export interface CLIConfigWithFramework extends CLIConfig {
   framework: CLIFramework;
+  stateManager?: any; // StateManager for UI updates
+  messageQueue?: any; // Message queue for communication
 }
 
 interface ConfigLoaderOptions {

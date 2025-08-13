@@ -7,11 +7,10 @@
 
 import type {
   IAsyncMessageQueue,
-  QueueEventCallback,
   QueueOptions,
   QueueState,
 } from '@qi/agent/messaging/interfaces/IAsyncMessageQueue';
-import { QueueEventType } from '@qi/agent/messaging/interfaces/IAsyncMessageQueue';
+// v-0.6.1: QueueEventCallback and QueueEventType removed - pure message-driven
 import type { MessageStats, QiMessage } from '@qi/agent/messaging/types/MessageTypes';
 import { MessagePriority, MessageStatus } from '@qi/agent/messaging/types/MessageTypes';
 import { create, failure, match, type QiError, type Result, success } from '@qi/base';
@@ -58,7 +57,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   private state: QueueState;
   private options: Required<QueueOptions>;
   private stats: MessageStats;
-  private eventSubscriptions: Map<QueueEventType, Set<QueueEventCallback<T>>> = new Map();
+  // v-0.6.1: EventEmitter patterns removed - pure message-driven
   private cleanupTimer?: NodeJS.Timeout;
   private isPausedState = false;
   private debug = createDebugLogger('QiAsyncMessageQueue');
@@ -110,15 +109,19 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     if (this.state.started) {
       this.debug.error(`CRITICAL ERROR: Queue already started - this causes infinite loops!`);
       this.debug.error(`Stack trace:`, new Error().stack);
-      const error = queueError('ALREADY_STARTED', 'Queue can only be iterated once. Multiple iterations cause message duplication and infinite loops.', {
-        operation: 'asyncIterator',
-        queueSize: this.queue.length
-      });
+      const error = queueError(
+        'ALREADY_STARTED',
+        'Queue can only be iterated once. Multiple iterations cause message duplication and infinite loops.',
+        {
+          operation: 'asyncIterator',
+          queueSize: this.queue.length,
+        }
+      );
       throw error;
     }
 
     this.state = { ...this.state, started: true };
-    this.emit(QueueEventType.QUEUE_RESUMED, { started: true });
+    // v-0.6.1: Event emission removed - pure message-driven
     this.debug.log(`Async iterator created successfully`);
 
     return this;
@@ -151,7 +154,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
             `Dequeuing message ID: ${queuedMessage.message.id}, type: ${queuedMessage.message.type}`
           );
           this.updateMessageStatus(queuedMessage, MessageStatus.PROCESSING);
-          this.emit(QueueEventType.MESSAGE_DEQUEUED, { message: queuedMessage.message });
+          // v-0.6.1: Event emission removed - pure message-driven
 
           return Promise.resolve({
             done: false,
@@ -173,7 +176,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   private handleEmptyQueue(): Promise<IteratorResult<T, any>> {
     // Check if queue is done
     if (this.state.isDone) {
-      this.emit(QueueEventType.QUEUE_EMPTY, { final: true });
+      // v-0.6.1: Event emission removed - pure message-driven
       return Promise.resolve({
         done: true,
         value: undefined,
@@ -220,10 +223,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
     // Check size limits
     if (this.options.maxSize > 0 && this.queue.length >= this.options.maxSize) {
-      this.emit(QueueEventType.QUEUE_FULL, {
-        queueSize: this.queue.length,
-        maxSize: this.options.maxSize,
-      });
+      // v-0.6.1: Event emission removed - pure message-driven
 
       return failure(
         queueError('QUEUE_FULL', 'Queue has reached maximum size', {
@@ -250,7 +250,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       messageCount: this.state.messageCount + 1,
     };
     this.updateStats(message, 'enqueued');
-    this.emit(QueueEventType.MESSAGE_ENQUEUED, { message });
+    // v-0.6.1: Event emission removed - pure message-driven
 
     // If there's a waiting reader, resolve immediately WITHOUT inserting into queue
     if (this.readResolve && !this.isPausedState) {
@@ -259,7 +259,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       this.readReject = undefined;
 
       this.updateMessageStatus(queuedMessage, MessageStatus.PROCESSING);
-      this.emit(QueueEventType.MESSAGE_DEQUEUED, { message });
+      // v-0.6.1: Event emission removed - pure message-driven
 
       resolve({
         done: false,
@@ -301,7 +301,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       });
     }
 
-    this.emit(QueueEventType.QUEUE_EMPTY, { final: true });
+    // v-0.6.1: Event emission removed - pure message-driven
     return success(undefined);
   }
 
@@ -323,7 +323,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       reject(error);
     }
 
-    this.emit(QueueEventType.QUEUE_ERROR, { error });
+    // v-0.6.1: Event emission removed - pure message-driven
     return success(undefined);
   }
 
@@ -398,7 +398,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       messageCount: 0,
     };
 
-    this.emit(QueueEventType.QUEUE_EMPTY, { cleared: true, count: clearedCount });
+    // v-0.6.1: Event emission removed - pure message-driven
     return success(clearedCount);
   }
 
@@ -407,7 +407,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    */
   pause(): Result<void, QueueError> {
     this.isPausedState = true;
-    this.emit(QueueEventType.QUEUE_PAUSED, { timestamp: new Date() });
+    // v-0.6.1: Event emission removed - pure message-driven
     return success(undefined);
   }
 
@@ -416,7 +416,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    */
   resume(): Result<void, QueueError> {
     this.isPausedState = false;
-    this.emit(QueueEventType.QUEUE_RESUMED, { timestamp: new Date() });
+    // v-0.6.1: Event emission removed - pure message-driven
     return success(undefined);
   }
 
@@ -460,10 +460,9 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       }
     }
 
-    // Clear subscriptions
-    this.eventSubscriptions.clear();
+    // v-0.6.1: Event subscriptions removed - pure message-driven
 
-    this.emit(QueueEventType.QUEUE_DESTROYED, { timestamp: new Date() });
+    // v-0.6.1: Event emission removed - pure message-driven
     return success(undefined);
   }
 
@@ -586,28 +585,5 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     }
   }
 
-  private emit(eventType: QueueEventType, data: any): void {
-    const subscribers = this.eventSubscriptions.get(eventType);
-    if (!subscribers || subscribers.size === 0) {
-      return;
-    }
-
-    const event = {
-      type: eventType,
-      timestamp: new Date(),
-      queue: this,
-      data,
-      message: data?.message,
-      error: data?.error,
-    };
-
-    for (const callback of subscribers) {
-      try {
-        callback(event);
-      } catch (error) {
-        // Log but don't throw to prevent callback errors from affecting queue
-        console.error('Queue event callback error:', error);
-      }
-    }
-  }
+  // v-0.6.1: emit method completely removed - pure message-driven architecture
 }
