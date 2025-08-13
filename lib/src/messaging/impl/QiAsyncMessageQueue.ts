@@ -15,6 +15,7 @@ import { QueueEventType } from '@qi/agent/messaging/interfaces/IAsyncMessageQueu
 import type { MessageStats, QiMessage } from '@qi/agent/messaging/types/MessageTypes';
 import { MessagePriority, MessageStatus } from '@qi/agent/messaging/types/MessageTypes';
 import { create, failure, match, type QiError, type Result, success } from '@qi/base';
+import { createDebugLogger } from '../../utils/DebugLogger.js';
 
 /**
  * Queue error types
@@ -60,6 +61,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
   private eventSubscriptions: Map<QueueEventType, Set<QueueEventCallback<T>>> = new Map();
   private cleanupTimer?: NodeJS.Timeout;
   private isPausedState = false;
+  private debug = createDebugLogger('QiAsyncMessageQueue');
 
   constructor(options: QueueOptions = {}) {
     // Initialize state
@@ -104,15 +106,20 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    * AsyncIterable implementation - core h2A pattern
    */
   [Symbol.asyncIterator](): AsyncIterator<T, any, undefined> {
-    console.log(`[QiAsyncMessageQueue] Creating async iterator, started: ${this.state.started}`);
+    this.debug.log(`Creating async iterator, started: ${this.state.started}`);
     if (this.state.started) {
-      console.log(`[QiAsyncMessageQueue] ERROR: Queue already started - this causes duplicates!`);
-      throw queueError('ALREADY_STARTED', 'Queue can only be iterated once');
+      this.debug.error(`CRITICAL ERROR: Queue already started - this causes infinite loops!`);
+      this.debug.error(`Stack trace:`, new Error().stack);
+      const error = queueError('ALREADY_STARTED', 'Queue can only be iterated once. Multiple iterations cause message duplication and infinite loops.', {
+        operation: 'asyncIterator',
+        queueSize: this.queue.length
+      });
+      throw error;
     }
 
     this.state = { ...this.state, started: true };
     this.emit(QueueEventType.QUEUE_RESUMED, { started: true });
-    console.log(`[QiAsyncMessageQueue] Async iterator created successfully`);
+    this.debug.log(`Async iterator created successfully`);
 
     return this;
   }
@@ -140,7 +147,9 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     return match(
       (queuedMessage) => {
         if (queuedMessage) {
-          console.log(`[QiAsyncMessageQueue] Dequeuing message ID: ${queuedMessage.message.id}, type: ${queuedMessage.message.type}`);
+          this.debug.log(
+            `Dequeuing message ID: ${queuedMessage.message.id}, type: ${queuedMessage.message.type}`
+          );
           this.updateMessageStatus(queuedMessage, MessageStatus.PROCESSING);
           this.emit(QueueEventType.MESSAGE_DEQUEUED, { message: queuedMessage.message });
 
@@ -187,7 +196,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
    * Enqueue message - supports real-time injection (h2A pattern)
    */
   enqueue(message: T): Result<void, QueueError> {
-    console.log(`[QiAsyncMessageQueue] Enqueuing message ID: ${message.id}, type: ${message.type}`);
+    this.debug.log(`Enqueuing message ID: ${message.id}, type: ${message.type}`);
     // Validate queue state
     if (this.state.isDone) {
       return failure(
@@ -226,7 +235,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       );
     }
 
-    // Create queued message
+    // Create queued message (not inserted yet to avoid duplication when a reader is waiting)
     const queuedMessage: QueuedMessage<T> = {
       message,
       enqueuedAt: new Date(),
@@ -235,23 +244,15 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       status: MessageStatus.PENDING,
     };
 
-    // Insert based on priority if enabled
-    if (this.options.priorityQueuing) {
-      this.insertByPriority(queuedMessage);
-    } else {
-      this.queue.push(queuedMessage);
-    }
-
-    // Update state and stats
+    // Update state and stats (consistent regardless of delivery path)
     this.state = {
       ...this.state,
       messageCount: this.state.messageCount + 1,
     };
-
     this.updateStats(message, 'enqueued');
     this.emit(QueueEventType.MESSAGE_ENQUEUED, { message });
 
-    // If there's a waiting reader, resolve immediately (h2A direct resolution)
+    // If there's a waiting reader, resolve immediately WITHOUT inserting into queue
     if (this.readResolve && !this.isPausedState) {
       const resolve = this.readResolve;
       this.readResolve = undefined;
@@ -264,6 +265,15 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
         done: false,
         value: message,
       });
+
+      return success(undefined);
+    }
+
+    // No waiting reader - insert into queue for normal consumption
+    if (this.options.priorityQueuing) {
+      this.insertByPriority(queuedMessage);
+    } else {
+      this.queue.push(queuedMessage);
     }
 
     return success(undefined);

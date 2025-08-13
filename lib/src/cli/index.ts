@@ -113,7 +113,7 @@ export const DefaultCLIConfig: import('./abstractions/ICLIFramework.js').CLIConf
  */
 export function createCLI(
   options: {
-    framework?: 'readline' | 'ink' | 'blessed' | 'hybrid';
+    framework?: 'readline' | 'ink' | 'hybrid';
     agent?: any;
     enableHotkeys?: boolean;
     enableStreaming?: boolean;
@@ -179,12 +179,6 @@ export function createCLI(
     case 'hybrid': {
       const { createHybridCLI } = require('./factories/createCLI.js');
       result = createHybridCLI(config, options.messageQueue);
-      break;
-    }
-
-    case 'blessed': {
-      const { createBlessedCLI } = require('./factories/createCLI.js');
-      result = createBlessedCLI(config);
       break;
     }
     default: {

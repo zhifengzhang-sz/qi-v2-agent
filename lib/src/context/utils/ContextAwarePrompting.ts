@@ -50,6 +50,9 @@ export class ContextAwarePromptHandler {
           domain: (options as any).domain || this.inferDomain(prompt, context),
         };
 
+        console.log(`🔍 [DEBUG] Calling LangChain with context - originalPrompt: "${prompt}"`);
+        console.log(`🔍 [DEBUG] Context messages count: ${context.messages.length}`);
+        console.log(`🔍 [DEBUG] Template options:`, templateOptions);
         result = await this.langChainHandler.completeWithContext(prompt, context, templateOptions);
       } else {
         // No history to include, use base handler

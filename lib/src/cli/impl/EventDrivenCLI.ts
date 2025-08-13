@@ -15,18 +15,20 @@
  */
 
 import type { ICommandHandler } from '../../command/abstractions/index.js';
+// v-0.6.1 Message Queue integration
+import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue.js';
+import type { QiMessage, UserInputMessage } from '../../messaging/types/MessageTypes.js';
+import { MessagePriority, MessageType } from '../../messaging/types/MessageTypes.js';
 import type {
   CLIConfig,
+  CLIEvents,
+  MessageType as CLIMessageType,
   CLIMode,
   CLIState,
   IAgentCLIBridge,
   ICLIFramework,
-  MessageType,
 } from '../abstractions/ICLIFramework.js';
-import type {
-  IAgentConnector,
-  ICommandRouter,
-} from '../abstractions/ICLIServices.js';
+import type { IAgentConnector, ICommandRouter } from '../abstractions/ICLIServices.js';
 import type { IInputManager } from '../abstractions/IInputManager.js';
 // Injected dependencies interfaces
 import type { ITerminal } from '../abstractions/ITerminal.js';
@@ -35,10 +37,6 @@ import type {
   IProgressRenderer,
   IStreamRenderer,
 } from '../abstractions/IUIComponent.js';
-// v-0.6.1 Message Queue integration
-import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue.js';
-import type { QiMessage } from '../../messaging/types/MessageTypes.js';
-import { MessageType } from '../../messaging/types/MessageTypes.js';
 
 /**
  * v-0.6.1 Pure Enqueue-Only CLI - Message-driven architecture
@@ -99,7 +97,7 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       lastActivity: new Date(),
     };
 
-    this.setupEventHandlers();
+    // v-0.6.1: No event handlers needed - pure message-driven
   }
 
   /**
@@ -116,7 +114,10 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     });
 
     // Essential: Connect input capture to message flow
+    // NOTE: This is only used for readline-based frameworks
+    // Ink/Hybrid frameworks handle input directly through React components
     this.inputManager.onInput((input) => {
+      console.log(`[EventDrivenCLI] inputManager.onInput called: "${input}"`);
       this.handleInput(input);
     });
 
@@ -192,13 +193,110 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     }
   }
 
+  private isPromptActive(): boolean {
+    return !this.state.isProcessing && !this.state.isStreamingActive;
+  }
+
   // v-0.6.1: handleInput moved to line 351 to follow design specification
 
-  displayMessage(content: string, type?: MessageType): void {
+  displayMessage(content: string, type?: CLIMessageType): void {
     // Only responsibility: display (EXACT design specification)
     this.terminal.writeLine(content);
     // Essential: Show prompt for next input
     this.inputManager.showPrompt();
+  }
+
+  displayProgress(phase: string, progress: number, details?: string): void {
+    this.progressRenderer.updateProgress(progress, phase, details);
+  }
+
+  // Streaming methods (delegated to streamRenderer)
+  startStreaming(): void {
+    this.state.isStreamingActive = true;
+    this.streamRenderer.startStreaming();
+  }
+
+  addStreamingChunk(content: string): void {
+    this.streamRenderer.addChunk(content);
+  }
+
+  completeStreaming(message?: string): void {
+    this.state.isStreamingActive = false;
+    this.streamRenderer.complete(message);
+    this.showPrompt();
+  }
+
+  cancelStreaming(): void {
+    this.state.isStreamingActive = false;
+    this.streamRenderer.cancel();
+    this.showPrompt();
+  }
+
+  // Event methods (simplified for v-0.6.1 message-driven architecture)
+  on<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
+    // v-0.6.1: Event system simplified - most events converted to messages
+    console.warn(
+      `[EventDrivenCLI] Event '${event}' registration - consider using message queue instead`
+    );
+  }
+
+  off<K extends keyof CLIEvents>(event: K, listener: (data: CLIEvents[K]) => void): void {
+    // v-0.6.1: Event system simplified
+    console.warn(
+      `[EventDrivenCLI] Event '${event}' removal - consider using message queue instead`
+    );
+  }
+
+  emit<K extends keyof CLIEvents>(event: K, data: CLIEvents[K]): void {
+    // v-0.6.1: Most events converted to messages
+    console.warn(
+      `[EventDrivenCLI] Event '${event}' emission - consider using message queue instead`
+    );
+  }
+
+  // IAgentCLIBridge implementation (simplified for v-0.6.1)
+  connectAgent(agent: any): void {
+    // v-0.6.1: Agent connection handled through message queue
+    console.log('[EventDrivenCLI] Agent connection - handled via message queue');
+  }
+
+  disconnectAgent(): void {
+    // v-0.6.1: Agent disconnection handled through message queue
+    console.log('[EventDrivenCLI] Agent disconnection - handled via message queue');
+  }
+
+  onAgentProgress(progress: { phase: string; progress: number; details?: string }): void {
+    this.displayProgress(progress.phase, progress.progress, progress.details);
+  }
+
+  onAgentMessage(message: { content: string; type: string }): void {
+    this.displayMessage(message.content, message.type as CLIMessageType);
+  }
+
+  onAgentComplete(result: any): void {
+    this.state.isProcessing = false;
+    this.displayMessage(`✅ Complete: ${result}`);
+  }
+
+  onAgentError(error: any): void {
+    this.state.isProcessing = false;
+    this.displayMessage(`❌ Error: ${error}`, 'error');
+  }
+
+  onAgentCancelled(reason: string): void {
+    this.state.isProcessing = false;
+    this.displayMessage(`🛑 Cancelled: ${reason}`, 'warning');
+  }
+
+  sendToAgent(input: string): void {
+    // v-0.6.1: Delegate to handleInput which uses message queue
+    this.handleInput(input);
+  }
+
+  cancelAgent(): void {
+    this.state.isProcessing = false;
+    this.cancelStreaming();
+    this.displayMessage('🛑 Operation cancelled');
   }
 
   // v-0.6.1: All complex methods removed - CLI only enqueues and displays
@@ -227,9 +325,6 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   // v-0.6.1: Agent callbacks removed - communication through message queue only
 
-
-
-
   // Design specification: handleInput() method
   handleInput(input: string): void {
     console.log(`[EventDrivenCLI] handleInput called with: "${input}"`);
@@ -239,10 +334,19 @@ export class EventDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       process.exit(0);
       return;
     }
-    
+
     // All other input goes to message queue
     console.log(`[EventDrivenCLI] Enqueuing to message queue`);
-    this.messageQueue.enqueue({ type: MessageType.USER_INPUT, input: input });
+    const userInputMessage: UserInputMessage = {
+      id: Math.random().toString(36).substring(2, 15),
+      type: MessageType.USER_INPUT,
+      timestamp: new Date(),
+      priority: MessagePriority.NORMAL,
+      input: input,
+      raw: false,
+      source: 'cli',
+    };
+    this.messageQueue.enqueue(userInputMessage);
   }
 
   // v-0.6.1: Pure message-driven CLI - only handleInput and displayMessage

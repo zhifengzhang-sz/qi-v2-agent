@@ -22,7 +22,7 @@ config({ path: envPath });
  * - v-0.5.x: Toolbox preview with file references and workflows ✓
  * - v-0.6.1: Pure message-driven architecture (h2A pattern) ← YOU ARE HERE
  * - v-0.6.x: Full toolbox (100+ tools, MCP integration)
- * - v-0.7.x: Advanced workflows  
+ * - v-0.7.x: Advanced workflows
  * - v-0.8.x: Full agent capabilities
  *
  * v-0.6.1 Features:
@@ -41,16 +41,18 @@ import { createStateManager } from '@qi/agent/state';
 import { match } from '@qi/base';
 // Use standard context manager instead of tool-based one
 import { ContextManager } from '../../../lib/src/context/impl/ContextManager.js';
-// Import new two-layer workflow architecture (v0.5.x refactored)
-import { createWorkflowHandler, type IWorkflowHandler } from '../../../lib/src/workflows/index.js';
-// v-0.6.1: Import new QiPrompt Core and message queue
-import { QiPromptCLI } from './QiPromptCLI.js';
 import { QiAsyncMessageQueue } from '../../../lib/src/messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../../../lib/src/messaging/types/MessageTypes.js';
+// Import new two-layer workflow architecture (v0.5.x refactored)
+import { createWorkflowHandler, type IWorkflowHandler } from '../../../lib/src/workflows/index.js';
 // Import app-specific commands
 import { createModelCommand } from './commands/ModelCommand.js';
 import { createProviderCommand } from './commands/ProviderCommand.js';
 import { createStatusCommand } from './commands/StatusCommand.js';
+// v-0.6.1: Import new QiPrompt Core and message queue
+import { QiPromptCLI } from './QiPromptCLI.js';
+// Debug logging utility
+import { initializeDebugLogging } from '../../../lib/src/utils/DebugLogger.js';
 
 /**
  * Main Application Class - v-0.6.1 Pure Message-Driven Architecture
@@ -83,6 +85,9 @@ class QiPromptApp {
     this.debugMode = options.debug ?? false;
     this.framework = options.framework;
     this.autoDetect = options.autoDetect ?? false;
+
+    // Initialize debug logging globally
+    initializeDebugLogging(this.debugMode);
 
     // v-0.6.1: Initialize message queue first (central coordination hub)
     // Design specification: Single Message Queue with sequential processing
@@ -152,7 +157,9 @@ class QiPromptApp {
       console.log(`✅ Conversation context created: ${conversationContext.id}`);
 
       // v-0.6.1: Create orchestrator directly with message queue (bypass factory)
-      this.orchestrator = new (await import('../../../lib/src/agent/PromptAppOrchestrator.js')).PromptAppOrchestrator(
+      this.orchestrator = new (
+        await import('../../../lib/src/agent/PromptAppOrchestrator.js')
+      ).PromptAppOrchestrator(
         this.stateManager,
         this.contextManager,
         {
@@ -174,7 +181,7 @@ class QiPromptApp {
 
       // v-0.6.1: Use proper CLI framework with message queue injection
       const { createCLI } = await import('../../../lib/src/cli/index.js');
-      
+
       this.cli = createCLI({
         framework: this.framework || 'hybrid',
         enableHotkeys: true,
@@ -187,11 +194,7 @@ class QiPromptApp {
       // CLI will be initialized by QiPromptCore
 
       // v-0.6.1: Create simplified QiPrompt Core for message processing
-      this.qiPromptCore = new QiPromptCLI(
-        this.cli,
-        this.orchestrator,
-        this.messageQueue
-      );
+      this.qiPromptCore = new QiPromptCLI(this.cli, this.orchestrator, this.messageQueue);
 
       const coreInitResult = await this.qiPromptCore.initialize();
       // Use QiCore functional pattern instead of manual checking
@@ -580,6 +583,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   });
 }
-
 
 export { QiPromptApp };

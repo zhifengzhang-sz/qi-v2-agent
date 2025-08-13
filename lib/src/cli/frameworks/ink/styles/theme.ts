@@ -102,14 +102,10 @@ export const defaultTheme: CLITheme = {
   animation: {
     loadingFrames: ['·', '✢', '✳', '∗', '✻', '✽'],
     processingMessages: [
-      'Clauding',
-      'Finagling',
       'Processing',
       'Thinking',
-      'Computing',
-      'Analyzing',
-      'Working',
-      'Generating',
+      'Responding',
+      'Loading',
     ],
     interval: 120, // ms between frame changes
   },

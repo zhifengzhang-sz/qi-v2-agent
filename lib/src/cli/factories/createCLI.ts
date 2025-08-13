@@ -254,7 +254,10 @@ export function recommendFramework(): {
 
 // Framework-specific factories
 
-function createInkCLI(config: Partial<CLIConfig> = {}, messageQueue?: any): Result<ICLIFramework, QiError> {
+function createInkCLI(
+  config: Partial<CLIConfig> = {},
+  messageQueue?: any
+): Result<ICLIFramework, QiError> {
   try {
     // Check if Ink is available
     const support = checkInkSupport();
@@ -379,7 +382,10 @@ export function getAvailableFrameworks(): CLIFramework[] {
 
 // Framework-specific Hybrid factories
 
-function createHybridCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
+function createHybridCLI(
+  config: Partial<CLIConfig> = {},
+  messageQueue?: any
+): Result<ICLIFramework, QiError> {
   try {
     // Check if both readline and Ink are available for hybrid mode
     const readlineSupport = checkReadlineSupport();
@@ -405,8 +411,8 @@ function createHybridCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework,
       );
     }
 
-    // Create hybrid CLI implementation
-    const cli = new HybridCLIFramework(config as CLIConfig);
+    // Create hybrid CLI implementation with shared message queue
+    const cli = new HybridCLIFramework(config as CLIConfig, messageQueue);
 
     return Ok(cli);
   } catch (error: any) {
@@ -431,9 +437,10 @@ function createValidatedHybridCLI(config: Partial<CLIConfig> = {}): Result<ICLIF
 }
 
 async function createHybridCLIAsync(
-  config: Partial<CLIConfig> = {}
+  config: Partial<CLIConfig> = {},
+  messageQueue?: any
 ): Promise<Result<ICLIFramework, QiError>> {
-  return createHybridCLI(config);
+  return createHybridCLI(config, messageQueue);
 }
 
 // Export the framework-specific factories for direct use
