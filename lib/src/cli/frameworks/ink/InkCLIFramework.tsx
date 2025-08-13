@@ -23,6 +23,7 @@ import { MainLayout } from './components/MainLayout.js';
 import { createOutputMessage, createUserMessage, createAssistantMessage, createSystemMessage, type OutputMessage } from './components/OutputDisplay.js';
 import { createPermissionRequest, type PermissionRequest } from './components/PermissionDialog.js';
 import { createDebugLogger } from '../../../utils/DebugLogger.js';
+import { createConditionalLogger, type SimpleLogger } from '../../../utils/QiCoreLogger.js';
 
 /**
  * Generate a unique message ID using crypto random bytes
@@ -67,6 +68,7 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   private stateUnsubscribe: (() => void) | null = null;
   private setMessages: ((updater: (prev: OutputMessage[]) => OutputMessage[]) => void) | null = null;
   private debugMode: boolean = false;
+  protected logger: SimpleLogger;
 
   constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     this.messageQueue = messageQueue;
@@ -74,10 +76,20 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     // Store debug mode from config
     this.debugMode = (config as any).debug || false;
     
-    if (this.debugMode) {
-      console.log('🔍 [DEBUG] InkCLIFramework constructor - config keys:', Object.keys(config));
-      console.log('🔍 [DEBUG] InkCLIFramework constructor - stateManager:', !!config.stateManager);
-    }
+    // Initialize QiCore conditional logger
+    this.logger = createConditionalLogger({
+      level: 'info',
+      name: 'InkCLIFramework',
+      pretty: true,
+      debugMode: this.debugMode
+    });
+    
+    this.logger.debug('🔍 InkCLIFramework constructor', undefined, {
+      component: 'InkCLIFramework',
+      method: 'constructor',
+      configKeys: Object.keys(config),
+      hasStateManager: !!config.stateManager
+    });
     
     this.config = { ...defaultInkConfig, ...config };
     this.state = {
@@ -102,9 +114,12 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     }
     if (stateManager?.subscribe) {
       this.stateUnsubscribe = stateManager.subscribe((change: any) => {
-        if (this.debugMode) {
-          console.log('🔄 [DEBUG] StateChange received in InkCLI:', change.type, change.field);
-        }
+        this.logger.debug('🔄 StateChange received in InkCLI', undefined, {
+          component: 'InkCLIFramework',
+          method: 'subscribeToStateChanges',
+          changeType: change.type,
+          changeField: change.field
+        });
         // Trigger UI updates for state changes that affect display
         if (change.type === 'config' && (change.field === 'promptModel' || change.field === 'promptProvider')) {
           // Force UI re-render for model/provider changes
@@ -118,9 +133,10 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   private forceUIUpdate(): void {
     // The React component will automatically re-render when state changes
     // This method is here for any explicit UI refresh needs
-    if (this.debugMode) {
-      console.log('🔄 [DEBUG] Forcing UI update');
-    }
+    this.logger.debug('🔄 Forcing UI update', undefined, {
+      component: 'InkCLIFramework',
+      method: 'forceUIUpdate'
+    });
   }
 
   // ==============================================
@@ -188,9 +204,12 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     this.state.lastActivity = new Date();
     
     // Mode changes are now handled through StateManager if needed
-    if (this.debugMode) {
-      console.log('🔄 [DEBUG] Mode changed:', previousMode, '->', mode);
-    }
+    this.logger.debug('🔄 Mode changed', undefined, {
+      component: 'InkCLIFramework',
+      method: 'setMode',
+      previousMode,
+      newMode: mode
+    });
   }
 
   getMode(): CLIMode {
@@ -218,9 +237,11 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     if (input.trim() === '/exit' || input.trim() === '/quit') {
       // Clear input box in UI before exiting
       this.state.currentInput = '';
-      if (this.debugMode) {
-        console.log('🔄 [DEBUG] Clearing input for exit command');
-      }
+      this.logger.debug('🔄 Clearing input for exit command', undefined, {
+        component: 'InkCLIFramework',
+        method: 'handleInput',
+        command: 'exit'
+      });
 
       if (this.messageQueue) {
         this.messageQueue.enqueue({
@@ -250,7 +271,13 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
         priority: 2 as any
       });
     } else {
-      console.error(`[InkCLIFramework] FATAL: No message queue - input lost!`);
+      this.logger.error('FATAL: No message queue - input lost!', undefined, {
+        component: 'InkCLIFramework',
+        method: 'handleInput',
+        input: input,
+        severity: 'FATAL',
+        errorContext: 'no_message_queue'
+      });
     }
   }
 
@@ -414,7 +441,13 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     this.displayMessage(`Error: ${errorMessage}`, 'error');
     
     // Error handling through direct state management
-    console.error(`[InkCLIFramework] Agent error:`, error);
+    this.logger.error('Agent error occurred', undefined, {
+      component: 'InkCLIFramework',
+      method: 'onAgentError',
+      errorMessage: error?.message || 'Unknown error',
+      errorStack: error?.stack,
+      errorContext: 'agent_error_handling'
+    });
   }
 
   onAgentCancelled(reason: string): void {

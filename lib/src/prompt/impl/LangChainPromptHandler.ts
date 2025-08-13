@@ -9,6 +9,12 @@ import { AIMessage, type BaseMessage, HumanMessage, SystemMessage } from '@langc
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import type { ContextMessage, ConversationContext } from '../../context/index.js';
 import { isDebugEnabled } from '../../utils/DebugLogger.js';
+import {
+  createQiLogger,
+  logError,
+  logWarning,
+  type SimpleLogger,
+} from '../../utils/QiCoreLogger.js';
 import type {
   IPromptHandler,
   PromptOptions,
@@ -22,9 +28,15 @@ import type {
 export class LangChainPromptHandler implements IPromptHandler {
   private baseHandler: IPromptHandler;
   private templates: Map<string, ChatPromptTemplate> = new Map();
+  private logger: SimpleLogger;
 
   constructor(baseHandler: IPromptHandler) {
     this.baseHandler = baseHandler;
+    this.logger = createQiLogger({
+      level: 'info',
+      name: 'LangChainPromptHandler',
+      pretty: true,
+    });
     this.initializeTemplates();
   }
 
@@ -49,7 +61,16 @@ export class LangChainPromptHandler implements IPromptHandler {
       const template = this.templates.get(templateType);
 
       if (!template) {
-        console.warn(`Template ${templateType} not found, falling back to base handler`);
+        logWarning(
+          this.logger,
+          `Template ${templateType} not found, falling back to base handler`,
+          {
+            component: 'LangChainPromptHandler',
+            method: 'completeWithContext',
+            templateType,
+            availableTemplates: Array.from(this.templates.keys()),
+          }
+        );
         return await this.baseHandler.complete(prompt, options);
       }
 
@@ -73,10 +94,14 @@ export class LangChainPromptHandler implements IPromptHandler {
       const formattedPrompt = this.messagesToString(messages);
 
       if (isDebugEnabled()) {
-        console.log(`📝 [DEBUG] Final formatted prompt being sent to LLM:`);
-        console.log(`--- START PROMPT ---`);
-        console.log(formattedPrompt);
-        console.log(`--- END PROMPT ---`);
+        this.logger.debug('📝 Final formatted prompt being sent to LLM', undefined, {
+          component: 'LangChainPromptHandler',
+          method: 'completeWithContext',
+          templateType,
+          promptLength: formattedPrompt.length,
+          messageCount: messages.length,
+          formattedPrompt: `--- START PROMPT ---\n${formattedPrompt}\n--- END PROMPT ---`,
+        });
       }
 
       // Execute with base handler
@@ -94,7 +119,13 @@ export class LangChainPromptHandler implements IPromptHandler {
 
       return result;
     } catch (error) {
-      console.error('LangChain template processing failed:', error);
+      const templateType = options.templateType || 'default';
+      logError(this.logger, error, {
+        component: 'LangChainPromptHandler',
+        method: 'completeWithContext',
+        templateType,
+        errorContext: 'langchain_template_processing_failed',
+      });
       // Fallback to base handler
       return await this.baseHandler.complete(prompt, options);
     }
@@ -124,7 +155,12 @@ export class LangChainPromptHandler implements IPromptHandler {
       const formattedPrompt = this.messagesToString(messages);
       return await this.baseHandler.complete(formattedPrompt, options);
     } catch (error) {
-      console.error('History-aware prompting failed:', error);
+      logError(this.logger, error, {
+        component: 'LangChainPromptHandler',
+        method: 'completeWithHistory',
+        conversationHistoryLength: conversationHistory.length,
+        errorContext: 'history_aware_prompting_failed',
+      });
       return await this.baseHandler.complete(prompt, options);
     }
   }

@@ -1,4 +1,4 @@
-# QiPrompt v-0.6.1 Component Architecture
+# QiPrompt v-0.6.3 Component Architecture with QiCore Integration
 
 ## Component Dependency Map
 
@@ -111,12 +111,15 @@ function createCLI(options: { framework?: string }) {
 ### 4. EventDrivenCLI (Architectural Layer)
 **File**: `lib/src/cli/impl/EventDrivenCLI.ts`
 **Dependencies**: `QiAsyncMessageQueue`
-**Design Specification**: v-0.6.1 implementation
+**Design Specification**: v-0.6.3 implementation with QiCore patterns
 
 **Current Implementation Status**:
 - ✅ Uses QiAsyncMessageQueue for coordination
 - ✅ Implements h2A-inspired message patterns
 - ✅ Follows QiCore Result<T> functional programming patterns
+- ✅ Conditional debug logging with --debug flag
+- ✅ Structured logging with metadata
+- ✅ Professional error handling with QiError
 
 **Required Implementation**:
 ```typescript
@@ -158,7 +161,7 @@ class QiAsyncMessageQueue {
 ### 6. QiPromptCLI (Message Processor)
 **File**: `app/src/prompt/QiPromptCLI.ts`
 **Dependencies**: CLI, Orchestrator, MessageQueue
-**Design Specification**: v-0.6.1 implementation
+**Design Specification**: v-0.6.3 implementation with QiCore patterns
 
 **Current Implementation**:
 ```typescript
@@ -360,12 +363,79 @@ readline.on('line') → ReadlineAdapter → EventDrivenCLI → MessageQueue → 
 4. **Single Source of Truth**: `QiAsyncMessageQueue` coordinates everything
 5. **Design Compliance**: `EventDrivenCLI` must match specification exactly
 
-## v-0.6.1 Architecture Status
+## QiCore Integration Patterns (v-0.6.3)
 
-The v-0.6.1 implementation successfully addresses architectural concerns:
+### Logger Integration
+All components use QiCore logger with fallback patterns:
+```typescript
+import { createLogger, type Logger } from '@qi/core';
+
+// Logger initialization with graceful fallback
+const loggerResult = createLogger({ level: 'info', pretty: true });
+this.logger = match(
+  (logger) => logger,
+  () => ({
+    info: () => {},
+    error: () => {},
+    warn: () => {},
+    debug: () => {}
+  }),
+  loggerResult
+);
+```
+
+### Structured Logging Standards
+```typescript
+// All log entries include structured metadata
+this.logger.info('🔁 Starting message processing loop', undefined, {
+  component: 'QiPromptCLI',
+  method: 'startMessageProcessingLoop',
+});
+
+// Error logging with context
+this.logger.error('Message processing failed', undefined, {
+  component: 'QiPromptCLI',
+  error: error.message,
+  errorContext: error.context,
+});
+```
+
+### Conditional Debug Logging
+```typescript
+// Debug logging conditional on --debug flag
+if (this.debugMode) {
+  this.logger.debug('🔍 Debug information', undefined, {
+    component: 'ComponentName',
+    debugData: someData,
+  });
+}
+```
+
+### Result<T> Pattern Usage
+```typescript
+// All async operations use fromAsyncTryCatch
+return fromAsyncTryCatch(
+  async () => {
+    // Operation logic
+    return result;
+  },
+  (error) => systemError('Operation failed', {
+    originalError: error instanceof Error ? error.message : String(error),
+    component: 'ComponentName',
+    step: 'operation_name',
+  })
+);
+```
+
+## v-0.6.3 Architecture Status
+
+The v-0.6.3 implementation successfully addresses architectural concerns:
 1. **Framework Support** - Maintains Ink, readline, hybrid framework choices
 2. **Message-Driven Architecture** - QiAsyncMessageQueue provides single-threaded processing  
 3. **QiCore Integration** - Full Result<T>, success(), failure(), match() patterns
 4. **Framework Flexibility** - User can choose `--framework=hybrid|ink|readline`
+5. **Professional Logging** - Conditional debug logging with structured metadata
+6. **Error Handling** - Proper QiError usage with context preservation
+7. **Code Quality** - Zero console.log statements, all linting rules pass
 
-The implementation achieves **architectural purity with framework flexibility**.
+The implementation achieves **architectural purity with framework flexibility and enterprise-grade logging**.

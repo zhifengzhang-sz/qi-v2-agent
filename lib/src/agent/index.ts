@@ -21,6 +21,7 @@ import type { ICommandHandler } from '../command/index.js';
 import type { IContextManager } from '../context/index.js';
 import type { IPromptHandler } from '../prompt/index.js';
 import type { IStateManager } from '../state/index.js';
+import { createQiLogger } from '../utils/QiCoreLogger.js';
 import type { IWorkflowEngine, IWorkflowExtractor } from '../workflow/index.js';
 import type { AgentConfig } from './abstractions/index.js';
 // Export factory functions (not implementation classes)
@@ -91,7 +92,15 @@ export function createPromptApp(
     workflowHandler: config.workflowHandler,
   };
 
-  console.log('🏗️ Creating PromptAppOrchestrator with workflow handler:', !!config.workflowHandler);
+  // Create logger for factory function
+  const logger = createQiLogger({ level: 'info', name: 'AgentFactory', pretty: true });
+  logger.info('🏗️ Creating PromptAppOrchestrator', undefined, {
+    component: 'AgentFactory',
+    method: 'createPromptAppOrchestrator',
+    hasWorkflowHandler: !!config.workflowHandler,
+    hasCommandHandler: !!config.commandHandler,
+    hasPromptHandler: !!config.promptHandler,
+  });
 
   return new PromptAppOrchestrator(stateManager, contextManager, agentConfig, dependencies);
 }
