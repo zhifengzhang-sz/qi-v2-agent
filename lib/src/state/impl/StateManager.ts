@@ -103,30 +103,33 @@ export class StateManager implements IStateManager {
   // LLM configuration management
   // ==========================================================================
 
-  async loadLLMConfig(configPath: string): Promise<void> {
+  async loadLLMConfig(configFilePath: string, schemaFilePath?: string): Promise<void> {
     const result = await fromAsyncTryCatch(
       async () => {
-        const configFilePath = join(configPath, 'llm-providers.yaml');
-        const schemaFilePath = join(configPath, 'llm-providers.schema.json');
-
         const builderResult = await ConfigBuilder.fromYamlFile(configFilePath);
         const config = match(
-          (builder: unknown) =>
-            match(
-              (validatedConfig: unknown) => validatedConfig,
-              (error: QiError) => {
-                throw new Error(`Config validation failed: ${error.message}`);
-              },
-              (
-                builder as {
-                  validateWithSchemaFile: (path: string) => {
-                    build: () => Result<unknown, QiError>;
-                  };
-                }
-              )
-                .validateWithSchemaFile(schemaFilePath)
-                .build()
-            ),
+          (builder: unknown) => {
+            if (schemaFilePath) {
+              return match(
+                (validatedConfig: unknown) => validatedConfig,
+                (error: QiError) => {
+                  throw new Error(`Config validation failed: ${error.message}`);
+                },
+                (
+                  builder as {
+                    validateWithSchemaFile: (path: string) => {
+                      build: () => Result<unknown, QiError>;
+                    };
+                  }
+                )
+                  .validateWithSchemaFile(schemaFilePath)
+                  .build()
+              );
+            } else {
+              // No schema validation, just build
+              return (builder as { build: () => Result<unknown, QiError> }).build();
+            }
+          },
           (error: QiError) => {
             throw new Error(`Config loading failed: ${error.message}`);
           },
@@ -151,8 +154,8 @@ export class StateManager implements IStateManager {
           promptConfig,
         });
 
-        // Update app config with the config path
-        this.updateConfig({ configPath });
+        // Update app config with the config file path
+        this.updateConfig({ configPath: configFilePath });
 
         this.notifyChange({
           type: 'config',

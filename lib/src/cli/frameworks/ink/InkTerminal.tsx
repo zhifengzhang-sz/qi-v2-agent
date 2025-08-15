@@ -152,11 +152,7 @@ export class InkTerminal implements ITerminal {
  * Check if Ink is available
  */
 export function isInkAvailable(): boolean {
-  try {
-    require('ink');
-    require('@inkjs/ui');
-    return true;
-  } catch {
-    return false;
-  }
+  // For bundling compatibility, assume availability in development
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  return isDevelopment;
 }

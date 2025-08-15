@@ -12,6 +12,7 @@
 import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue';
 import type { QiMessage } from '../../messaging/types/MessageTypes';
 import { MessagePriority, MessageType } from '../../messaging/types/MessageTypes';
+import { createDebugLogger } from '../../utils/DebugLogger.js';
 
 export interface HotkeyConfig {
   enableShiftTab: boolean;
@@ -29,6 +30,7 @@ export class HotkeyManager {
   private config: HotkeyConfig;
   private originalStdinListeners: Array<(...args: any[]) => void> = [];
   private messageQueue: QiAsyncMessageQueue<QiMessage>;
+  private logger = createDebugLogger('HotkeyManager');
 
   constructor(messageQueue: QiAsyncMessageQueue<QiMessage>, config: Partial<HotkeyConfig> = {}) {
     // v-0.6.1: Pure message-driven constructor - requires message queue
@@ -47,10 +49,13 @@ export class HotkeyManager {
    * Enable raw mode and start listening for hotkeys
    */
   enable(): void {
+    this.logger.trace('enable() called');
     if (this.isRawMode) {
+      this.logger.trace('Already in raw mode, skipping');
       return; // Already enabled
     }
 
+    this.logger.trace('Enabling raw mode and setting up listeners');
     // Store existing listeners to restore later
     this.originalStdinListeners = process.stdin.listeners('data') as Array<
       (...args: any[]) => void
@@ -103,32 +108,44 @@ export class HotkeyManager {
     const key = chunk.toString();
     const raw = chunk;
 
+    // Debug ALL keypresses
+    const bytes = Array.from(chunk)
+      .map((b) => `0x${b.toString(16).padStart(2, '0')}`)
+      .join(' ');
+    this.logger.trace(`Got keypress [${bytes}] "${key}"`);
+
     // v-0.6.1: Send hotkey messages to queue instead of events
+
+    // Track if this key was handled as a global hotkey
+    let wasGlobalHotkey = false;
 
     // Check for hotkey combinations
     if (this.detectShiftTab(chunk)) {
       if (this.config.enableShiftTab) {
+        // QiCore debug logging
+        this.logger.trace('Processing Shift+Tab globally - blocking passthrough');
         this.sendHotkeyMessage('SHIFT_TAB', { key, raw });
-        return; // Don't pass through hotkey
+        wasGlobalHotkey = true; // Mark as handled globally
       }
     }
 
     if (this.detectEscape(chunk)) {
       if (this.config.enableEscape) {
         this.sendHotkeyMessage('ESCAPE', { key, raw });
-        return; // Don't pass through hotkey
+        wasGlobalHotkey = true; // Mark as handled globally
       }
     }
 
     if (this.detectCtrlC(chunk)) {
       if (this.config.enableCtrlC) {
         this.sendHotkeyMessage('CTRL_C', { key, raw });
-        // Note: Ctrl+C should still be passed through for SIGINT
+        // Note: Ctrl+C should still be passed through for SIGINT even though it's global
       }
     }
 
-    // Pass through to normal input handling if enabled
-    if (this.config.passthrough) {
+    // CRITICAL FIX: Only pass through if NOT a global hotkey and passthrough is enabled
+    // This prevents React components from seeing global hotkeys and causing race conditions
+    if (this.config.passthrough && !wasGlobalHotkey) {
       this.passthroughKey(chunk);
     }
   }

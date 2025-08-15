@@ -18,6 +18,7 @@ export type {
   IStreamingRenderer,
   MessageType,
 } from './abstractions/ICLIFramework.js';
+
 // Legacy exports (maintained for backward compatibility)
 export * from './abstractions/index.js';
 export {
@@ -27,6 +28,7 @@ export {
   displayConfigHelp,
   loadCLIConfig,
 } from './config/index.js';
+
 // Framework-agnostic factories and configuration
 export { getAvailableFrameworks, recommendFramework } from './factories/createCLI.js';
 export {
@@ -36,10 +38,10 @@ export {
 } from './factories/createReadlineCLI.js';
 export * from './frameworks/index.js';
 export * from './impl/index.js';
+
 // NEW: Refactored CLI Framework with Dependency Injection
 export { MessageDrivenCLI } from './impl/MessageDrivenCLI.js';
-// v-0.6.1: Event-based exports removed
-// export { type CLIFeedback, type CLIInput, createPureCLI, type ICLI } from './impl/index.js';
+
 export type { HotkeyConfig } from './keyboard/HotkeyManager.js';
 // Keyboard management
 export { createHotkeyManager, debugKeypress, HotkeyManager } from './keyboard/HotkeyManager.js';
@@ -73,17 +75,8 @@ export {
 export type { StreamChunk } from './ui/StreamingRenderer.js';
 export { createStreamingRenderer, StreamingRenderer, wrapText } from './ui/StreamingRenderer.js';
 
-// Factory functions
-import { createReadlineCLI } from './factories/createReadlineCLI.js';
-export function createCompleteCLI(
-  config?: Partial<import('./abstractions/ICLIFramework.js').CLIConfig>
-) {
-  const result = createReadlineCLI(config);
-  if (result.tag === 'failure') {
-    throw new Error(`Failed to create CLI: ${result.error.message}`);
-  }
-  return result.value;
-}
+// ONLY ONE CLI CREATION FUNCTION - NO FALLBACKS
+export { createCLIAsync } from './factories/createCLI.js';
 
 // Re-export types for convenience
 export type {
@@ -107,105 +100,3 @@ export const DefaultCLIConfig: import('./abstractions/ICLIFramework.js').CLIConf
   maxBufferSize: 10000,
   debug: false,
 };
-
-/**
- * Create CLI framework instance with configuration support
- * Supports configuration loading from environment variables, CLI args, and config files
- */
-export function createCLI(
-  options: {
-    framework?: 'readline' | 'ink' | 'hybrid';
-    agent?: any;
-    enableHotkeys?: boolean;
-    enableStreaming?: boolean;
-    debug?: boolean;
-    commandHandler?: any; // ICommandHandler - using any for now to avoid circular imports
-    configPath?: string;
-    args?: string[];
-    autoDetect?: boolean; // Auto-detect best framework
-    messageQueue?: any; // v-0.6.1: Message queue for pure async messaging
-    stateManager?: any; // v-0.6.1: State manager for UI updates
-  } = {}
-) {
-  // Always load configuration to get all settings
-  const { loadCLIConfig, autoDetectFramework } = require('./config/CLIConfigLoader.js');
-
-  const cliConfig = loadCLIConfig({
-    configPath: options.configPath,
-    args: options.args,
-  });
-
-  // Clean up debug logging for production
-  // if (options.debug) {
-  //   console.log('🔍 Loaded config:', cliConfig);
-  //   console.log('🔍 Options framework:', options.framework);
-  //   console.log('🔍 Args passed:', options.args);
-  // }
-
-  // Determine framework with proper precedence: explicit option > config > auto-detect > default
-  let framework: string;
-  if (options.framework) {
-    framework = options.framework; // Explicit option wins
-  } else if (cliConfig.framework) {
-    framework = cliConfig.framework; // Config file/env var
-  } else if (options.autoDetect) {
-    framework = autoDetectFramework(); // Auto-detect
-  } else {
-    framework = 'readline'; // Default
-  }
-
-  // Merge config with explicit options taking precedence
-  const config = {
-    ...cliConfig, // Base config
-    framework, // Override with the determined framework
-    // Explicit options override everything
-    ...(options.enableHotkeys !== undefined && { enableHotkeys: options.enableHotkeys }),
-    ...(options.enableStreaming !== undefined && { enableStreaming: options.enableStreaming }),
-    ...(options.debug !== undefined && { debug: options.debug }),
-    // v-0.6.1: Pass through messageQueue and stateManager
-    ...(options.messageQueue !== undefined && { messageQueue: options.messageQueue }),
-    ...(options.stateManager !== undefined && { stateManager: options.stateManager }),
-  };
-
-  if (config.debug) {
-    console.log(`🔧 Using ${framework} framework with config:`, config);
-  }
-
-  // Use framework-specific factories to handle commandHandler properly
-  let result: any;
-
-  switch (framework) {
-    case 'ink': {
-      const { createInkCLI } = require('./factories/createCLI.js');
-      result = createInkCLI(config, config.messageQueue);
-      break;
-    }
-
-    case 'hybrid': {
-      const { createHybridCLI } = require('./factories/createCLI.js');
-      result = createHybridCLI(config, config.messageQueue);
-      break;
-    }
-    default: {
-      // Use existing readline factory which supports commandHandler
-      result = createReadlineCLI(config, {
-        commandHandler: options.commandHandler,
-      });
-      break;
-    }
-  }
-
-  if (result.tag === 'failure') {
-    throw new Error(`Failed to create CLI: ${result.error.message}`);
-  }
-
-  const cli = result.value;
-
-  if (options.agent) {
-    // v-0.6.1: Agent communication handled through message queue only
-    // EventEmitter patterns removed - no more dual architecture
-    (cli as any).connectAgent(options.agent);
-  }
-
-  return cli;
-}

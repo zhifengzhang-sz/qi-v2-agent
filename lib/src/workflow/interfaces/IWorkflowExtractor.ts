@@ -5,6 +5,10 @@
  */
 
 import type {
+  IDecompositionStrategy,
+  WorkflowContext,
+} from '../strategies/IDecompositionStrategy.js';
+import type {
   ProcessingContext,
   WorkflowExtractionResult,
   WorkflowMode,
@@ -12,13 +16,32 @@ import type {
 } from './IWorkflow.js';
 
 /**
+ * Workflow extraction method specification
+ */
+export interface WorkflowExtractionMethod {
+  readonly method: 'strategy-based' | 'template-based' | 'hybrid';
+  readonly strategy?: IDecompositionStrategy; // For strategy-based
+  readonly strategyName?: string; // For strategy selection
+  readonly templateMode?: string; // For template-based
+  readonly promptProvider?: any; // LLM provider interface (user-configurable)
+}
+
+/**
  * Abstract workflow extractor interface
  */
 export interface IWorkflowExtractor {
   /**
    * Extract workflow specification from natural language input
+   *
+   * @param input Natural language task description
+   * @param method How to extract the workflow (strategy, template, hybrid)
+   * @param context Execution context
    */
-  extractWorkflow(input: string, context?: ProcessingContext): Promise<WorkflowExtractionResult>;
+  extractWorkflow(
+    input: string,
+    method: WorkflowExtractionMethod,
+    context: WorkflowContext
+  ): Promise<WorkflowExtractionResult>;
 
   /**
    * Get supported workflow modes
@@ -31,9 +54,9 @@ export interface IWorkflowExtractor {
   validateWorkflowSpec(spec: WorkflowSpec): Promise<boolean>;
 
   /**
-   * Get workflow templates for a specific mode
+   * Get available strategies
    */
-  getWorkflowTemplates(mode: string): Promise<readonly WorkflowSpec[]>;
+  getAvailableStrategies(): readonly IDecompositionStrategy[];
 }
 
 /**
@@ -41,9 +64,7 @@ export interface IWorkflowExtractor {
  */
 export interface IWorkflowExtractorConfig {
   readonly supportedModes: readonly WorkflowMode[];
-  readonly patternMapping: readonly [string, string][];
-  readonly baseUrl?: string;
-  readonly modelId?: string;
-  readonly temperature?: number;
-  readonly maxTokens?: number;
+  readonly strategies: readonly IDecompositionStrategy[]; // Available strategies
+  readonly templateModes?: readonly string[]; // Available template modes
+  readonly defaultMethod?: WorkflowExtractionMethod; // Default extraction method
 }

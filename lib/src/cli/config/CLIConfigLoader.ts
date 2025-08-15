@@ -271,14 +271,12 @@ function validateConfig(config: CLIConfigWithFramework): CLIConfigWithFramework 
 export function getAvailableFrameworks(): CLIFramework[] {
   const frameworks: CLIFramework[] = ['readline']; // Always available
 
-  // Check if Ink is available
-  try {
-    require('ink');
-    require('@inkjs/ui');
+  // Check if Ink is available (defer runtime check for bundling compatibility)
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  if (isDevelopment) {
     frameworks.push('ink');
-  } catch {
-    // Ink not available
   }
+  // In production/bundled environment, Ink availability is checked at runtime
 
   // Hybrid is a meta-framework that wraps Ink capabilities
   frameworks.push('hybrid');

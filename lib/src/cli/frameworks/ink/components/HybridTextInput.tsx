@@ -13,6 +13,7 @@
 import React from 'react';
 import { Text, useInput } from 'ink';
 import type { Key } from 'ink';
+import { createDebugLogger } from '../../../../utils/DebugLogger.js';
 import { useHybridTextInput } from '../../hybrid/hooks/useHybridTextInput.js';
 import type { HybridCLIFramework } from '../../hybrid/HybridCLIFramework.js';
 
@@ -119,6 +120,8 @@ export function HybridTextInput({
   onCursorOffsetChange,
   framework,
 }: HybridTextInputProps) {
+  const logger = createDebugLogger('HybridTextInput');
+  logger.trace('HybridTextInput component rendered - this should show if hybrid mode is active');
   
   // Delegate all logic to hook (Claude Code pattern)
   const { onInput, renderedValue } = useHybridTextInput({
@@ -138,7 +141,29 @@ export function HybridTextInput({
   });
 
   // Capture input events (Claude Code pattern)
-  useInput(onInput, { isActive: focus });
+  // CRITICAL FIX: Block global hotkeys to prevent dual processing and cursor corruption
+  useInput((input, key) => {
+    logger.trace(`useInput: input="${input}" key=${JSON.stringify({tab: key.tab, shift: key.shift, escape: key.escape})}`);
+    
+    // Block ESC for HotkeyManager, but let Shift+Tab through for hybrid handling
+    if (key.escape) {
+      logger.trace('Blocking ESC for HotkeyManager');
+      // Don't process - these will be handled by HotkeyManager
+      return;
+    }
+    
+    // CRITICAL FIX: Block Shift+Tab at Ink level to prevent tab character insertion
+    if (key.tab && key.shift) {
+      logger.trace('Blocking Shift+Tab at Ink level to prevent cursor advancement');
+      // Let the hybrid hook handle mode cycling, but don't process the tab character
+      onInput('', key); // Pass empty input to prevent tab insertion
+      return;
+    }
+    
+    // Process all other input normally
+    logger.trace(`Processing input normally: "${input}"`);
+    onInput(input, key);
+  }, { isActive: focus });
 
   // Show placeholder when empty (Claude Code pattern)
   if (value === '' && placeholder) {

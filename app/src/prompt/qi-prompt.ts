@@ -7,31 +7,27 @@ import { fileURLToPath } from 'node:url';
  */
 import { config } from 'dotenv';
 
-// Get the correct path to .env relative to this file (root directory)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const envPath = join(__dirname, '..', '..', '..', '.env');
-
-config({ path: envPath });
+// Environment loading will be handled after argument parsing
 
 /**
- * Qi Prompt CLI Application - v-0.6.3 Pure Message-Driven Architecture with QiCore Integration
+ * Qi Prompt CLI Application - v-0.8.0 Complete Binary Compilation with Professional Configuration
  *
  * Roadmap:
  * - v-0.4.x: Pure prompt app ✓
  * - v-0.5.x: Toolbox preview with file references and workflows ✓
  * - v-0.6.1: Pure message-driven architecture (h2A pattern) ✓
- * - v-0.6.3: Complete QiCore integration ← YOU ARE HERE
+ * - v-0.8.0: Complete binary compilation with professional configuration ← YOU ARE HERE
  * - v-0.6.x: Full toolbox (100+ tools, MCP integration)
  * - v-0.7.x: Advanced workflows
  * - v-0.8.x: Full agent capabilities
  *
- * v-0.6.3 Features:
+ * v-0.8.0 Features:
+ * - Portable binary compilation (8.74MB executable)
+ * - Professional CLI arguments (--config-path, --schema-path, --env-path)
+ * - No hardcoded paths - complete configuration flexibility
+ * - Dynamic imports solving top-level await bundling issues
  * - Complete QiCore integration with Result<T> patterns
- * - Structured logging with @qi/core/logger
- * - Type-safe configuration with ConfigBuilder
- * - Professional error handling with QiError
- * - No console.log or try/catch blocks
+ * - Structured logging and professional error handling
  */
 
 // v-0.6.3: QiCore imports for professional patterns
@@ -153,17 +149,29 @@ class QiPromptApp {
   private currentSession?: string;
   private logger: SimpleLogger;
   private configHelper!: AppConfigHelper;
+  private promptConfigPath?: string;
+  private promptSchemaPath?: string;
 
   constructor(
     options: {
       debug?: boolean;
       framework?: 'readline' | 'ink' | 'hybrid';
       autoDetect?: boolean;
+      promptConfigPath?: string;
+      promptSchemaPath?: string;
+      envPath?: string;
     } = {}
   ) {
     this.debugMode = options.debug ?? false;
     this.framework = options.framework;
     this.autoDetect = options.autoDetect ?? false;
+    this.promptConfigPath = options.promptConfigPath;
+    this.promptSchemaPath = options.promptSchemaPath;
+
+    // Load environment file if provided
+    if (options.envPath) {
+      config({ path: options.envPath });
+    }
 
     // Initialize simple logger
     this.logger = createSimpleLogger(this.debugMode ? 'debug' : 'info', true);
@@ -213,8 +221,15 @@ class QiPromptApp {
           });
         }
 
-        const llmConfigPath = join(__dirname, '..', '..', '..', 'config');
-        await this.stateManager.loadLLMConfig(llmConfigPath);
+        if (!this.promptConfigPath) {
+          throw systemError(
+            'Prompt config path is required for StateManager. Use --config-path argument.',
+            {
+              code: 'MISSING_STATE_CONFIG',
+            }
+          );
+        }
+        await this.stateManager.loadLLMConfig(this.promptConfigPath, this.promptSchemaPath);
 
         // Create config helper that uses StateManager as source
         this.configHelper = createAppConfigHelper(this.stateManager);
@@ -229,7 +244,7 @@ class QiPromptApp {
           this.logger.info('✅ LLM Configuration loaded successfully', undefined, {
             component: this.configHelper.getOr('logging.component', 'QiPromptApp'),
             step: 'llm_config_loaded',
-            configPath: llmConfigPath,
+            configPath: this.promptConfigPath,
             logLevel: this.configHelper.getOr('logging.level', 'info'),
           });
         }
@@ -280,17 +295,21 @@ class QiPromptApp {
         }
 
         // Initialize prompt handler with config files
-        const promptConfigPath = join(__dirname, '..', '..', '..', 'config', 'llm-providers.yaml');
-        const promptSchemaPath = join(
-          __dirname,
-          '..',
-          '..',
-          '..',
-          'config',
-          'llm-providers.schema.json'
-        );
+        if (!this.promptConfigPath) {
+          throw systemError('Prompt config path is required. Use --config-path argument.', {
+            code: 'MISSING_CONFIG',
+          });
+        }
+        if (!this.promptSchemaPath) {
+          throw systemError('Prompt schema path is required. Use --schema-path argument.', {
+            code: 'MISSING_SCHEMA',
+          });
+        }
 
-        const initResult = await this.promptHandler.initialize(promptConfigPath, promptSchemaPath);
+        const initResult = await this.promptHandler.initialize(
+          this.promptConfigPath,
+          this.promptSchemaPath
+        );
         if (!initResult.success) {
           throw new Error(`Failed to initialize prompt handler: ${initResult.error}`);
         }
@@ -347,11 +366,17 @@ class QiPromptApp {
           });
         }
 
-        // v-0.6.3: Use proper CLI framework with message queue injection
-        const { createCLI } = await import('@qi/agent/cli');
+        // v-0.6.3: Use proper CLI framework with message queue injection (async for dynamic imports)
+        const { createCLIAsync } = await import('@qi/agent/cli');
 
-        const cliResult = createCLI({
-          framework: this.framework || this.configHelper.getOr('app.framework', 'hybrid'),
+        const selectedFramework =
+          this.framework || this.configHelper.getOr('app.framework', 'hybrid');
+        console.log(
+          `🔍 [APP DEBUG] Using framework: ${selectedFramework} (this.framework: ${this.framework})`
+        );
+
+        const cliResult = await createCLIAsync({
+          framework: selectedFramework,
           enableHotkeys: this.configHelper.getOr('ui.enableHotkeys', true),
           enableStreaming: this.configHelper.getOr('ui.enableStreaming', true),
           debug: this.debugMode || this.configHelper.getOr('app.debug', false),
@@ -716,6 +741,9 @@ function parseArgs(): {
   framework?: 'readline' | 'ink' | 'hybrid';
   autoDetect: boolean;
   help: boolean;
+  promptConfigPath?: string;
+  promptSchemaPath?: string;
+  envPath?: string;
 } {
   const args = process.argv.slice(2);
 
@@ -745,7 +773,54 @@ function parseArgs(): {
     }
   }
 
-  return { debug, framework, autoDetect, help };
+  let promptConfigPath: string | undefined;
+  let promptSchemaPath: string | undefined;
+
+  // Look for config path argument
+  for (const arg of args) {
+    if (arg.startsWith('--config-path=')) {
+      promptConfigPath = arg.split('=')[1];
+      break;
+    } else if (arg === '--config-path') {
+      const index = args.indexOf(arg);
+      if (index >= 0 && index + 1 < args.length) {
+        promptConfigPath = args[index + 1];
+      }
+      break;
+    }
+  }
+
+  // Look for schema path argument
+  for (const arg of args) {
+    if (arg.startsWith('--schema-path=')) {
+      promptSchemaPath = arg.split('=')[1];
+      break;
+    } else if (arg === '--schema-path') {
+      const index = args.indexOf(arg);
+      if (index >= 0 && index + 1 < args.length) {
+        promptSchemaPath = args[index + 1];
+      }
+      break;
+    }
+  }
+
+  let envPath: string | undefined;
+
+  // Look for env path argument
+  for (const arg of args) {
+    if (arg.startsWith('--env-path=')) {
+      envPath = arg.split('=')[1];
+      break;
+    } else if (arg === '--env-path') {
+      const index = args.indexOf(arg);
+      if (index >= 0 && index + 1 < args.length) {
+        envPath = args[index + 1];
+      }
+      break;
+    }
+  }
+
+  return { debug, framework, autoDetect, help, promptConfigPath, promptSchemaPath, envPath };
 }
 
 // Display help function
@@ -781,6 +856,9 @@ Usage: bun run qi-prompt [options]
 Options:
   --framework, -f <type>    UI framework (${available.join('|')})
   --auto-detect, -a         Auto-detect best framework for environment
+  --config-path <path>      Path to LLM providers configuration file
+  --schema-path <path>      Path to LLM providers schema file
+  --env-path <path>         Path to environment variables file (.env)
   --tui                     Enable TUI mode
   --debug, -d               Enable debug mode
   --help, -h                Display this help message
@@ -813,13 +891,10 @@ HOTKEYS:
   Ctrl+C        - Clear current input (Ink framework only)
 
 Examples:
-  bun run qi-prompt                           # Use default configuration
-  bun run qi-prompt --framework ink          # Use Ink framework (React-based UI)  
-  bun run qi-prompt --framework readline     # Use basic terminal UI
-  bun run qi-prompt --auto-detect            # Use recommended framework (${recommended})
-  bun run qi-prompt --debug                  # Enable debug mode
-  
-  QI_CLI_FRAMEWORK=ink bun run qi-prompt     # Use environment variable
+  bun run qi-prompt --config-path config/llm.yaml --schema-path config/schema.json --env-path .env
+  bun run qi-prompt --framework ink --config-path ./my-config.yaml --schema-path ./schema.json --env-path ./my.env
+  bun run qi-prompt --framework readline --config-path /path/to/config.yaml --schema-path /path/to/schema.json --env-path /path/to/.env
+  bun run qi-prompt --auto-detect --debug --config-path config.yaml --schema-path schema.json --env-path .env
 
 TOOLBOX USAGE EXAMPLES (v-0.5.x):
   @src/index.ts explain this file          # File reference workflow

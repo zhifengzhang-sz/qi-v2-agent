@@ -112,7 +112,7 @@ export interface WorkflowExtractionResult {
   readonly pattern: string;
   readonly workflowSpec?: WorkflowSpec;
   readonly confidence: number;
-  readonly extractionMethod: 'template-based' | 'llm-based' | 'hybrid';
+  readonly extractionMethod: 'strategy-based' | 'template-based' | 'llm-based' | 'hybrid';
   readonly error?: string;
   readonly metadata: ReadonlyMap<string, unknown>;
 }

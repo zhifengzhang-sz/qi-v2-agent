@@ -6,7 +6,7 @@
  */
 
 import type { PromptAppOrchestrator } from '@qi/agent/agent/PromptAppOrchestrator';
-import type { ICLIFramework } from '@qi/agent/cli/abstractions/ICLIFramework';
+import type { CLIMode, ICLIFramework } from '@qi/agent/cli/abstractions/ICLIFramework';
 import type { QiAsyncMessageQueue } from '@qi/agent/messaging/impl/QiAsyncMessageQueue';
 import type { QiMessage, SystemControlMessage } from '@qi/agent/messaging/types/MessageTypes';
 import { MessagePriority, MessageType } from '@qi/agent/messaging/types/MessageTypes';
@@ -262,6 +262,118 @@ export class QiPromptCLI {
     switch (message.type) {
       case MessageType.USER_INPUT: {
         const userInput = (message as any).input;
+
+        // Handle special hotkey messages
+        if (typeof userInput === 'string' && userInput.startsWith('__HOTKEY_')) {
+          this.logger.debug('⌨️ Processing HOTKEY message', undefined, {
+            hotkey: userInput,
+            messageId: message.id,
+            component: 'QiPromptCLI',
+          });
+
+          if (userInput === '__HOTKEY_ESCAPE__') {
+            this.logger.debug('🚫 Processing ESC cancellation', undefined, {
+              messageId: message.id,
+              component: 'QiPromptCLI',
+            });
+
+            // Cancel streaming operations if active
+            if (typeof this.cli.cancelStreaming === 'function') {
+              this.cli.cancelStreaming();
+              this.logger.debug('🛑 Cancelled streaming operations', undefined, {
+                messageId: message.id,
+                component: 'QiPromptCLI',
+              });
+            }
+
+            // Reset processing state in CLI
+            if (typeof this.cli.resetProcessingState === 'function') {
+              this.cli.resetProcessingState();
+              this.logger.debug('🔄 Reset processing state from ESC', undefined, {
+                messageId: message.id,
+                component: 'QiPromptCLI',
+              });
+            }
+
+            // Display cancellation feedback
+            this.cli.displayMessage('\n⏹️  Operation cancelled');
+          } else if (userInput === '__HOTKEY_SHIFT_TAB__') {
+            // QiCore debug logging
+            this.logger.debug(
+              '🎯 QiPromptCLI: Processing Shift+Tab hotkey - MODE CHANGE STARTING',
+              undefined,
+              {
+                messageId: message.id,
+                component: 'QiPromptCLI',
+                method: 'processMessage',
+                hotkeyType: 'SHIFT_TAB',
+              }
+            );
+            this.logger.debug('🔄 Processing mode cycle hotkey', undefined, {
+              messageId: message.id,
+              component: 'QiPromptCLI',
+            });
+
+            // Handle mode cycling - check for mode indicator first
+            if (typeof (this.cli as any).modeIndicator?.cycleMode === 'function') {
+              this.logger.debug('🎯 QiPromptCLI: Using modeIndicator.cycleMode()', undefined, {
+                messageId: message.id,
+                component: 'QiPromptCLI',
+                method: 'processMessage',
+              });
+              (this.cli as any).modeIndicator.cycleMode();
+              this.logger.debug('🔄 Cycled CLI mode', undefined, {
+                messageId: message.id,
+                component: 'QiPromptCLI',
+              });
+            } else if (
+              typeof this.cli.setMode === 'function' &&
+              typeof this.cli.getMode === 'function'
+            ) {
+              // Manual mode cycling if no mode indicator
+              const currentMode = this.cli.getMode();
+              const modes: CLIMode[] = ['interactive', 'command', 'streaming'];
+              const currentIndex = modes.indexOf(currentMode);
+              const nextMode = modes[(currentIndex + 1) % modes.length];
+              this.logger.debug('🎯 QiPromptCLI: Manual mode cycling', undefined, {
+                messageId: message.id,
+                component: 'QiPromptCLI',
+                method: 'processMessage',
+                currentMode,
+                nextMode,
+              });
+              this.cli.setMode(nextMode);
+              this.logger.debug(
+                '🎯 QiPromptCLI: Mode change completed - checking for side effects',
+                undefined,
+                {
+                  messageId: message.id,
+                  component: 'QiPromptCLI',
+                  method: 'processMessage',
+                }
+              );
+              this.logger.debug('🔄 Manually cycled CLI mode', undefined, {
+                messageId: message.id,
+                previousMode: currentMode,
+                newMode: nextMode,
+                component: 'QiPromptCLI',
+              });
+            }
+            this.logger.debug('🎯 QiPromptCLI: Shift+Tab processing completed', undefined, {
+              messageId: message.id,
+              component: 'QiPromptCLI',
+              method: 'processMessage',
+            });
+          }
+
+          this.logger.debug('✅ Hotkey message processing complete', undefined, {
+            messageId: message.id,
+            hotkey: userInput,
+            component: 'QiPromptCLI',
+          });
+          break;
+        }
+
         this.logger.debug('📝 Processing USER_INPUT', undefined, {
           userInput,
           messageId: message.id,

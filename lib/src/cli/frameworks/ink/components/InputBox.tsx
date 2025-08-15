@@ -11,6 +11,14 @@ import { LoadingSpinner } from './LoadingIndicator.js'
 import { HybridTextInput } from './HybridTextInput.js'
 import { useHybridHistory } from '../../hybrid/hooks/useHybridHistory.js'
 import type { AppState, AppSubState } from '../../../abstractions/index.js'
+import { createDebugLogger } from '../../../../utils/DebugLogger.js'
+import { appendFileSync } from 'fs'
+
+// QiCore debug logging
+const logger = createDebugLogger('InputBox');
+const debugLog = (message: string) => {
+  logger.trace(message);
+};
 
 interface InputBoxProps {
   state: AppState
@@ -60,6 +68,10 @@ export function InputBox({
   const [isPending, startTransition] = useTransition()
   const { exit } = useApp()
   
+  // CRITICAL FIX: Use ref to preserve cursor position across React re-renders
+  // This prevents cursor reset when mode changes trigger component re-renders
+  const cursorPositionRef = useRef(0)
+  
   const isDisabled = state === 'busy' || isPending
   
   // Check if we're in hybrid mode (enhanced with Claude Code navigation)
@@ -67,6 +79,9 @@ export function InputBox({
     framework.constructor && 
     framework.constructor.name === 'HybridCLIFramework' && 
     framework.isHybridEnabled;
+  
+  // DEBUG: Log component renders and state changes
+  debugLog(`🔍 InputBox render: hybrid=${isHybridMode}, state=${state}, cursor=${hybridCursor}, ref=${cursorPositionRef.current}`);
 
 
   // In hybrid mode, use hybrid input; otherwise use currentInput or localInput
@@ -77,10 +92,13 @@ export function InputBox({
     if (!framework) return;
     
     const handleClearInput = () => {
+      debugLog('🧹 InputBox: handleClearInput called - CURSOR WILL BE RESET TO 0');
       setLocalInput('');
       if (isHybridMode) {
         setHybridInput('');
+        cursorPositionRef.current = 0; // Update ref
         setHybridCursor(0);
+        debugLog('🧹 InputBox: Hybrid cursor cleared to 0');
       }
       if (onClear) {
         onClear();
@@ -88,9 +106,12 @@ export function InputBox({
     };
 
     const handleInputUpdate = (data: { text: string; cursorPosition: number }) => {
+      debugLog(`📝 InputBox: handleInputUpdate called - text:'${data.text}', cursor:${data.cursorPosition}, hybrid:${isHybridMode}`);
       if (isHybridMode) {
         setHybridInput(data.text);
         setHybridCursor(data.cursorPosition);
+        cursorPositionRef.current = data.cursorPosition; // Update ref too
+        debugLog('📝 InputBox: Updated hybrid input and cursor from framework');
       }
     };
 
@@ -120,10 +141,13 @@ export function InputBox({
         }
         
         // Clear both local and hybrid input
+        debugLog('🚀 InputBox: handleSubmit - clearing input and cursor');
         setLocalInput('')
         if (isHybridMode) {
           setHybridInput('')
+          cursorPositionRef.current = 0; // Update ref
           setHybridCursor(0)
+          debugLog('🚀 InputBox: Hybrid cursor reset after submit');
         }
       })
     }
@@ -168,6 +192,13 @@ export function InputBox({
   useInput((input, key) => {
     // In hybrid mode, let HybridTextInput handle all input
     if (isHybridMode) {
+      return;
+    }
+    
+    // CRITICAL FIX: Block Shift+Tab to prevent cursor advancement in regular mode
+    if (key.tab && key.shift) {
+      logger.trace('Blocking Shift+Tab to prevent cursor advancement in regular mode');
+      // Mode cycling happens elsewhere - we just need to prevent the tab character insertion
       return;
     }
     
@@ -225,6 +256,7 @@ export function InputBox({
   const hybridHistory = useHybridHistory({
     onSetInput: (value: string) => {
       setHybridInput(value);
+      cursorPositionRef.current = value.length; // Update ref
       setHybridCursor(value.length); // Move cursor to end when setting from history
     },
     currentInput: hybridInput,
@@ -242,6 +274,28 @@ export function InputBox({
       framework.resetCursorEndState();
     }
   };
+
+  // CRITICAL FIX: Enhanced cursor change handler that preserves position across mode changes
+  const handleHybridCursorChange = (newOffset: number) => {
+    logger.trace(`CURSOR CHANGE: old:${hybridCursor} → new:${newOffset}, ref:${cursorPositionRef.current}`);
+    debugLog(`🔧 InputBox: Cursor change requested - old:${hybridCursor}, new:${newOffset}, ref:${cursorPositionRef.current}`);
+    cursorPositionRef.current = newOffset; // Always update ref
+    setHybridCursor(newOffset); // Update state for re-renders
+  };
+
+  // Get current mode for effect dependency
+  const currentMode = framework?.getMode?.();
+  
+  // CRITICAL FIX: Restore cursor position from ref after mode changes
+  // This ensures cursor position survives React re-renders triggered by framework state changes
+  useEffect(() => {
+    if (isHybridMode && cursorPositionRef.current !== hybridCursor) {
+      logger.trace(`RESTORING CURSOR: mode:${currentMode}, ref:${cursorPositionRef.current} → state:${hybridCursor}`);
+      debugLog(`🔧 InputBox: Restoring cursor from ref after re-render - mode:${currentMode}, ref:${cursorPositionRef.current}, state:${hybridCursor}`);
+      // Restore cursor position from ref (which survives re-renders)
+      setHybridCursor(cursorPositionRef.current);
+    }
+  }, [isHybridMode, currentMode]); // Re-run only when mode changes, not hybridCursor
 
   // History navigation handlers for hybrid mode
   const handleHistoryUp = () => {
@@ -299,7 +353,7 @@ export function InputBox({
               focus={true}
               framework={framework}
               cursorOffset={hybridCursor}
-              onCursorOffsetChange={setHybridCursor}
+              onCursorOffsetChange={handleHybridCursorChange}
               columns={80}
             />
           ) : (

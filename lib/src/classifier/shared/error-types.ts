@@ -6,6 +6,7 @@
  */
 
 import type { QiError } from '@qi/base';
+import { create } from '@qi/base';
 
 /**
  * Base error context shared across all classification methods
@@ -102,7 +103,6 @@ export function createClassificationError(
   category: import('@qi/base').ErrorCategory,
   context: Partial<BaseClassificationErrorContext> = {}
 ): import('@qi/base').QiError {
-  const { create } = require('@qi/base');
   return create(code, message, category, {
     operation: 'classification',
     method,

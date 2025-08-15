@@ -13,6 +13,7 @@
 import chalk from 'chalk';
 import type { Key } from 'ink';
 import { Cursor } from '../../../../utils/Cursor.js';
+import { createDebugLogger } from '../../../../utils/DebugLogger.js';
 import type { HybridCLIFramework } from '../HybridCLIFramework.js';
 
 type MaybeCursor = undefined | Cursor;
@@ -63,6 +64,9 @@ export function useHybridTextInput({
   onCursorOffsetChange,
   framework,
 }: UseHybridTextInputProps): UseHybridTextInputResult {
+  // Create debug logger
+  const logger = createDebugLogger('useHybridTextInput');
+
   // Create cursor from current state (Claude Code pattern)
   const cursor = Cursor.fromText(value, columns, cursorOffset);
 
@@ -135,6 +139,19 @@ export function useHybridTextInput({
 
   // Claude Code's main input handler pattern
   function onInput(input: string, key: Key): void {
+    logger.trace(
+      `onInput: input="${input}" key=${JSON.stringify({ tab: key.tab, shift: key.shift, backspace: key.backspace, delete: key.delete })}`
+    );
+
+    // CRITICAL FIX: Block Shift+Tab completely at hook level
+    if (key.tab && key.shift) {
+      logger.trace('Blocking Shift+Tab completely - NO PROCESSING');
+      return; // Don't process anything for Shift+Tab
+    }
+
+    // Note: Shift+Tab and ESC are now blocked at the useInput level
+    // This function should only receive events that need component-level processing
+
     // Handle backspace/delete first (Claude Code pattern)
     if (key.backspace || key.delete || input === '\b' || input === '\x7f' || input === '\x08') {
       const nextCursor = cursor.backspace();
@@ -151,16 +168,27 @@ export function useHybridTextInput({
     const nextCursor = mapKey(key)(input);
     if (nextCursor) {
       if (!cursor.equals(nextCursor)) {
+        logger.trace(
+          `Cursor change detected: ${cursor.offset} → ${nextCursor.offset} (key: ${JSON.stringify({ tab: key.tab, shift: key.shift })})`
+        );
         onCursorOffsetChange(nextCursor.offset);
         if (cursor.text !== nextCursor.text) {
+          logger.trace(`Text change detected: "${cursor.text}" → "${nextCursor.text}"`);
           onChange(nextCursor.text);
         }
+      } else {
+        logger.trace(
+          `No cursor change: cursor.equals(nextCursor) = true (key: ${JSON.stringify({ tab: key.tab, shift: key.shift })})`
+        );
       }
     }
   }
 
   // Claude Code's key mapping function
   function mapKey(key: Key): InputMapper {
+    logger.trace(
+      `mapKey: ${JSON.stringify({ tab: key.tab, shift: key.shift, upArrow: key.upArrow, downArrow: key.downArrow })}`
+    );
     switch (true) {
       case key.leftArrow && (key.ctrl || key.meta):
         return () => cursor.prevWord();
@@ -183,15 +211,35 @@ export function useHybridTextInput({
         return () => cursor.left();
       case key.rightArrow:
         return () => cursor.right();
-      case key.tab:
+      case key.tab && !key.shift:
         return () => {
+          logger.trace('Regular Tab detected in hybrid hook');
           // If command suggestions are visible, accept current suggestion
           if (hasCommandSuggestions) {
             onCommandSuggestionAccept?.();
             return cursor; // Don't change cursor for tab acceptance
           }
           // Otherwise, insert tab character
+          logger.trace('Inserting tab character');
           return cursor.insert('\t');
+        };
+      case key.tab && key.shift:
+        return () => {
+          logger.trace('Shift+Tab detected in hybrid hook - cursor should NOT advance');
+          logger.trace(`Current cursor state: offset=${cursor.offset}, text="${cursor.text}"`);
+          // Handle mode cycling via framework
+          if (framework && typeof framework.setMode === 'function') {
+            const currentMode = framework.getMode();
+            const modes = ['interactive', 'command', 'streaming'] as const;
+            const currentIndex = modes.indexOf(currentMode);
+            const nextMode = modes[(currentIndex + 1) % modes.length];
+            logger.trace(`Mode cycling: ${currentMode} → ${nextMode}`);
+            framework.setMode(nextMode);
+          }
+          logger.trace(
+            `Returning unchanged cursor: offset=${cursor.offset}, text="${cursor.text}"`
+          );
+          return cursor; // Don't change cursor for mode cycling
         };
     }
 
@@ -207,6 +255,11 @@ export function useHybridTextInput({
         // Handle backspace character explicitly
         case input === '\b' || input === '\x7f' || input === '\x08':
           return cursor.backspace();
+        // Note: Tab characters (\t) should only be inserted through explicit tab key handling above
+        // If we reach this fallback with a tab character, it's likely from Shift+Tab spillover
+        case input === '\t':
+          logger.trace('Blocking stray tab character - likely from Shift+Tab spillover');
+          return cursor; // Don't insert tab characters that reach the fallback
         default:
           return cursor.insert(input);
       }

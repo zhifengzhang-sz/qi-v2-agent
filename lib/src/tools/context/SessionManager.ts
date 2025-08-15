@@ -6,7 +6,14 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { ContextMessage } from '../../context/abstractions/index.js';
 
@@ -319,7 +326,7 @@ export class SessionManager implements Tool<string, Session> {
     if (!existsSync(this.config.storagePath)) return;
 
     try {
-      const files = require('node:fs').readdirSync(this.config.storagePath);
+      const files = readdirSync(this.config.storagePath);
       const sessionFiles = files.filter((file: string) => file.endsWith('.json'));
 
       for (const file of sessionFiles) {
@@ -395,7 +402,7 @@ export class SessionManager implements Tool<string, Session> {
 
     try {
       if (existsSync(filePath)) {
-        require('node:fs').unlinkSync(filePath);
+        unlinkSync(filePath);
       }
     } catch (error) {
       console.warn(`Failed to delete stored session ${sessionId}:`, error);

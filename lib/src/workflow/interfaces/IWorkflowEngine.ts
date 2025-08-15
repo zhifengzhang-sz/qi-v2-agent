@@ -4,7 +4,12 @@
  * Abstract interface for executing workflows
  */
 
-import type { WorkflowResult, WorkflowState, WorkflowStreamChunk } from './IWorkflow.js';
+import type {
+  WorkflowResult,
+  WorkflowSpec,
+  WorkflowState,
+  WorkflowStreamChunk,
+} from './IWorkflow.js';
 
 /**
  * Executable workflow definition
@@ -94,6 +99,20 @@ export interface IWorkflowEngine {
    * Get a precompiled workflow
    */
   getCompiledWorkflow(patternName: string): ExecutableWorkflow | null;
+
+  /**
+   * Execute workflow from specification with configuration
+   */
+  executeWorkflow(
+    spec: WorkflowSpec,
+    config: {
+      sessionId: string;
+      contextId: string;
+      streamingEnabled?: boolean;
+      checkpointingEnabled?: boolean;
+      progressCallback?: (nodeId: string, progress: any) => void;
+    }
+  ): Promise<WorkflowResult>;
 }
 
 /**

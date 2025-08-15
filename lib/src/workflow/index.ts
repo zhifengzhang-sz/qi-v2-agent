@@ -15,6 +15,9 @@ import type {
   IWorkflowExtractorConfig,
   WorkflowMode,
 } from './interfaces/index.js';
+import { ADaPTStrategy } from './strategies/ADaPTStrategy.js';
+import { ReActStrategy } from './strategies/ReActStrategy.js';
+import { ReWOOStrategy } from './strategies/ReWOOStrategy.js';
 
 /**
  * Create workflow extractor with default configuration
@@ -57,20 +60,13 @@ export function createWorkflowExtractor(
     },
   ];
 
-  const defaultPatternMapping: [string, string][] = [
-    ['general', 'general'],
-    ['analytical', 'analytical'],
-    ['creative', 'creative'],
-    ['problem-solving', 'problem-solving'],
-    ['informational', 'informational'],
-  ];
+  // Default strategies available
+  const defaultStrategies = [new ReActStrategy(), new ReWOOStrategy(), new ADaPTStrategy()];
 
   const finalConfig: IWorkflowExtractorConfig = {
     supportedModes: defaultModes,
-    patternMapping: defaultPatternMapping,
-    baseUrl: 'http://localhost:11434',
-    modelId: 'qwen2.5:7b',
-    temperature: 0.2,
+    strategies: config?.strategies || defaultStrategies,
+    templateModes: ['general', 'analytical', 'creative', 'problem-solving'],
     ...config,
   };
 

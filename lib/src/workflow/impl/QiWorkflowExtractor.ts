@@ -4,17 +4,30 @@
  * LangChain structured output workflow extractor adapted for app layer
  */
 
-import { create, type ErrorCategory, type QiError } from '@qi/base';
-
-// OllamaStructuredWrapper removed - workflow extractor needs reimplementation
+import {
+  create,
+  type ErrorCategory,
+  failure,
+  flatMap,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type {
   IWorkflowExtractor,
   IWorkflowExtractorConfig,
   ProcessingContext,
+  WorkflowExtractionMethod,
   WorkflowExtractionResult,
   WorkflowMode,
   WorkflowSpec,
 } from '../interfaces/index.js';
+import type {
+  IDecompositionStrategy,
+  WorkflowContext,
+} from '../strategies/IDecompositionStrategy.js';
 
 /**
  * Workflow extractor error factory using QiCore patterns
@@ -72,315 +85,485 @@ const _WorkflowSpecSchema = {
 };
 
 export class QiWorkflowExtractor implements IWorkflowExtractor {
-  // private wrapper: OllamaStructuredWrapper; // Removed - broken dependency
   private supportedModes: readonly WorkflowMode[];
-  private patternMapping: Map<string, string>;
+  private strategies: readonly IDecompositionStrategy[];
+  private templateModes: readonly string[];
+  private defaultMethod?: WorkflowExtractionMethod;
 
   constructor(config: IWorkflowExtractorConfig) {
     this.supportedModes = config.supportedModes;
-    this.patternMapping = new Map(config.patternMapping);
+    this.strategies = config.strategies;
+    this.templateModes = config.templateModes || [];
+    this.defaultMethod = config.defaultMethod;
+  }
 
-    // TODO: Reimplement workflow extraction without OllamaStructuredWrapper
-    // Workflow extraction currently disabled - dependency removed
+  /**
+   * Analyze complexity using QiCore Result patterns
+   */
+  private analyzeComplexityWithQiCore(
+    input: string,
+    context?: ProcessingContext
+  ): Result<{ detectedMode: string; confidence: number }> {
+    if (!input || input.trim().length === 0) {
+      return failure(
+        _createWorkflowExtractorError('INVALID_INPUT', 'Input cannot be empty', 'VALIDATION')
+      );
+    }
+
+    // Simple rule-based mode detection
+    const inputLower = input.toLowerCase();
+    let detectedMode = 'general';
+    let confidence = 0.5;
+
+    if (
+      inputLower.includes('analyze') ||
+      inputLower.includes('study') ||
+      inputLower.includes('examine')
+    ) {
+      detectedMode = 'analytical';
+      confidence = 0.8;
+    } else if (
+      inputLower.includes('create') ||
+      inputLower.includes('generate') ||
+      inputLower.includes('design')
+    ) {
+      detectedMode = 'creative';
+      confidence = 0.8;
+    } else if (
+      inputLower.includes('fix') ||
+      inputLower.includes('solve') ||
+      inputLower.includes('debug')
+    ) {
+      detectedMode = 'problem-solving';
+      confidence = 0.8;
+    }
+
+    return success({ detectedMode, confidence });
+  }
+
+  /**
+   * Generate workflow from template using QiCore patterns
+   */
+  private generateWorkflowFromTemplate(
+    input: string,
+    mode: string,
+    pattern: string
+  ): Result<WorkflowSpec> {
+    // Generate a simple workflow based on the mode
+    const workflowId = `workflow_${Date.now()}`;
+    const nodes = this.getTemplateNodesForMode(mode, input);
+    const edges = this.getTemplateEdgesForNodes(nodes);
+
+    const workflowSpec: WorkflowSpec = {
+      id: workflowId,
+      name: `${mode} workflow for: ${input.substring(0, 50)}...`,
+      description: `Auto-generated ${mode} workflow`,
+      nodes,
+      edges,
+      parameters: new Map([
+        ['mode', mode],
+        ['pattern', pattern],
+        ['generated_at', new Date().toISOString()],
+      ]),
+      steps: nodes,
+    };
+
+    return success(workflowSpec);
+  }
+
+  /**
+   * Get template nodes for a specific mode
+   */
+  private getTemplateNodesForMode(mode: string, input: string) {
+    const baseNodes = [
+      {
+        id: 'input_node',
+        name: 'Input Processing',
+        type: 'input' as const,
+        parameters: new Map([['task', input]]),
+        requiredTools: [],
+        conditions: [],
+        dependencies: [],
+      },
+    ];
+
+    switch (mode) {
+      case 'analytical':
+        return [
+          ...baseNodes,
+          {
+            id: 'analysis_node',
+            name: 'Data Analysis',
+            type: 'processing' as const,
+            parameters: new Map(),
+            requiredTools: ['analysis-tools'],
+            conditions: [],
+            dependencies: ['input_node'],
+          },
+          {
+            id: 'reasoning_node',
+            name: 'Reasoning',
+            type: 'reasoning' as const,
+            parameters: new Map(),
+            requiredTools: [],
+            conditions: [],
+            dependencies: ['analysis_node'],
+          },
+          {
+            id: 'output_node',
+            name: 'Output Results',
+            type: 'output' as const,
+            parameters: new Map(),
+            requiredTools: [],
+            conditions: [],
+            dependencies: ['reasoning_node'],
+          },
+        ];
+
+      case 'creative':
+        return [
+          ...baseNodes,
+          {
+            id: 'ideation_node',
+            name: 'Ideation',
+            type: 'processing' as const,
+            parameters: new Map(),
+            requiredTools: ['creation-tools'],
+            conditions: [],
+            dependencies: ['input_node'],
+          },
+          {
+            id: 'creation_node',
+            name: 'Creation',
+            type: 'processing' as const,
+            parameters: new Map(),
+            requiredTools: ['creation-tools'],
+            conditions: [],
+            dependencies: ['ideation_node'],
+          },
+          {
+            id: 'output_node',
+            name: 'Output Results',
+            type: 'output' as const,
+            parameters: new Map(),
+            requiredTools: [],
+            conditions: [],
+            dependencies: ['creation_node'],
+          },
+        ];
+
+      case 'problem-solving':
+        return [
+          ...baseNodes,
+          {
+            id: 'diagnosis_node',
+            name: 'Problem Diagnosis',
+            type: 'processing' as const,
+            parameters: new Map(),
+            requiredTools: ['diagnostic-tools'],
+            conditions: [],
+            dependencies: ['input_node'],
+          },
+          {
+            id: 'solution_node',
+            name: 'Solution Generation',
+            type: 'processing' as const,
+            parameters: new Map(),
+            requiredTools: ['diagnostic-tools'],
+            conditions: [],
+            dependencies: ['diagnosis_node'],
+          },
+          {
+            id: 'output_node',
+            name: 'Output Results',
+            type: 'output' as const,
+            parameters: new Map(),
+            requiredTools: [],
+            conditions: [],
+            dependencies: ['solution_node'],
+          },
+        ];
+
+      default:
+        return [
+          ...baseNodes,
+          {
+            id: 'processing_node',
+            name: 'General Processing',
+            type: 'processing' as const,
+            parameters: new Map(),
+            requiredTools: [],
+            conditions: [],
+            dependencies: ['input_node'],
+          },
+          {
+            id: 'output_node',
+            name: 'Output Results',
+            type: 'output' as const,
+            parameters: new Map(),
+            requiredTools: [],
+            conditions: [],
+            dependencies: ['processing_node'],
+          },
+        ];
+    }
+  }
+
+  /**
+   * Generate edges based on node dependencies
+   */
+  private getTemplateEdgesForNodes(nodes: any[]) {
+    const edges = [];
+
+    for (const node of nodes) {
+      for (const dependency of node.dependencies) {
+        edges.push({
+          from: dependency,
+          to: node.id,
+          condition: undefined,
+        });
+      }
+    }
+
+    return edges;
+  }
+
+  /**
+   * Get pattern for a given mode
+   */
+  private getPatternForMode(mode: string): string {
+    return mode; // Pattern is same as mode for template-based
   }
 
   async extractWorkflow(
     input: string,
-    context?: ProcessingContext
+    method: WorkflowExtractionMethod,
+    context: WorkflowContext
   ): Promise<WorkflowExtractionResult> {
     const startTime = Date.now();
 
-    try {
-      // 1. Analyze complexity and determine mode
-      const analysis = this.analyzeComplexity(input, context);
-      const mode = analysis.detectedMode;
-      const _pattern = this.getPatternForMode(mode);
+    // Extract based on the specified method
+    switch (method.method) {
+      case 'strategy-based':
+        return this.extractWithStrategy(input, method, context, startTime);
 
-      // 2. Generate workflow - OllamaStructuredWrapper removed, workflow disabled
-      // TODO: Reimplement workflow extraction without deleted dependencies
+      case 'template-based':
+        return this.extractWithTemplate(input, method, context, startTime);
+
+      case 'hybrid':
+        return this.extractWithHybrid(input, method, context, startTime);
+
+      default:
+        return {
+          success: false,
+          mode: 'error',
+          pattern: 'error',
+          confidence: 0,
+          extractionMethod: method.method,
+          error: `Unsupported extraction method: ${method.method}`,
+          metadata: new Map([
+            ['errorCode', 'UNSUPPORTED_METHOD'],
+            ['extractionTime', (Date.now() - startTime).toString()],
+          ]),
+        };
+    }
+  }
+
+  /**
+   * Extract workflow using research-based strategies (ReAct, ReWOO, ADaPT)
+   */
+  private async extractWithStrategy(
+    input: string,
+    method: WorkflowExtractionMethod,
+    context: WorkflowContext,
+    startTime: number
+  ): Promise<WorkflowExtractionResult> {
+    // Get the strategy to use
+    const strategy =
+      method.strategy || (method.strategyName ? this.findStrategy(method.strategyName) : null);
+
+    if (!strategy) {
       return {
         success: false,
         mode: 'error',
         pattern: 'error',
         confidence: 0,
-        extractionMethod: 'template-based',
-        error: 'Workflow extraction disabled - OllamaStructuredWrapper dependency removed',
+        extractionMethod: 'strategy-based',
+        error: 'No strategy specified or strategy not found',
         metadata: new Map([
-          ['errorCode', 'WORKFLOW_EXTRACTION_DISABLED'],
-          ['dependency', 'OllamaStructuredWrapper'],
+          ['errorCode', 'NO_STRATEGY'],
           ['extractionTime', (Date.now() - startTime).toString()],
-        ]),
-      };
-
-      // NOTE: The following code is unreachable due to the early return above
-      // 3. Post-process and validate
-      // const processedSpec = this.postProcessWorkflowSpec(workflowSpec);
-      // const isValid = await this.validateWorkflowSpec(processedSpec);
-
-      // if (!isValid) {
-      //   console.log('DEBUG: Validation failed for spec:', JSON.stringify(workflowSpec, null, 2));
-      //   console.log(
-      //     'DEBUG: Processed spec:',
-      //     JSON.stringify(
-      //       {
-      //         id: processedSpec.id,
-      //         name: processedSpec.name,
-      //         nodeCount: processedSpec.nodes.length,
-      //         edgeCount: processedSpec.edges.length,
-      //       },
-      //       null,
-      //       2
-      //     )
-      //   );
-      //   return {
-      //     success: false,
-      //     mode,
-      //     pattern,
-      //     confidence: 0.1,
-      //     extractionMethod: 'llm-based',
-      //     error: 'Generated workflow specification failed validation',
-      //     metadata: new Map([
-      //       ['extractionTime', Date.now() - startTime],
-      //       ['validationFailed', true],
-      //       ['rawSpec', workflowSpec],
-      //     ]),
-      //   };
-      // }
-
-      // return {
-      //   success: true,
-      //   mode,
-      //   pattern,
-      //   workflowSpec: processedSpec,
-      //   confidence: 0.9,
-      //   extractionMethod: 'llm-based',
-      //   metadata: new Map([
-      //     ['extractionTime', (Date.now() - startTime).toString()],
-      //     ['nodeCount', processedSpec.nodes.length.toString()],
-      //     ['edgeCount', processedSpec.edges.length.toString()],
-      //     ['complexity', analysis.level],
-      //     ['model', 'ollama-structured-wrapper'],
-      //     ['schemaValidated', 'true'],
-      //   ]),
-      // };
-    } catch (error) {
-      return {
-        success: false,
-        mode: 'unknown',
-        pattern: this.getDefaultPattern(),
-        confidence: 0.0,
-        extractionMethod: 'llm-based',
-        error: error instanceof Error ? error.message : String(error),
-        metadata: new Map([
-          ['extractionTime', (Date.now() - startTime).toString()],
-          ['errorType', 'llm-extraction-failed'],
-          ['errorMessage', error instanceof Error ? error.message : String(error)],
         ]),
       };
     }
+
+    // Use QiCore fromAsyncTryCatch for async operations
+    const strategyResult = await fromAsyncTryCatch(
+      async () => strategy.decompose(input, context),
+      (error) =>
+        create(
+          'STRATEGY_EXECUTION_FAILED',
+          `Strategy ${strategy.name} execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { strategyName: strategy.name, input }
+        )
+    );
+
+    return match(
+      (workflowSpec) =>
+        ({
+          success: true,
+          workflowSpec,
+          mode: strategy.name,
+          pattern: strategy.category,
+          confidence: 0.9, // High confidence for research-based strategies
+          extractionMethod: 'strategy-based' as const,
+          metadata: new Map([
+            ['strategyName', strategy.name],
+            ['strategySource', strategy.source],
+            ['extractionTime', (Date.now() - startTime).toString()],
+            ['nodeCount', workflowSpec.nodes.length.toString()],
+            ['edgeCount', workflowSpec.edges.length.toString()],
+          ]),
+        }) as WorkflowExtractionResult,
+      (error) =>
+        ({
+          success: false,
+          mode: strategy.name,
+          pattern: strategy.category,
+          confidence: 0,
+          extractionMethod: 'strategy-based' as const,
+          error: error.message,
+          metadata: new Map([
+            ['errorCode', error.code],
+            ['strategyName', strategy.name],
+            ['extractionTime', (Date.now() - startTime).toString()],
+          ]),
+        }) as WorkflowExtractionResult,
+      strategyResult
+    );
+  }
+
+  /**
+   * Extract workflow using template-based approach
+   */
+  private async extractWithTemplate(
+    input: string,
+    method: WorkflowExtractionMethod,
+    context: WorkflowContext,
+    startTime: number
+  ): Promise<WorkflowExtractionResult> {
+    // Use the old template-based logic
+    const analysisResult = this.analyzeComplexityWithQiCore(input, context);
+
+    return match(
+      (analysis) => {
+        const mode = analysis.detectedMode;
+        const pattern = method.templateMode || mode;
+
+        const workflowResult = this.generateWorkflowFromTemplate(input, mode, pattern);
+
+        return match(
+          (workflowSpec) =>
+            ({
+              success: true,
+              workflowSpec,
+              mode,
+              pattern,
+              confidence: 0.7,
+              extractionMethod: 'template-based' as const,
+              metadata: new Map([
+                ['extractionTime', (Date.now() - startTime).toString()],
+                ['nodeCount', workflowSpec.nodes.length.toString()],
+                ['edgeCount', workflowSpec.edges.length.toString()],
+              ]),
+            }) as WorkflowExtractionResult,
+          (error) =>
+            ({
+              success: false,
+              mode,
+              pattern,
+              confidence: 0,
+              extractionMethod: 'template-based' as const,
+              error: error.message,
+              metadata: new Map([
+                ['errorCode', error.code],
+                ['extractionTime', (Date.now() - startTime).toString()],
+              ]),
+            }) as WorkflowExtractionResult,
+          workflowResult
+        );
+      },
+      (error) => ({
+        success: false,
+        mode: 'error',
+        pattern: 'error',
+        confidence: 0,
+        extractionMethod: 'template-based' as const,
+        error: error.message,
+        metadata: new Map([
+          ['errorCode', error.code],
+          ['extractionTime', (Date.now() - startTime).toString()],
+        ]),
+      }),
+      analysisResult
+    );
+  }
+
+  /**
+   * Extract workflow using hybrid approach (strategy first, template fallback)
+   */
+  private async extractWithHybrid(
+    input: string,
+    method: WorkflowExtractionMethod,
+    context: WorkflowContext,
+    startTime: number
+  ): Promise<WorkflowExtractionResult> {
+    // Try strategy-based first if provider is available
+    if (method.promptProvider && method.strategyName) {
+      const strategyResult = await this.extractWithStrategy(input, method, context, startTime);
+      if (strategyResult.success) {
+        return strategyResult;
+      }
+    }
+
+    // Fallback to template-based
+    return this.extractWithTemplate(input, method, context, startTime);
+  }
+
+  /**
+   * Find strategy by name
+   */
+  private findStrategy(name: string): IDecompositionStrategy | null {
+    return this.strategies.find((strategy) => strategy.name === name) || null;
   }
 
   getSupportedModes(): readonly WorkflowMode[] {
     return this.supportedModes;
   }
 
-  async validateWorkflowSpec(spec: WorkflowSpec): Promise<boolean> {
-    try {
-      // Basic validation checks
-      if (!spec.id || !spec.name || !spec.nodes || spec.nodes.length === 0) {
-        return false;
-      }
-
-      // Validate each node
-      for (const node of spec.nodes) {
-        if (!node.id || !node.name || !node.type) {
-          return false;
-        }
-
-        // Validate node type
-        const validTypes = [
-          'input',
-          'processing',
-          'tool',
-          'reasoning',
-          'output',
-          'decision',
-          'validation',
-        ];
-        if (!validTypes.includes(node.type)) {
-          return false;
-        }
-      }
-
-      // Validate edges reference existing nodes
-      const nodeIds = new Set(spec.nodes.map((n) => n.id));
-      for (const edge of spec.edges) {
-        if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-          return false;
-        }
-      }
-
-      // Check for circular dependencies
-      if (this.hasCircularDependencies(spec)) {
-        return false;
-      }
-
-      return true;
-    } catch (_error) {
-      return false;
-    }
+  getAvailableStrategies(): readonly IDecompositionStrategy[] {
+    return this.strategies;
   }
 
-  async getWorkflowTemplates(_mode: string): Promise<readonly WorkflowSpec[]> {
-    // Return empty array for now - could be extended with templates
+  async validateWorkflowSpec(spec: WorkflowSpec): Promise<boolean> {
+    // Basic validation
+    if (!spec.id || !spec.name || !spec.nodes || spec.nodes.length === 0) {
+      return false;
+    }
+
+    // Validate nodes
+    for (const node of spec.nodes) {
+      if (!node.id || !node.name || !node.type) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  async getWorkflowTemplates(mode: string): Promise<readonly WorkflowSpec[]> {
+    // Return empty array for now - templates could be loaded from config
     return [];
   }
-
-  // Private methods
-
-  private analyzeComplexity(input: string, _context?: ProcessingContext): ComplexityAnalysis {
-    const wordCount = input.split(/\s+/).length;
-    const lowerInput = input.toLowerCase();
-
-    // Detect complexity indicators
-    const multiStepIndicators = ['then', 'after', 'next', 'followed by', 'and then'];
-    const toolIndicators = ['create', 'build', 'generate', 'implement', 'deploy', 'test'];
-    const fileIndicators = ['.js', '.ts', '.py', '.java', '.html', '.css', '.md'];
-    const complexityKeywords = ['architecture', 'system', 'integration', 'workflow'];
-
-    const multiStepCount = multiStepIndicators.filter((indicator) =>
-      lowerInput.includes(indicator)
-    ).length;
-    const toolCount = toolIndicators.filter((indicator) => lowerInput.includes(indicator)).length;
-    const fileCount = fileIndicators.filter((indicator) => lowerInput.includes(indicator)).length;
-    const complexityCount = complexityKeywords.filter((keyword) =>
-      lowerInput.includes(keyword)
-    ).length;
-
-    // Determine complexity level and mode
-    let level: 'simple' | 'moderate' | 'complex';
-    let detectedMode = 'general';
-
-    if (wordCount < 20 && multiStepCount <= 1 && toolCount <= 2) {
-      level = 'simple';
-      detectedMode = this.detectSimpleMode(lowerInput);
-    } else if (wordCount > 50 || multiStepCount > 3 || complexityCount > 1) {
-      level = 'complex';
-      detectedMode = this.detectComplexMode(lowerInput);
-    } else {
-      level = 'moderate';
-      detectedMode = this.detectModeFromTools(lowerInput, toolCount, fileCount);
-    }
-
-    return {
-      level,
-      detectedMode,
-      indicators: {
-        wordCount,
-        multiStepCount,
-        toolCount,
-        fileCount,
-        complexityCount,
-      },
-    };
-  }
-
-  private detectSimpleMode(input: string): string {
-    if (input.includes('create') || input.includes('build') || input.includes('generate')) {
-      return 'creative';
-    }
-    if (input.includes('fix') || input.includes('debug') || input.includes('error')) {
-      return 'problem-solving';
-    }
-    if (input.includes('analyze') || input.includes('review') || input.includes('plan')) {
-      return 'analytical';
-    }
-    if (input.includes('explain') || input.includes('what') || input.includes('how')) {
-      return 'informational';
-    }
-    return 'general';
-  }
-
-  private detectComplexMode(input: string): string {
-    if (
-      input.includes('architecture') ||
-      input.includes('system') ||
-      input.includes('integration')
-    ) {
-      return 'analytical';
-    }
-    if (input.includes('implement') || input.includes('develop') || input.includes('build')) {
-      return 'creative';
-    }
-    if (input.includes('troubleshoot') || input.includes('diagnose') || input.includes('resolve')) {
-      return 'problem-solving';
-    }
-    return 'general';
-  }
-
-  private detectModeFromTools(input: string, toolCount: number, fileCount: number): string {
-    if (fileCount > 0 && toolCount > 1) {
-      return 'creative';
-    }
-    if (input.includes('test') || input.includes('validate')) {
-      return 'analytical';
-    }
-    return 'general';
-  }
-
-  private getPatternForMode(mode: string): string {
-    return this.patternMapping.get(mode) || this.getDefaultPattern();
-  }
-
-  private getDefaultPattern(): string {
-    return 'general';
-  }
-
-  private hasCircularDependencies(spec: WorkflowSpec): boolean {
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    const hasCycle = (nodeId: string): boolean => {
-      if (recursionStack.has(nodeId)) {
-        return true;
-      }
-      if (visited.has(nodeId)) {
-        return false;
-      }
-
-      visited.add(nodeId);
-      recursionStack.add(nodeId);
-
-      // Check edges for dependencies
-      const outgoingEdges = spec.edges.filter((edge) => edge.from === nodeId);
-      for (const edge of outgoingEdges) {
-        if (hasCycle(edge.to)) {
-          return true;
-        }
-      }
-
-      recursionStack.delete(nodeId);
-      return false;
-    };
-
-    for (const node of spec.nodes) {
-      if (hasCycle(node.id)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-}
-
-interface ComplexityAnalysis {
-  level: 'simple' | 'moderate' | 'complex';
-  detectedMode: string;
-  indicators: {
-    wordCount: number;
-    multiStepCount: number;
-    toolCount: number;
-    fileCount: number;
-    complexityCount: number;
-  };
 }
