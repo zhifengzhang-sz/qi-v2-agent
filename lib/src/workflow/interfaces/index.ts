@@ -2,6 +2,14 @@
  * @qi/workflow - Workflow interfaces export
  */
 
+// Strategy interfaces
+export type {
+  IDecompositionStrategy,
+  IStrategyRegistry,
+  StrategyScore,
+  TaskAnalysis,
+  WorkflowContext,
+} from '../strategies/IDecompositionStrategy.js';
 export type {
   ProcessingContext,
   ToolResult,
@@ -31,4 +39,5 @@ export type {
 export type {
   IWorkflowExtractor,
   IWorkflowExtractorConfig,
+  WorkflowExtractionMethod,
 } from './IWorkflowExtractor.js';

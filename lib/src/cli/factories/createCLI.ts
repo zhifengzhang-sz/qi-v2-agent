@@ -8,10 +8,8 @@
 
 import { create, Err, match, Ok, type QiError, type Result } from '@qi/base';
 import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
-// Import Hybrid framework
-import { HybridCLIFramework } from '../frameworks/hybrid/HybridCLIFramework.js';
-// Import Ink framework
-import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework.js';
+import { createDebugLogger } from '../../utils/DebugLogger.js';
+// NOTE: Ink framework is imported dynamically to avoid top-level await issues in binary compilation
 // Framework factories
 import {
   checkReadlineSupport,
@@ -59,14 +57,13 @@ const cliFactoryError = (
 export function createCLI(
   config: Partial<CLIConfigWithFramework> = {}
 ): Result<ICLIFramework, QiError> {
-  const debugMode = (config as any).debug || false;
-  if (debugMode) {
-    console.log('🔍 [DEBUG] createCLI - received config keys:', Object.keys(config));
-    console.log('🔍 [DEBUG] createCLI - stateManager:', !!config.stateManager);
-    console.log('🔍 [DEBUG] createCLI - messageQueue:', !!config.messageQueue);
-  }
+  const logger = createDebugLogger('CLIFactory');
+  logger.trace('createCLI - received config keys:', Object.keys(config));
+  logger.trace('createCLI - stateManager:', !!config.stateManager);
+  logger.trace('createCLI - messageQueue:', !!config.messageQueue);
 
   const framework = config.framework || 'readline';
+  logger.trace(`createCLI - using framework: ${framework} (config.framework: ${config.framework})`);
 
   switch (framework) {
     case 'readline':
@@ -76,7 +73,9 @@ export function createCLI(
       return createInkCLI(config);
 
     case 'hybrid':
-      return createHybridCLI(config);
+      throw new Error(
+        'Hybrid framework not supported in sync createCLI. Use createCLIAsync() instead.'
+      );
 
     default:
       return Err(
@@ -113,7 +112,7 @@ export function createValidatedCLI(
           return createValidatedInkCLI(config);
 
         case 'hybrid':
-          return createValidatedHybridCLI(config);
+          throw new Error('Hybrid CLI validation not supported. Use createCLIAsync() instead.');
 
         default:
           return Err(
@@ -138,7 +137,14 @@ export function createValidatedCLI(
 export async function createCLIAsync(
   config: Partial<CLIConfigWithFramework> = {}
 ): Promise<Result<ICLIFramework, QiError>> {
+  const logger = createDebugLogger('CLIFactory');
   const framework = config.framework || 'readline';
+  logger.trace(
+    `createCLIAsync - using framework: ${framework} (config.framework: ${config.framework})`
+  );
+
+  // If user explicitly requested a framework, it MUST work - NO FALLBACKS
+  const explicitFrameworkRequested = !!config.framework;
 
   switch (framework) {
     case 'readline':
@@ -148,6 +154,7 @@ export async function createCLIAsync(
       return await createInkCLIAsync(config);
 
     case 'hybrid':
+      logger.trace('User explicitly requested hybrid - MUST succeed or exit');
       return await createHybridCLIAsync(config);
 
     default:
@@ -265,31 +272,13 @@ function createInkCLI(
   config: Partial<CLIConfig> = {},
   messageQueue?: any
 ): Result<ICLIFramework, QiError> {
-  try {
-    // Check if Ink is available
-    const support = checkInkSupport();
-    if (!support.available) {
-      return Err(
-        cliFactoryError(
-          'INK_NOT_AVAILABLE',
-          `Ink framework not available: ${support.reason}. Install with: bun add ${support.packages?.join(' ')}`,
-          { framework: 'ink', operation: 'createInkCLI', supportCheck: support }
-        )
-      );
-    }
-
-    // Create actual Ink CLI implementation with messageQueue and stateManager from config
-    const cli = new InkCLIFramework(config, config.messageQueue || messageQueue);
-
-    return Ok(cli);
-  } catch (error: any) {
-    return Err(
-      cliFactoryError('INK_CREATION_FAILED', `Failed to create Ink CLI: ${error.message}`, {
-        framework: 'ink',
-        operation: 'createInkCLI',
-      })
-    );
-  }
+  return Err(
+    cliFactoryError(
+      'INK_SYNC_NOT_SUPPORTED',
+      'Ink CLI requires async initialization due to dynamic imports. Use createInkCLIAsync() instead.',
+      { framework: 'ink', operation: 'createInkCLI' }
+    )
+  );
 }
 
 function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
@@ -304,30 +293,59 @@ function createValidatedInkCLI(config: Partial<CLIConfig> = {}): Result<ICLIFram
 }
 
 async function createInkCLIAsync(
-  config: Partial<CLIConfig> = {}
+  config: Partial<CLIConfig> = {},
+  messageQueue?: any
 ): Promise<Result<ICLIFramework, QiError>> {
-  return createInkCLI(config);
+  try {
+    // Check if Ink is available
+    const support = checkInkSupport();
+    if (!support.available) {
+      return Err(
+        cliFactoryError(
+          'INK_NOT_AVAILABLE',
+          `Ink framework not available: ${support.reason}. Install with: bun add ${support.packages?.join(' ')}`,
+          { framework: 'ink', operation: 'createInkCLIAsync', supportCheck: support }
+        )
+      );
+    }
+
+    // Dynamic import to avoid top-level await issues in binary compilation
+    const { InkCLIFramework } = await import('../frameworks/ink/InkCLIFramework.js');
+
+    // Create actual Ink CLI implementation with messageQueue and stateManager from config
+    const cli = new InkCLIFramework(config, config.messageQueue || messageQueue);
+
+    return Ok(cli);
+  } catch (error: any) {
+    return Err(
+      cliFactoryError('INK_CREATION_FAILED', `Failed to create Ink CLI: ${error.message}`, {
+        framework: 'ink',
+        operation: 'createInkCLIAsync',
+      })
+    );
+  }
 }
 
 // Support checking functions
 
 function checkInkSupport(): { available: boolean; reason: string; packages?: string[] } {
-  try {
-    // Try to require ink packages
-    require('ink');
-    require('ink-text-input');
+  // For bundling compatibility, assume Ink is available if in development
+  // Actual runtime checks will happen in dynamic imports
+  const isDevelopment = process.env.NODE_ENV !== 'production';
 
+  if (isDevelopment) {
     return {
       available: true,
-      reason: 'Ink packages are available',
-    };
-  } catch (_error) {
-    return {
-      available: false,
-      reason: 'Ink packages not found',
-      packages: ['ink', 'ink-text-input'],
+      reason: 'Ink support assumed in development environment',
     };
   }
+
+  // In production/bundled environment, defer to runtime check
+  return {
+    available: false,
+    reason: 'Ink availability determined at runtime',
+    packages: ['ink', 'ink-text-input'],
+  };
 }
 
 function checkHybridSupport(): { available: boolean; reason: string; dependencies?: string[] } {
@@ -382,10 +400,16 @@ export function getAvailableFrameworks(): CLIFramework[] {
 
 // Framework-specific Hybrid factories
 
-function createHybridCLI(
+// DELETED: Sync createHybridCLI - always failed anyway
+
+// DELETED: createValidatedHybridCLI - another fallback function
+
+async function createHybridCLIAsync(
   config: Partial<CLIConfig> = {},
   messageQueue?: any
-): Result<ICLIFramework, QiError> {
+): Promise<Result<ICLIFramework, QiError>> {
+  const logger = createDebugLogger('HybridCLIFactory');
+  logger.trace('createHybridCLIAsync called - attempting to create hybrid CLI');
   try {
     // Check if both readline and Ink are available for hybrid mode
     const readlineSupport = checkReadlineSupport();
@@ -396,7 +420,7 @@ function createHybridCLI(
         cliFactoryError(
           'HYBRID_READLINE_NOT_AVAILABLE',
           'Hybrid framework requires terminal (TTY) support for readline',
-          { framework: 'hybrid', operation: 'createHybridCLI', supportCheck: readlineSupport }
+          { framework: 'hybrid', operation: 'createHybridCLIAsync', supportCheck: readlineSupport }
         )
       );
     }
@@ -406,47 +430,37 @@ function createHybridCLI(
         cliFactoryError(
           'HYBRID_INK_NOT_AVAILABLE',
           `Hybrid framework requires Ink packages: ${inkSupport.packages?.join(' ')}`,
-          { framework: 'hybrid', operation: 'createHybridCLI', supportCheck: inkSupport }
+          { framework: 'hybrid', operation: 'createHybridCLIAsync', supportCheck: inkSupport }
         )
       );
     }
 
+    // Dynamic imports to avoid top-level await issues in binary compilation
+    const [{ InkCLIFramework }, { HybridCLIFramework }] = await Promise.all([
+      import('../frameworks/ink/InkCLIFramework.js'),
+      import('../frameworks/hybrid/HybridCLIFramework.js'),
+    ]);
+
     // Create hybrid CLI implementation with shared message queue and state manager
-    const debugMode = (config as any).debug || false;
-    if (debugMode) {
-      console.log('🔍 [DEBUG] createHybridCLI - config keys:', Object.keys(config));
-      console.log('🔍 [DEBUG] createHybridCLI - stateManager:', !!config.stateManager);
-    }
+    logger.trace('createHybridCLIAsync - config keys:', Object.keys(config));
+    logger.trace('createHybridCLIAsync - stateManager:', !!config.stateManager);
+    logger.trace('creating HybridCLIFramework instance');
     const cli = new HybridCLIFramework(config, config.messageQueue || messageQueue);
+    logger.trace('HybridCLIFramework created successfully:', cli.constructor.name);
 
     return Ok(cli);
   } catch (error: any) {
+    logger.error('Hybrid framework creation FAILED:', error.message);
+    logger.error('Error details:', error);
     return Err(
       cliFactoryError('HYBRID_CREATION_FAILED', `Failed to create Hybrid CLI: ${error.message}`, {
         framework: 'hybrid',
-        operation: 'createHybridCLI',
+        operation: 'createHybridCLIAsync',
       })
     );
   }
 }
 
-function createValidatedHybridCLI(config: Partial<CLIConfig> = {}): Result<ICLIFramework, QiError> {
-  // Run validation first
-  const validationResult = checkFrameworkSupport('hybrid');
-
-  return match(
-    () => createHybridCLI(config),
-    (error) => Err(error),
-    validationResult
-  );
-}
-
-async function createHybridCLIAsync(
-  config: Partial<CLIConfig> = {},
-  messageQueue?: any
-): Promise<Result<ICLIFramework, QiError>> {
-  return createHybridCLI(config, messageQueue);
-}
-
 // Export the framework-specific factories for direct use
-export { createInkCLI, createHybridCLI };
+export { createInkCLI };
+// createHybridCLI deleted - use createCLIAsync() instead

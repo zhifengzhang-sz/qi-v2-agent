@@ -19,6 +19,7 @@ import type {
 import type { QiAsyncMessageQueue } from '../../../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../../../messaging/types/MessageTypes.js';
 import { MessageType } from '../../../messaging/types/MessageTypes.js';
+import { HotkeyManager } from '../../keyboard/HotkeyManager.js';
 import { MainLayout } from './components/MainLayout.js';
 import { createOutputMessage, createUserMessage, createAssistantMessage, createSystemMessage, type OutputMessage } from './components/OutputDisplay.js';
 import { createPermissionRequest, type PermissionRequest } from './components/PermissionDialog.js';
@@ -69,6 +70,7 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   private setMessages: ((updater: (prev: OutputMessage[]) => OutputMessage[]) => void) | null = null;
   private debugMode: boolean = false;
   protected logger: SimpleLogger;
+  private hotkeyManager?: HotkeyManager;
 
   constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     this.messageQueue = messageQueue;
@@ -146,12 +148,25 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
     
-    // Verify Ink is available
-    try {
-      require('ink');
-      require('ink-text-input');
-    } catch (error) {
-      throw new Error('Ink packages not available. Install with: bun add ink ink-text-input');
+    // Verify Ink is available (deferred to runtime for bundling compatibility)
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    if (!isDevelopment) {
+      console.warn('⚠️ Ink framework availability not verified in production mode');
+    }
+    
+    // Initialize HotkeyManager if hotkeys are enabled and message queue is available
+    if (this.config.enableHotkeys && this.messageQueue) {
+      this.hotkeyManager = new HotkeyManager(this.messageQueue, {
+        enableShiftTab: true,
+        enableEscape: true,
+        enableCtrlC: true,
+        passthrough: true,
+      });
+      
+      this.logger.debug('InkCLIFramework HotkeyManager initialized', undefined, {
+        component: 'InkCLIFramework',
+        enableHotkeys: this.config.enableHotkeys,
+      });
     }
     
     this.isInitialized = true;
@@ -164,6 +179,15 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
     
     if (this.renderInstance) {
       throw new Error('CLI already started');
+    }
+
+    // Enable hotkeys after start
+    if (this.hotkeyManager) {
+      this.hotkeyManager.enable();
+      this.logger.debug('InkCLIFramework HotkeyManager enabled', undefined, {
+        component: 'InkCLIFramework',
+        method: 'start',
+      });
     }
 
     // Render the Ink application with custom Ctrl+C handling
@@ -187,6 +211,16 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
       this.renderInstance = null;
     }
     
+    // Clean up HotkeyManager
+    if (this.hotkeyManager) {
+      this.hotkeyManager.destroy();
+      this.logger.debug('InkCLIFramework HotkeyManager destroyed', undefined, {
+        component: 'InkCLIFramework',
+        method: 'shutdown',
+      });
+      this.hotkeyManager = undefined;
+    }
+
     // Clean up StateManager subscription
     if (this.stateUnsubscribe) {
       this.stateUnsubscribe();
@@ -200,6 +234,15 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
 
   setMode(mode: CLIMode): void {
     const previousMode = this.state.mode;
+    // QiCore debug logging
+    this.logger.debug(`MODE CHANGE: ${previousMode} → ${mode}`);
+    this.logger.debug('🎨 InkCLIFramework: setMode called', undefined, {
+      component: 'InkCLIFramework',
+      method: 'setMode',
+      previousMode,
+      newMode: mode
+    });
+    
     this.state.mode = mode;
     this.state.lastActivity = new Date();
     
@@ -209,6 +252,12 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
       method: 'setMode',
       previousMode,
       newMode: mode
+    });
+    
+    this.logger.debug('🎨 InkCLIFramework: setMode completed - state updated', undefined, {
+      component: 'InkCLIFramework',
+      method: 'setMode',
+      mode
     });
   }
 
@@ -811,6 +860,9 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
     setPermissionRequest(null);
   }, []);
 
+  // Create logger for use in useInput callback
+  const logger = createDebugLogger('InkCLIApp');
+
   // Global input handler to intercept Ctrl+C, Esc, and Shift+Tab before TextInput can block them
   useInput((inputChar, key) => {
     // Handle Ctrl+C to clear input - high priority handler
@@ -838,8 +890,9 @@ function InkCLIApp({ framework, config, initialState }: InkCLIAppProps) {
       return;
     }
     
-    // Handle Shift+Tab to cycle modes
+    // Handle Shift+Tab for mode cycling (fallback if HotkeyManager doesn't work)
     if (key.shift && key.tab) {
+      logger.trace('Ink useInput: Detected Shift+Tab - cycling mode');
       handleStateChange();
       return;
     }

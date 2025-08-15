@@ -389,9 +389,20 @@ export function createValidatedReadlineCLI(
  * Create readline CLI with async initialization
  */
 export async function createReadlineCLIAsync(
-  config: Partial<CLIConfig> = {}
+  config: Partial<CLIConfig> = {},
+  options: {
+    commandHandler?: ICommandHandler;
+    messageQueue?: QiAsyncMessageQueue<QiMessage>;
+  } = {}
 ): Promise<Result<ICLIFramework, QiError>> {
-  const cliResult = createReadlineCLI(config);
+  // Extract messageQueue from config if not provided in options
+  const messageQueue = options.messageQueue || (config as any).messageQueue;
+  const mergedOptions = {
+    ...options,
+    messageQueue,
+  };
+
+  const cliResult = createReadlineCLI(config, mergedOptions);
 
   return await match(
     async (cli): Promise<Result<ICLIFramework, QiError>> => {

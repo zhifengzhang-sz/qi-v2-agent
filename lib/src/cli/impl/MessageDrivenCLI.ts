@@ -37,6 +37,8 @@ import type {
   IProgressRenderer,
   IStreamRenderer,
 } from '../abstractions/IUIComponent.js';
+// HotkeyManager for hotkey support
+import { HotkeyManager } from '../keyboard/HotkeyManager.js';
 
 /**
  * v-0.6.1 Pure Message-Driven CLI Architecture
@@ -56,6 +58,7 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   private state: CLIState;
   private isInitialized = false;
   private isStarted = false;
+  private hotkeyManager?: HotkeyManager;
 
   constructor(
     private terminal: ITerminal,
@@ -120,6 +123,18 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       this.handleInput(input);
     });
 
+    // Initialize HotkeyManager if hotkeys are enabled
+    if (this.config.enableHotkeys) {
+      this.hotkeyManager = new HotkeyManager(this.messageQueue, {
+        enableShiftTab: true,
+        enableEscape: true,
+        enableCtrlC: true,
+        passthrough: true,
+      });
+
+      console.log('[MessageDrivenCLI] HotkeyManager initialized');
+    }
+
     this.isInitialized = true;
   }
 
@@ -138,7 +153,16 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     this.terminal.writeLine('🚀 Message-Driven CLI Ready');
     this.terminal.writeLine('============================');
     this.terminal.writeLine('💡 Type /exit to quit');
+    if (this.config.enableHotkeys) {
+      this.terminal.writeLine('⌨️  ESC: Cancel operation, Shift+Tab: Cycle modes');
+    }
     this.terminal.writeLine('');
+
+    // Enable hotkeys after startup
+    if (this.hotkeyManager) {
+      this.hotkeyManager.enable();
+      console.log('[MessageDrivenCLI] HotkeyManager enabled');
+    }
 
     // Show initial prompt
     this.inputManager.showPrompt();
@@ -163,6 +187,12 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
     this.modeRenderer.destroy();
     this.streamRenderer.destroy();
     this.inputManager.close();
+
+    // Cleanup HotkeyManager
+    if (this.hotkeyManager) {
+      this.hotkeyManager.destroy();
+      console.log('[MessageDrivenCLI] HotkeyManager destroyed');
+    }
     // v-0.6.1: No eventManager to destroy
 
     this.isStarted = false;

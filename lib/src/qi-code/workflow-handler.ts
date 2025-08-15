@@ -10,6 +10,7 @@ import {
   type IWorkflowEngine,
   type IWorkflowExtractor,
   type ProcessingContext,
+  type WorkflowContext,
   type WorkflowState,
 } from '../workflow/index.js';
 
@@ -76,6 +77,31 @@ export class CLIWorkflowHandler implements IWorkflowHandler {
     this.workflowExtractor = createWorkflowExtractor();
   }
 
+  private createWorkflowContext(context?: ProcessingContext): WorkflowContext {
+    return {
+      sessionId: context?.sessionId || 'cli-session',
+      userId: undefined,
+      environmentContext: new Map<string, unknown>([
+        ['domain', 'cli'],
+        ['environment', 'development'],
+        ...(context?.environmentContext ? Array.from(context.environmentContext.entries()) : []),
+      ]),
+      availableTools: ['file-system', 'shell', 'network', 'text-processing'],
+      resourceLimits: {
+        maxExecutionTime: 30000,
+        maxMemoryUsage: 512 * 1024 * 1024, // 512MB
+        maxToolCalls: 100,
+        maxNodes: 50,
+      },
+      preferences: {
+        preferredStrategy: undefined,
+        speedVsAccuracy: 'balanced',
+        allowParallelExecution: true,
+        allowIterativeExecution: true,
+      },
+    };
+  }
+
   async executeWorkflow(
     input: string,
     context?: ProcessingContext
@@ -84,7 +110,11 @@ export class CLIWorkflowHandler implements IWorkflowHandler {
 
     try {
       // 1. Extract workflow from input
-      const extractionResult = await this.workflowExtractor.extractWorkflow(input, context);
+      const extractionResult = await this.workflowExtractor.extractWorkflow(
+        input,
+        { method: 'hybrid', promptProvider: undefined },
+        this.createWorkflowContext(context)
+      );
 
       if (!extractionResult.success || !extractionResult.workflowSpec) {
         return {
@@ -154,7 +184,11 @@ export class CLIWorkflowHandler implements IWorkflowHandler {
   ): AsyncIterableIterator<WorkflowStreamUpdate> {
     try {
       // 1. Extract workflow
-      const extractionResult = await this.workflowExtractor.extractWorkflow(input, context);
+      const extractionResult = await this.workflowExtractor.extractWorkflow(
+        input,
+        { method: 'hybrid', promptProvider: undefined },
+        this.createWorkflowContext(context)
+      );
 
       if (!extractionResult.success || !extractionResult.workflowSpec) {
         yield {
@@ -224,7 +258,11 @@ export class CLIWorkflowHandler implements IWorkflowHandler {
 
   async isWorkflowInput(input: string): Promise<boolean> {
     try {
-      const extractionResult = await this.workflowExtractor.extractWorkflow(input);
+      const extractionResult = await this.workflowExtractor.extractWorkflow(
+        input,
+        { method: 'hybrid', promptProvider: undefined },
+        {} as any // Mock context for quick validation
+      );
       return extractionResult.success && extractionResult.confidence > 0.6;
     } catch (_error) {
       return false;

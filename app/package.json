@@ -1,6 +1,6 @@
 {
   "name": "@qi/app",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Qi V2 Agent - CLI + Agent with Command, Prompt & Context Continuation",
   "type": "module",
   "scripts": {
@@ -23,6 +23,8 @@
     "demo:classifier-fix-test": "bun run src/demos/classifier-fix-test.ts",
     "demo:workflow-integration": "bun run src/demos/workflow-integration-demo.ts",
     "demo:workflow-extractor": "bun run src/demos/workflow-extractor-test.ts",
+    "demo:workflow-planning": "bun run src/workflow/demo.ts",
+    "demo:strategy-selection": "bun run src/workflow/strategies/demo.ts",
     "demo:context-manager": "bun run src/demos/context/context-manager-demo.ts",
     "demo:context-continuation": "bun run src/demos/context/context-continuation-demo.ts",
     "test:context": "bun run src/demos/context/context-test.ts",
@@ -54,6 +56,7 @@
   "dependencies": {
     "@inkjs/ui": "^2.0.0",
     "@langchain/core": "^0.3.66",
+    "@langchain/langgraph": "^0.2.29",
     "@langchain/ollama": "^0.2.3",
     "@xstate/react": "^6.0.0",
     "chalk": "^5.4.1",

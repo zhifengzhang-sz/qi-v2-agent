@@ -50,10 +50,15 @@ const hybridError = (
 export class HybridCLIFramework extends InkCLIFramework {
   public isHybridEnabled = true; // Public flag for InputBox detection
   private cursorAtEndState = false; // Track if cursor moved to end on last down arrow
+  private rawStdinHandler?: (chunk: Buffer) => void;
+  private isRawModeActive = false;
 
   constructor(config: Partial<CLIConfig> = {}, messageQueue?: QiAsyncMessageQueue<QiMessage>) {
     super(config, messageQueue);
+    this.logger.debug('HybridCLIFramework constructor called - THIS IS HYBRID MODE');
+    this.logger.debug('HybridCLIFramework calling initializeInfrastructure');
     this.initializeInfrastructure(config);
+    this.logger.debug('HybridCLIFramework fully initialized');
   }
 
   /**
@@ -67,6 +72,115 @@ export class HybridCLIFramework extends InkCLIFramework {
       framework: 'hybrid',
       parent: 'ink',
     });
+
+    // Set up raw stdin handling for special keys like Shift+Tab
+    this.setupRawStdinHandling();
+  }
+
+  /**
+   * Set up raw stdin handling for special keys (Claude Code approach)
+   * This complements Ink's input handling for keys that Ink doesn't handle well
+   */
+  private setupRawStdinHandling(): void {
+    this.rawStdinHandler = (chunk: Buffer) => {
+      const input = chunk.toString('utf8');
+      const bytes = Array.from(chunk);
+
+      this.logger.debug(
+        `Hybrid raw stdin: Got [${bytes.map((b) => `0x${b.toString(16)}`).join(' ')}] "${input}"`
+      );
+
+      // Handle Shift+Tab (ESC[Z - 0x1b, 0x5b, 0x5a)
+      if (bytes.length === 3 && bytes[0] === 0x1b && bytes[1] === 0x5b && bytes[2] === 0x5a) {
+        this.logger.debug('Hybrid: Detected Shift+Tab - cycling mode');
+        this.handleModeToggle();
+        return;
+      }
+    };
+
+    // Note: We'll enable this when the framework starts to avoid conflicts with Ink's setup
+  }
+
+  /**
+   * Handle mode cycling for Shift+Tab
+   */
+  private handleModeToggle(): void {
+    const currentMode = this.getMode();
+    const modes = ['interactive', 'command', 'streaming'] as const;
+    const currentIndex = modes.indexOf(currentMode);
+    const nextMode = modes[(currentIndex + 1) % modes.length];
+
+    this.logger.debug(`Hybrid: Mode change ${currentMode} → ${nextMode}`);
+    this.setMode(nextMode);
+  }
+
+  /**
+   * Override start to enable raw stdin handling after Ink is set up
+   */
+  async start(): Promise<void> {
+    // Call parent start first to set up Ink
+    await super.start();
+
+    // Now enable our raw stdin handling for special keys
+    this.enableRawStdinHandling();
+  }
+
+  /**
+   * Override shutdown to clean up raw stdin handling
+   */
+  async shutdown(): Promise<void> {
+    this.disableRawStdinHandling();
+
+    // Call parent shutdown
+    await super.shutdown();
+  }
+
+  /**
+   * Enable raw stdin handling for special keys
+   */
+  private enableRawStdinHandling(): void {
+    if (this.isRawModeActive || !this.rawStdinHandler) {
+      return;
+    }
+
+    this.logger.debug('Hybrid: Enabling raw stdin handling for special keys');
+
+    // Set up raw mode and listener
+    if (process.stdin.setRawMode) {
+      try {
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.on('data', this.rawStdinHandler);
+        this.isRawModeActive = true;
+        this.logger.debug('Hybrid: Raw stdin handling enabled');
+      } catch (error) {
+        this.logger.debug('Hybrid: Failed to enable raw mode:', error);
+      }
+    } else {
+      this.logger.debug('Hybrid: Raw mode not supported');
+    }
+  }
+
+  /**
+   * Disable raw stdin handling
+   */
+  private disableRawStdinHandling(): void {
+    if (!this.isRawModeActive || !this.rawStdinHandler) {
+      return;
+    }
+
+    this.logger.debug('Hybrid: Disabling raw stdin handling');
+
+    try {
+      process.stdin.removeListener('data', this.rawStdinHandler);
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(false);
+      }
+      this.isRawModeActive = false;
+      this.logger.debug('Hybrid: Raw stdin handling disabled');
+    } catch (error) {
+      this.logger.debug('Hybrid: Failed to disable raw mode:', error);
+    }
   }
 
   /**

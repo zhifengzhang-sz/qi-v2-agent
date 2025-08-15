@@ -21,3 +21,20 @@ export type {
   IContextManager,
   ISecurityBoundaryManager,
 } from './IContextManager.js';
+
+// Provider interfaces (v-0.8.0)
+export type {
+  IContextProvider,
+  ISessionProvider,
+  IStreamingProvider,
+  IWorkflowProvider,
+  ProviderStatus,
+  SessionContext,
+  SessionMessage,
+  StreamingContext,
+  StreamingContextConfig,
+  StreamingEvent,
+  WorkflowContext,
+  WorkflowContextConfig,
+  WorkflowExecutionState,
+} from './IContextProvider.js';

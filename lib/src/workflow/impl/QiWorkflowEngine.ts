@@ -8,11 +8,14 @@ import type {
   ExecutableWorkflow,
   IWorkflowEngine,
   IWorkflowEngineConfig,
+  WorkflowCondition,
   WorkflowCustomization,
   WorkflowEdge,
   WorkflowNode,
   WorkflowNodeHandler,
+  WorkflowNodeSpec,
   WorkflowResult,
+  WorkflowSpec,
   WorkflowState,
   WorkflowStreamChunk,
 } from '../interfaces/index.js';
@@ -473,5 +476,102 @@ export class QiWorkflowEngine implements IWorkflowEngine {
       conversational: '💬',
     };
     return icons[pattern] || '🤖';
+  }
+
+  /**
+   * Execute workflow from specification with configuration
+   */
+  async executeWorkflow(
+    spec: WorkflowSpec,
+    config: {
+      sessionId: string;
+      contextId: string;
+      streamingEnabled?: boolean;
+      checkpointingEnabled?: boolean;
+      progressCallback?: (nodeId: string, progress: any) => void;
+    }
+  ): Promise<WorkflowResult> {
+    // Create executable workflow from spec
+    const executableWorkflow: ExecutableWorkflow = {
+      id: spec.id,
+      pattern: spec.name,
+      nodes: spec.nodes.map((node: WorkflowNodeSpec) => ({
+        id: node.id,
+        name: node.name,
+        type: node.type,
+        handler: this.createNodeHandlerFromSpec(node),
+      })),
+      edges: spec.edges.map((edge: any) => ({
+        from: edge.from,
+        to: edge.to,
+        condition: edge.condition ? this.createConditionFromSpec(edge.condition) : undefined,
+      })),
+    };
+
+    // Create initial state
+    const initialState: WorkflowState = {
+      input: (spec.parameters.get('input') as string) || '',
+      pattern: spec.name,
+      domain: (spec.parameters.get('domain') as string) || 'general',
+      context: new Map(spec.parameters),
+      toolResults: [],
+      reasoningOutput: '',
+      output: '',
+      metadata: {
+        startTime: Date.now(),
+        currentStage: 'starting',
+        processingSteps: [],
+        performance: new Map(),
+      },
+    };
+
+    // Execute the workflow
+    return this.execute(executableWorkflow, initialState);
+  }
+
+  private createNodeHandlerFromSpec(nodeSpec: WorkflowNodeSpec): WorkflowNodeHandler {
+    return async (state: WorkflowState): Promise<WorkflowState> => {
+      // Simple handler that simulates execution based on node type
+      const result = { ...state };
+
+      switch (nodeSpec.type) {
+        case 'reasoning':
+          result.reasoningOutput = `Reasoning completed for ${nodeSpec.name}`;
+          break;
+        case 'tool':
+          result.toolResults = [
+            ...state.toolResults,
+            {
+              toolName: nodeSpec.name,
+              status: 'success' as const,
+              data: `Tool ${nodeSpec.name} executed successfully`,
+              executionTime: 100,
+              metadata: new Map([['nodeId', nodeSpec.id]]),
+            },
+          ];
+          break;
+        case 'output':
+          result.output = `Final output from ${nodeSpec.name}`;
+          break;
+      }
+
+      return result;
+    };
+  }
+
+  private createConditionFromSpec(conditionSpec: any): WorkflowCondition {
+    return (state: WorkflowState): boolean => {
+      // Simple condition evaluation
+      switch (conditionSpec.type) {
+        case 'always':
+          return true;
+        case 'success':
+          return !state.output.includes('error');
+        case 'error':
+          return state.output.includes('error');
+        default:
+          return true;
+      }
+    };
   }
 }

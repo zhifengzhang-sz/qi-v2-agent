@@ -1,6 +1,6 @@
 # qi-v2-agent
 
-**v-0.5.1** - AI coding assistant with toolbox architecture, file reference system, and multi-provider LLM support.
+**v-0.8.0** - AI coding assistant with complete workflow system, portable binary compilation, and professional configuration management.
 
 ## Install & Run
 
@@ -10,25 +10,28 @@ bun --cwd lib build
 cd app && bun run qi-prompt
 ```
 
-**Prerequisites**: Node.js 18+, Bun, [Ollama](https://ollama.ai) running locally
+**Prerequisites**: 
+- **Development**: Node.js 18+, Bun, [Ollama](https://ollama.ai) running locally
+- **Production Binary**: Just the qi-prompt executable and your config files
 
 ## Usage Examples
 
 ```bash
-# Basic usage
-bun run qi-prompt                    # Default CLI (readline)
-bun run qi-prompt --framework ink   # Rich UI with React components
+# Development usage
+bun run qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json --env-path .env
+bun run qi-prompt --framework ink --config-path /path/to/config.yaml --schema-path /path/to/schema.json
 bun run qi-prompt --help           # Show all options
 
-# Alternative (same as qi-prompt)
-bun run qi-code                     # Legacy alias for qi-prompt
+# Production binary usage (NEW in v-0.8.0)
+./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json --env-path .env
+./app/qi-prompt --framework ink --config-path ./config.yaml --schema-path ./schema.json --env-path ./.env
 ```
 
 **Framework Options:**
 - `--framework readline` - Basic terminal interface (default, works everywhere)  
 - `--framework ink` - Rich React-based UI with colors and animations
 
-## ✨ Key Features (v-0.5.1)
+## ✨ Key Features (v-0.8.0)
 
 ### 📁 File Reference System
 Use `@file` patterns to include file content in your prompts:
@@ -112,6 +115,24 @@ The CLI provides responsive keyboard shortcuts for efficient interaction:
 - **Non-destructive**: Cancellation safely stops operations without data loss
 - **Framework agnostic**: Works consistently in both Readline and Ink modes
 
+## 📦 Binary Compilation (NEW in v-0.8.0)
+
+```bash
+# Build and compile portable binary
+bun run compile                          # Creates app/qi-prompt executable
+
+# Run compiled binary with config files
+./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json --env-path .env
+./app/qi-prompt --framework ink --config-path /path/to/config.yaml --schema-path /path/to/schema.json
+./app/qi-prompt --help                   # Show all binary options
+```
+
+**Binary Features:**
+- **Portable**: Single 8.74MB executable with no dependencies
+- **Professional CLI**: Full argument parsing with `--config-path`, `--schema-path`, `--env-path`
+- **No Hardcoded Paths**: Complete configuration flexibility
+- **Framework Support**: Works with all UI frameworks (readline, ink, hybrid)
+
 ## 🧪 Testing & Development
 
 ```bash
@@ -120,6 +141,10 @@ bun run test                    # Architecture tests (lib)
 bun run typecheck              # TypeScript compilation check
 bun run check                  # Full quality check (typecheck + lint + test)
 
+# Build and compilation
+bun run build                   # Build library and validate app
+bun run compile                 # Create portable binary
+
 # Performance studies
 bun --cwd app run study:rule-based      # Classification study
 ```
@@ -127,11 +152,13 @@ bun --cwd app run study:rule-based      # Classification study
 ## 📈 Version Roadmap
 
 - **v-0.4.x**: Pure prompt app ✅
-- **v-0.5.x**: Current - toolbox preview ← **HERE**
-- **v-0.6.x**: Full toolbox (100+ tools, MCP integration)
-- **v-0.7.x**: Advanced workflows  
-- **v-0.8.x**: Full agent capabilities
+- **v-0.5.x**: Toolbox preview with file references ✅
+- **v-0.6.x**: Message-driven architecture with QiCore integration ✅
+- **v-0.7.x**: XState v5 agent state management ✅
+- **v-0.8.x**: **Current** - Binary compilation & professional configuration ← **HERE**
+- **v-0.9.x**: Full agent capabilities (qi-code integration)
+- **v-1.0.x**: Production-ready agent system
 
 ---
 
-**Status**: v-0.5.1 foundation complete with working file reference system and clean architecture.
+**Status**: v-0.8.0 complete with portable binary compilation, professional CLI arguments, and configuration management. No hardcoded paths, full portability achieved.
