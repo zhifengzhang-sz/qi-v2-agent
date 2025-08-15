@@ -18,8 +18,8 @@ export type * from './abstractions/index.js';
 
 // Implementations
 export * from './impl/index.js';
-// Providers (v-0.8.0)
-export * from './providers/index.js';
+// Providers (v-0.8.0) - TODO: Create providers directory
+// export * from './providers/index.js';
 // Utilities
 export * from './utils/index.js';
 

@@ -7,8 +7,8 @@
  */
 
 import { create, Err, match, Ok, type QiError, type Result } from '@qi/base';
-import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
 import { createDebugLogger } from '../../utils/DebugLogger.js';
+import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
 // NOTE: Ink framework is imported dynamically to avoid top-level await issues in binary compilation
 // Framework factories
 import {

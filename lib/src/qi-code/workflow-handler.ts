@@ -94,7 +94,7 @@ export class CLIWorkflowHandler implements IWorkflowHandler {
         maxNodes: 50,
       },
       preferences: {
-        preferredStrategy: undefined,
+        preferredPattern: undefined,
         speedVsAccuracy: 'balanced',
         allowParallelExecution: true,
         allowIterativeExecution: true,

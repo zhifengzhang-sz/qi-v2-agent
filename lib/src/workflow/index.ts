@@ -2,11 +2,19 @@
  * @qi/workflow - Main module exports
  */
 
+// Two-Layer Architecture Factory (Recommended)
+export {
+  createWorkflowHandler,
+  createWorkflowHandlerWithFallback,
+} from './factories/createWorkflowHandler.js';
+
 // Implementations
 export * from './impl/index.js';
 // Interfaces
 export type * from './interfaces/index.js';
 
+// import { LangGraphWorkflowEngine } from './impl/LangGraphWorkflowEngine.js';
+import { LangGraphWorkflowEngineSimple } from './impl/LangGraphWorkflowEngineSimple.js';
 import { QiWorkflowEngine } from './impl/QiWorkflowEngine.js';
 // Factory functions
 import { QiWorkflowExtractor } from './impl/QiWorkflowExtractor.js';
@@ -15,9 +23,7 @@ import type {
   IWorkflowExtractorConfig,
   WorkflowMode,
 } from './interfaces/index.js';
-import { ADaPTStrategy } from './strategies/ADaPTStrategy.js';
-import { ReActStrategy } from './strategies/ReActStrategy.js';
-import { ReWOOStrategy } from './strategies/ReWOOStrategy.js';
+// Research patterns available through QiCoreWorkflowManager or createWorkflowHandler()
 
 /**
  * Create workflow extractor with default configuration
@@ -60,12 +66,8 @@ export function createWorkflowExtractor(
     },
   ];
 
-  // Default strategies available
-  const defaultStrategies = [new ReActStrategy(), new ReWOOStrategy(), new ADaPTStrategy()];
-
   const finalConfig: IWorkflowExtractorConfig = {
     supportedModes: defaultModes,
-    strategies: config?.strategies || defaultStrategies,
     templateModes: ['general', 'analytical', 'creative', 'problem-solving'],
     ...config,
   };
@@ -86,4 +88,38 @@ export function createWorkflowEngine(config?: IWorkflowEngineConfig): QiWorkflow
   };
 
   return new QiWorkflowEngine(defaultConfig);
+}
+
+/**
+ * Create LangGraph-based workflow engine with default configuration
+ */
+export function createLangGraphWorkflowEngine(
+  config?: IWorkflowEngineConfig
+): LangGraphWorkflowEngineSimple {
+  const defaultConfig: IWorkflowEngineConfig = {
+    enableCheckpointing: true, // Enable checkpointing for LangGraph
+    maxExecutionTime: 60000, // Longer timeout for complex workflows
+    enableStreaming: true,
+    persistenceStore: 'memory',
+    ...config,
+  };
+
+  return new LangGraphWorkflowEngineSimple(defaultConfig);
+}
+
+/**
+ * Create simplified LangGraph-based workflow engine (for v-0.8.0 development)
+ */
+export function createLangGraphWorkflowEngineSimple(
+  config?: IWorkflowEngineConfig
+): LangGraphWorkflowEngineSimple {
+  const defaultConfig: IWorkflowEngineConfig = {
+    enableCheckpointing: false, // Simplified version doesn't need checkpointing
+    maxExecutionTime: 30000,
+    enableStreaming: true,
+    persistenceStore: 'memory',
+    ...config,
+  };
+
+  return new LangGraphWorkflowEngineSimple(defaultConfig);
 }

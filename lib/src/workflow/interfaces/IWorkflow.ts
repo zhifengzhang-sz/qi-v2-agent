@@ -79,6 +79,41 @@ export interface WorkflowMetadata {
 }
 
 /**
+ * Workflow context for processing
+ */
+export interface WorkflowContext {
+  readonly sessionId: string;
+  readonly userId?: string;
+  readonly metadata?: ReadonlyMap<string, unknown>;
+  readonly environmentContext?: ReadonlyMap<string, unknown>;
+  readonly availableTools?: readonly string[];
+  readonly mode?: string;
+  readonly priority?: number;
+  readonly resourceLimits?: {
+    readonly maxExecutionTime?: number;
+    readonly maxMemoryUsage?: number;
+    readonly maxToolCalls?: number;
+    readonly maxNodes?: number;
+  };
+  readonly preferences?: {
+    readonly preferredPattern?: string;
+    readonly speedVsAccuracy?: 'speed' | 'accuracy' | 'balanced';
+    readonly allowParallelExecution?: boolean;
+    readonly allowIterativeExecution?: boolean;
+  };
+}
+
+/**
+ * Processing context
+ */
+export interface ProcessingContext {
+  readonly sessionId: string;
+  readonly userId?: string;
+  readonly metadata?: ReadonlyMap<string, unknown>;
+  readonly environmentContext?: ReadonlyMap<string, unknown>;
+}
+
+/**
  * Workflow execution state
  */
 export interface WorkflowState {
@@ -104,6 +139,20 @@ export interface ToolResult {
 }
 
 /**
+ * Enhanced tool result for workflow nodes with real tool system integration
+ */
+export interface WorkflowToolResult {
+  readonly toolName: string;
+  readonly input: Record<string, unknown>;
+  readonly output: unknown;
+  readonly success: boolean;
+  readonly executionTime: number;
+  readonly metadata: ReadonlyMap<string, unknown>;
+  readonly callId: string;
+  readonly error?: string;
+}
+
+/**
  * Workflow extraction result
  */
 export interface WorkflowExtractionResult {
@@ -112,7 +161,7 @@ export interface WorkflowExtractionResult {
   readonly pattern: string;
   readonly workflowSpec?: WorkflowSpec;
   readonly confidence: number;
-  readonly extractionMethod: 'strategy-based' | 'template-based' | 'llm-based' | 'hybrid';
+  readonly extractionMethod: 'template-based' | 'llm-based' | 'hybrid';
   readonly error?: string;
   readonly metadata: ReadonlyMap<string, unknown>;
 }
