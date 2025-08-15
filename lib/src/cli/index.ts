@@ -5,11 +5,15 @@
  */
 
 // CLI Framework interfaces
+// Re-export types for convenience
 export type {
   CLIConfig,
+  CLIConfig as Config,
   CLIEvents,
   CLIMode,
+  CLIMode as Mode,
   CLIState,
+  CLIState as State,
   IAgentCLIBridge,
   ICLIFramework,
   IKeyboardManager,
@@ -18,7 +22,6 @@ export type {
   IStreamingRenderer,
   MessageType,
 } from './abstractions/ICLIFramework.js';
-
 // Legacy exports (maintained for backward compatibility)
 export * from './abstractions/index.js';
 export {
@@ -28,9 +31,13 @@ export {
   displayConfigHelp,
   loadCLIConfig,
 } from './config/index.js';
-
 // Framework-agnostic factories and configuration
-export { getAvailableFrameworks, recommendFramework } from './factories/createCLI.js';
+// ONLY ONE CLI CREATION FUNCTION - NO FALLBACKS
+export {
+  createCLIAsync,
+  getAvailableFrameworks,
+  recommendFramework,
+} from './factories/createCLI.js';
 export {
   createReadlineCLI,
   createReadlineCLIAsync,
@@ -38,14 +45,11 @@ export {
 } from './factories/createReadlineCLI.js';
 export * from './frameworks/index.js';
 export * from './impl/index.js';
-
 // NEW: Refactored CLI Framework with Dependency Injection
 export { MessageDrivenCLI } from './impl/MessageDrivenCLI.js';
-
 export type { HotkeyConfig } from './keyboard/HotkeyManager.js';
 // Keyboard management
 export { createHotkeyManager, debugKeypress, HotkeyManager } from './keyboard/HotkeyManager.js';
-
 export {
   Colors,
   controlToString,
@@ -74,16 +78,6 @@ export {
 } from './ui/ProgressDisplay.js';
 export type { StreamChunk } from './ui/StreamingRenderer.js';
 export { createStreamingRenderer, StreamingRenderer, wrapText } from './ui/StreamingRenderer.js';
-
-// ONLY ONE CLI CREATION FUNCTION - NO FALLBACKS
-export { createCLIAsync } from './factories/createCLI.js';
-
-// Re-export types for convenience
-export type {
-  CLIConfig as Config,
-  CLIMode as Mode,
-  CLIState as State,
-} from './abstractions/ICLIFramework.js';
 
 // Default configuration
 export const DefaultCLIConfig: import('./abstractions/ICLIFramework.js').CLIConfig = {

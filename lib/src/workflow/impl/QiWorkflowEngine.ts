@@ -4,6 +4,7 @@
  * Simplified workflow engine adapted for app layer without LangGraph dependency
  */
 
+import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   ExecutableWorkflow,
   IWorkflowEngine,
@@ -23,9 +24,14 @@ import type {
 export class QiWorkflowEngine implements IWorkflowEngine {
   private compiledWorkflows = new Map<string, ExecutableWorkflow>();
   private config: IWorkflowEngineConfig;
+  private logger: SimpleLogger;
 
   constructor(config: IWorkflowEngineConfig = {}) {
     this.config = config;
+    this.logger = createQiLogger({
+      name: 'QiWorkflowEngine',
+      level: 'info',
+    });
   }
 
   createWorkflow(pattern: string, customizations?: WorkflowCustomization[]): ExecutableWorkflow {
@@ -199,18 +205,39 @@ export class QiWorkflowEngine implements IWorkflowEngine {
   }
 
   async precompileWorkflows(patterns: readonly string[]): Promise<void> {
-    console.log(`🔧 Precompiling workflows for ${patterns.length} patterns...`);
+    this.logger.info('🔧 Starting workflow precompilation', undefined, {
+      component: 'QiWorkflowEngine',
+      method: 'precompileWorkflows',
+      patternCount: patterns.length,
+      patterns: patterns.slice(0, 5), // Log first 5 patterns to avoid spam
+    });
 
     for (const pattern of patterns) {
       try {
         this.createWorkflow(pattern);
-        console.log(`✓ Compiled workflow for pattern: ${pattern}`);
+        this.logger.debug('✓ Compiled workflow for pattern', undefined, {
+          component: 'QiWorkflowEngine',
+          method: 'precompileWorkflows',
+          pattern,
+          operationType: 'workflow_compilation',
+        });
       } catch (error) {
-        console.error(`✗ Failed to compile workflow for pattern ${pattern}:`, error);
+        this.logger.error('✗ Failed to compile workflow for pattern', undefined, {
+          component: 'QiWorkflowEngine',
+          method: 'precompileWorkflows',
+          pattern,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          operationType: 'workflow_compilation_error',
+        });
       }
     }
 
-    console.log('🎯 Workflow precompilation complete');
+    this.logger.info('🎯 Workflow precompilation complete', undefined, {
+      component: 'QiWorkflowEngine',
+      method: 'precompileWorkflows',
+      compiledCount: this.compiledWorkflows.size,
+      operationType: 'precompilation_complete',
+    });
   }
 
   getCompiledWorkflow(patternName: string): ExecutableWorkflow | null {

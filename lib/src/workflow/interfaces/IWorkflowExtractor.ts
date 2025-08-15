@@ -4,12 +4,11 @@
  * Abstract interface for extracting workflows from natural language
  */
 
-import type {
-  IDecompositionStrategy,
-  WorkflowContext,
-} from '../strategies/IDecompositionStrategy.js';
+// Strategy system removed - using direct pattern implementations instead
+
 import type {
   ProcessingContext,
+  WorkflowContext,
   WorkflowExtractionResult,
   WorkflowMode,
   WorkflowSpec,
@@ -19,9 +18,7 @@ import type {
  * Workflow extraction method specification
  */
 export interface WorkflowExtractionMethod {
-  readonly method: 'strategy-based' | 'template-based' | 'hybrid';
-  readonly strategy?: IDecompositionStrategy; // For strategy-based
-  readonly strategyName?: string; // For strategy selection
+  readonly method: 'template-based' | 'llm-based' | 'hybrid';
   readonly templateMode?: string; // For template-based
   readonly promptProvider?: any; // LLM provider interface (user-configurable)
 }
@@ -34,7 +31,7 @@ export interface IWorkflowExtractor {
    * Extract workflow specification from natural language input
    *
    * @param input Natural language task description
-   * @param method How to extract the workflow (strategy, template, hybrid)
+   * @param method How to extract the workflow (template, llm, hybrid)
    * @param context Execution context
    */
   extractWorkflow(
@@ -54,9 +51,9 @@ export interface IWorkflowExtractor {
   validateWorkflowSpec(spec: WorkflowSpec): Promise<boolean>;
 
   /**
-   * Get available strategies
+   * Get supported extraction methods
    */
-  getAvailableStrategies(): readonly IDecompositionStrategy[];
+  getSupportedMethods(): readonly WorkflowExtractionMethod['method'][];
 }
 
 /**
@@ -64,7 +61,7 @@ export interface IWorkflowExtractor {
  */
 export interface IWorkflowExtractorConfig {
   readonly supportedModes: readonly WorkflowMode[];
-  readonly strategies: readonly IDecompositionStrategy[]; // Available strategies
   readonly templateModes?: readonly string[]; // Available template modes
   readonly defaultMethod?: WorkflowExtractionMethod; // Default extraction method
+  readonly enableLLMExtraction?: boolean; // Enable LLM-based extraction
 }

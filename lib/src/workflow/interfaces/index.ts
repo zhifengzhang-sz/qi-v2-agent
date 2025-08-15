@@ -2,18 +2,13 @@
  * @qi/workflow - Workflow interfaces export
  */
 
-// Strategy interfaces
-export type {
-  IDecompositionStrategy,
-  IStrategyRegistry,
-  StrategyScore,
-  TaskAnalysis,
-  WorkflowContext,
-} from '../strategies/IDecompositionStrategy.js';
+// Research patterns are implemented in ../patterns/ directory
+// Strategy system removed in favor of direct pattern usage
 export type {
   ProcessingContext,
   ToolResult,
   WorkflowConditionSpec,
+  WorkflowContext,
   WorkflowEdgeSpec,
   WorkflowError,
   WorkflowExtractionResult,
@@ -25,6 +20,7 @@ export type {
   WorkflowSpec,
   WorkflowState,
   WorkflowStreamChunk,
+  WorkflowToolResult,
 } from './IWorkflow.js';
 export type {
   ExecutableWorkflow,
@@ -41,3 +37,15 @@ export type {
   IWorkflowExtractorConfig,
   WorkflowExtractionMethod,
 } from './IWorkflowExtractor.js';
+export type {
+  IWorkflowHandler,
+  PatternConfig,
+  PatternExecutionResult,
+  WorkflowConfig,
+  WorkflowExecutionResult,
+} from './IWorkflowHandler.js';
+export type {
+  InternalPatternResult,
+  IWorkflowManager,
+  WorkflowExecutionContext,
+} from './IWorkflowManager.js';

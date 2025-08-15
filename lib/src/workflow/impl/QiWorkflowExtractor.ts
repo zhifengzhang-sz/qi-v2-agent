@@ -24,10 +24,10 @@ import type {
   WorkflowMode,
   WorkflowSpec,
 } from '../interfaces/index.js';
-import type {
-  IDecompositionStrategy,
-  WorkflowContext,
-} from '../strategies/IDecompositionStrategy.js';
+import { LLMWorkflowPlanner } from './LLMWorkflowPlanner.js';
+
+// Strategy system removed - using direct pattern implementations instead
+type WorkflowContext = any;
 
 /**
  * Workflow extractor error factory using QiCore patterns
@@ -86,15 +86,32 @@ const _WorkflowSpecSchema = {
 
 export class QiWorkflowExtractor implements IWorkflowExtractor {
   private supportedModes: readonly WorkflowMode[];
-  private strategies: readonly IDecompositionStrategy[];
   private templateModes: readonly string[];
   private defaultMethod?: WorkflowExtractionMethod;
+  private llmPlanner?: LLMWorkflowPlanner;
 
   constructor(config: IWorkflowExtractorConfig) {
     this.supportedModes = config.supportedModes;
-    this.strategies = config.strategies;
     this.templateModes = config.templateModes || [];
     this.defaultMethod = config.defaultMethod;
+
+    // Initialize LLM planner if API key is available
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+    if (openaiKey) {
+      this.llmPlanner = new LLMWorkflowPlanner({
+        provider: 'openai',
+        apiKey: openaiKey,
+        model: 'gpt-4o-mini',
+      });
+    } else if (anthropicKey) {
+      this.llmPlanner = new LLMWorkflowPlanner({
+        provider: 'anthropic',
+        apiKey: anthropicKey,
+        model: 'claude-3-haiku-20240307',
+      });
+    }
   }
 
   /**
@@ -344,11 +361,11 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
 
     // Extract based on the specified method
     switch (method.method) {
-      case 'strategy-based':
-        return this.extractWithStrategy(input, method, context, startTime);
-
       case 'template-based':
         return this.extractWithTemplate(input, method, context, startTime);
+
+      case 'llm-based':
+        return this.extractWithLLM(input, method, context, startTime);
 
       case 'hybrid':
         return this.extractWithHybrid(input, method, context, startTime);
@@ -370,78 +387,65 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
   }
 
   /**
-   * Extract workflow using research-based strategies (ReAct, ReWOO, ADaPT)
+   * Extract workflow using LLM-based approach
    */
-  private async extractWithStrategy(
+  private async extractWithLLM(
     input: string,
     method: WorkflowExtractionMethod,
     context: WorkflowContext,
     startTime: number
   ): Promise<WorkflowExtractionResult> {
-    // Get the strategy to use
-    const strategy =
-      method.strategy || (method.strategyName ? this.findStrategy(method.strategyName) : null);
-
-    if (!strategy) {
+    if (!this.llmPlanner) {
       return {
         success: false,
         mode: 'error',
         pattern: 'error',
         confidence: 0,
-        extractionMethod: 'strategy-based',
-        error: 'No strategy specified or strategy not found',
+        extractionMethod: 'llm-based',
+        error: 'LLM planner not available - check API key configuration',
         metadata: new Map([
-          ['errorCode', 'NO_STRATEGY'],
+          ['errorCode', 'LLM_NOT_CONFIGURED'],
           ['extractionTime', (Date.now() - startTime).toString()],
         ]),
       };
     }
 
-    // Use QiCore fromAsyncTryCatch for async operations
-    const strategyResult = await fromAsyncTryCatch(
-      async () => strategy.decompose(input, context),
-      (error) =>
-        create(
-          'STRATEGY_EXECUTION_FAILED',
-          `Strategy ${strategy.name} execution failed: ${error instanceof Error ? error.message : String(error)}`,
-          'SYSTEM',
-          { strategyName: strategy.name, input }
-        )
+    // Convert WorkflowContext to ProcessingContext for LLM planner
+    const processingContext: ProcessingContext = {
+      sessionId: context.sessionId,
+      userId: context.userId,
+      metadata: context.metadata,
+      environmentContext: context.environmentContext,
+    };
+
+    const extractionResult = await fromAsyncTryCatch(
+      async (): Promise<WorkflowExtractionResult> => {
+        return await this.llmPlanner!.extractWorkflowWithFallback(input, processingContext);
+      },
+      (error: unknown): QiError => ({
+        code: 'LLM_EXTRACTION_FAILED',
+        message: `LLM workflow extraction failed: ${error instanceof Error ? error.message : String(error)}`,
+        category: 'SYSTEM',
+        context: { input: input.substring(0, 100), extractionTime: Date.now() - startTime },
+      })
     );
 
-    return match(
-      (workflowSpec) =>
-        ({
-          success: true,
-          workflowSpec,
-          mode: strategy.name,
-          pattern: strategy.category,
-          confidence: 0.9, // High confidence for research-based strategies
-          extractionMethod: 'strategy-based' as const,
-          metadata: new Map([
-            ['strategyName', strategy.name],
-            ['strategySource', strategy.source],
-            ['extractionTime', (Date.now() - startTime).toString()],
-            ['nodeCount', workflowSpec.nodes.length.toString()],
-            ['edgeCount', workflowSpec.edges.length.toString()],
-          ]),
-        }) as WorkflowExtractionResult,
-      (error) =>
-        ({
-          success: false,
-          mode: strategy.name,
-          pattern: strategy.category,
-          confidence: 0,
-          extractionMethod: 'strategy-based' as const,
-          error: error.message,
-          metadata: new Map([
-            ['errorCode', error.code],
-            ['strategyName', strategy.name],
-            ['extractionTime', (Date.now() - startTime).toString()],
-          ]),
-        }) as WorkflowExtractionResult,
-      strategyResult
-    );
+    if (extractionResult.tag === 'success') {
+      return extractionResult.value;
+    } else {
+      return {
+        success: false,
+        mode: 'error',
+        pattern: 'error',
+        confidence: 0,
+        extractionMethod: 'llm-based',
+        error: extractionResult.error.message,
+        metadata: new Map([
+          ['errorCode', extractionResult.error.code],
+          ['extractionTime', (Date.now() - startTime).toString()],
+        ]),
+      };
+    }
   }
 
   /**
@@ -511,7 +515,7 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
   }
 
   /**
-   * Extract workflow using hybrid approach (strategy first, template fallback)
+   * Extract workflow using hybrid approach (LLM first, template fallback)
    */
   private async extractWithHybrid(
     input: string,
@@ -519,11 +523,11 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
     context: WorkflowContext,
     startTime: number
   ): Promise<WorkflowExtractionResult> {
-    // Try strategy-based first if provider is available
-    if (method.promptProvider && method.strategyName) {
-      const strategyResult = await this.extractWithStrategy(input, method, context, startTime);
-      if (strategyResult.success) {
-        return strategyResult;
+    // Try LLM-based first if available
+    if (this.llmPlanner) {
+      const llmResult = await this.extractWithLLM(input, method, context, startTime);
+      if (llmResult.success) {
+        return llmResult;
       }
     }
 
@@ -531,19 +535,12 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
     return this.extractWithTemplate(input, method, context, startTime);
   }
 
-  /**
-   * Find strategy by name
-   */
-  private findStrategy(name: string): IDecompositionStrategy | null {
-    return this.strategies.find((strategy) => strategy.name === name) || null;
-  }
-
   getSupportedModes(): readonly WorkflowMode[] {
     return this.supportedModes;
   }
 
-  getAvailableStrategies(): readonly IDecompositionStrategy[] {
-    return this.strategies;
+  getSupportedMethods(): readonly WorkflowExtractionMethod['method'][] {
+    return ['template-based', 'llm-based', 'hybrid'];
   }
 
   async validateWorkflowSpec(spec: WorkflowSpec): Promise<boolean> {
