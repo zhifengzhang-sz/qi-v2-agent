@@ -72,10 +72,17 @@ total_timeline: "24 weeks with 3-4 engineers"
 - **[MCP Protocol Docs](https://modelcontextprotocol.io)** - Protocol specification
 
 ### **Current Codebase**
-- **[lib/src/state/](../../lib/src/state/)** - Existing state management foundation
-- **[lib/src/context/](../../lib/src/context/)** - Existing context management foundation
-- **[lib/src/prompt/](../../lib/src/prompt/)** - Complete prompt system implementation
-- **[lib/src/tools/](../../lib/src/tools/)** - Comprehensive tool ecosystem
+- **[lib/src/state/](../../lib/src/state/)** - Multi-tier memory system | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-1-2-enhanced-state-manager)
+- **[lib/src/context/](../../lib/src/context/)** - Context optimization + RAG | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-3-4-enhanced-context-manager) | [📖 docs](../context/README.md)
+- **[lib/src/prompt/](../../lib/src/prompt/)** - Complete prompt system implementation | [📖 docs](../prompt/README.md)
+- **[lib/src/tools/](../../lib/src/tools/)** - Comprehensive tool ecosystem | [📋 specs](./comprehensive-implementation-status.md)
+- **[lib/src/agent/](../../lib/src/agent/)** - Agent orchestration foundation | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#v-09x-agent-implementation-phase) | [📖 docs](../agent/README.md)
+- **[lib/src/cli/](../../lib/src/cli/)** - Professional CLI framework | [📋 specs](./comprehensive-implementation-status.md) | [📖 docs](../cli/README.md)
+- **[lib/src/messaging/](../../lib/src/messaging/)** - Async message system | [📋 specs](./comprehensive-implementation-status.md) | [📖 docs](../messaging/README.md)
+- **[lib/src/workflow/](../../lib/src/workflow/)** - Advanced workflow patterns | [📋 specs](./comprehensive-implementation-status.md) | [📖 docs](../workflow/README.md)
+- **[lib/src/classifier/](../../lib/src/classifier/)** - Input classification system | [📖 docs](../classifier/README.md)
+- **[lib/src/models/](../../lib/src/models/)** - Model lifecycle management | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-5-6-enhanced-model-manager)
+- **[lib/src/mcp/](../../lib/src/mcp/)** - MCP client integration | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-7-8-mcp-client-integration)
 
 ## Archived Documents
 
