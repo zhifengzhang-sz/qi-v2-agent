@@ -5,11 +5,16 @@
 
 ## Active Roadmap Documents
 
-### **📋 Official Roadmap**
-- **[v-0.8.x to v-0.9.x Roadmap](./v-0.8.x-to-v-0.9.x-roadmap.md)** - The official development plan
-  - **Timeline**: 24 weeks (6 months)
-  - **Strategy**: Hybrid approach (internal modules + selective MCP usage)
-  - **Focus**: Enhanced core components → Advanced agent capabilities
+### **📋 Official Implementation Guides**
+- **[v0.8.x Implementation Guide](./impl.v-0.8.x.md)** - Enhanced Core Components
+  - Enhanced State Manager with multi-tier memory
+  - Enhanced Context Manager with RAG integration
+  - Model Manager with lifecycle management
+  - MCP Client for external service integration
+- **[v0.9.x Implementation Guide](./impl.v-0.9.x.md)** - Advanced Agent Capabilities
+  - Advanced Decision Engine with planning and reasoning
+  - Multi-Agent Coordination with distributed task handling
+  - Production Features with monitoring and resilience
 
 ### **📊 Current Status**
 - **[Comprehensive Implementation Status](./comprehensive-implementation-status.md)** - Detailed current state
@@ -72,17 +77,17 @@ total_timeline: "24 weeks with 3-4 engineers"
 - **[MCP Protocol Docs](https://modelcontextprotocol.io)** - Protocol specification
 
 ### **Current Codebase**
-- **[lib/src/state/](../../lib/src/state/)** - Multi-tier memory system | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-1-2-enhanced-state-manager)
-- **[lib/src/context/](../../lib/src/context/)** - Context optimization + RAG | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-3-4-enhanced-context-manager) | [📖 docs](../context/README.md)
+- **[lib/src/state/](../../lib/src/state/)** - Multi-tier memory system | [📋 impl guide](./impl.v-0.8.x.md#module-1-enhanced-state-manager)
+- **[lib/src/context/](../../lib/src/context/)** - Context optimization + RAG | [📋 impl guide](./impl.v-0.8.x.md#module-2-enhanced-context-manager) | [📖 docs](../context/README.md)
 - **[lib/src/prompt/](../../lib/src/prompt/)** - Complete prompt system implementation | [📖 docs](../prompt/README.md)
 - **[lib/src/tools/](../../lib/src/tools/)** - Comprehensive tool ecosystem | [📋 specs](./comprehensive-implementation-status.md)
-- **[lib/src/agent/](../../lib/src/agent/)** - Agent orchestration foundation | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#v-09x-agent-implementation-phase) | [📖 docs](../agent/README.md)
+- **[lib/src/agent/](../../lib/src/agent/)** - Agent orchestration foundation | [📋 impl guide](./impl.v-0.9.x.md#module-1-advanced-decision-engine) | [📖 docs](../agent/README.md)
 - **[lib/src/cli/](../../lib/src/cli/)** - Professional CLI framework | [📋 specs](./comprehensive-implementation-status.md) | [📖 docs](../cli/README.md)
 - **[lib/src/messaging/](../../lib/src/messaging/)** - Async message system | [📋 specs](./comprehensive-implementation-status.md) | [📖 docs](../messaging/README.md)
 - **[lib/src/workflow/](../../lib/src/workflow/)** - Advanced workflow patterns | [📋 specs](./comprehensive-implementation-status.md) | [📖 docs](../workflow/README.md)
 - **[lib/src/classifier/](../../lib/src/classifier/)** - Input classification system | [📖 docs](../classifier/README.md)
-- **[lib/src/models/](../../lib/src/models/)** - Model lifecycle management | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-5-6-enhanced-model-manager)
-- **[lib/src/mcp/](../../lib/src/mcp/)** - MCP client integration | [📋 specs](./v-0.8.x-to-v-0.9.x-roadmap.md#week-7-8-mcp-client-integration)
+- **[lib/src/models/](../../lib/src/models/)** - Model lifecycle management | [📋 impl guide](./impl.v-0.8.x.md#module-3-model-manager)
+- **[lib/src/mcp/](../../lib/src/mcp/)** - MCP client integration | [📋 impl guide](./impl.v-0.8.x.md#module-4-mcp-client-integration)
 
 ## Archived Documents
 
@@ -93,16 +98,18 @@ Historical roadmap documents have been moved to `archive/` for reference:
 - `archive/v-0.9.x-continuous-learning-roadmap.md`
 - `archive/two-architecture-proposals.md`
 - `archive/pre-agent-foundation-analysis.md`
+- `archive/v-0.8.x-to-v-0.9.x-roadmap.md` - Replaced by detailed implementation guides
 
 ## Next Steps
 
-1. **Begin v-0.8.1 development** following the official roadmap
-2. **Start with Enhanced State Manager** (weeks 1-2)
+1. **Begin v0.8.x implementation** following the [v0.8.x Implementation Guide](./impl.v-0.8.x.md)
+2. **Start with Enhanced State Manager** with multi-tier memory architecture
 3. **Leverage existing foundations** in `lib/src/state/`, `lib/src/context/`
 4. **Integrate mature MCP servers** where they provide genuine value
+5. **Follow detailed specifications** with concrete TypeScript interfaces and examples
 
 ---
 
-**Status**: Ready for v-0.8.1 implementation  
+**Status**: Ready for v0.8.x implementation  
 **Contact**: Development team leads  
-**Last Updated**: 2025-01-16
+**Last Updated**: 2025-01-17
