@@ -1,11 +1,31 @@
 # Qi V2 Agent - Version History
 
-## v0.8.0 - Binary Compilation & Professional Configuration (COMPLETED)
+## 🤖 Dual-Agent Architecture
+
+This project develops **two specialized AI agents** with distinct capabilities and milestones:
+
+### **qi-prompt** - Advanced Prompt Application
+- **Focus**: Context management and simple workflows
+- **Strength**: Professional context optimization with RAG integration  
+- **Design Philosophy**: Simple, well-defined patterns (no fancy complexity)
+- **Current Status**: v-0.8.0 working implementation ✅
+- **Milestone**: v-0.8.x complete (qi-prompt enhanced with upgraded modules)
+
+### **qi-code** - Full Coding Agent  
+- **Focus**: Complete workflow orchestration and tool ecosystem
+- **Strength**: Advanced agent capabilities with MCP server integration
+- **Design Philosophy**: Full pattern library with intelligent selection
+- **Current Status**: Under development 🚧
+- **Milestone**: v-0.10.x Advanced Agent Capabilities
+
+---
+
+## v0.8.0 - qi-prompt First Working Implementation (COMPLETED)
 
 ### 📅 **Release Date**: January 2025
 
 ### 🎯 **Overview**
-Complete binary compilation system with professional CLI argument handling and configuration management. This release achieves full portability through dynamic imports solving Ink's top-level await bundling issues, eliminates all hardcoded paths, and provides professional command-line interface patterns suitable for production deployment.
+**First working qi-prompt implementation**: Professional binary compilation with simple workflow patterns and foundational infrastructure. This release establishes qi-prompt as a functional prompt application while maintaining design simplicity. Provides the foundation for v-0.8.x module upgrades and eventual qi-code development. The qi-prompt milestone will be achieved at the end of v-0.8.x when all enhanced modules are integrated.
 
 ### ✨ **Major Features**
 
@@ -188,6 +208,39 @@ Complete implementation of QiCore-integrated tool layer with advanced security f
 - **Audit Logging**: Comprehensive security event tracking
 - **Rate Limiting**: Protection against abuse and resource exhaustion
 - **Command Sandboxing**: Secure command execution with restricted environments
+
+---
+
+## 🚧 qi-code Development Roadmap
+
+### v0.9.x - Enhanced Workflow System (IN DEVELOPMENT)
+**Target**: Foundation for qi-code agent capabilities
+- **Intelligent Pattern Selection**: ReAct, ReWOO, ADaPT with automated selection
+- **Production Workflow Execution**: Monitoring, optimization, and learning
+- **Real-time Adaptation**: Performance-based workflow optimization
+- **MCP Integration**: Deep integration with external services
+
+### v0.10.x - qi-code Advanced Agent Capabilities (PLANNED)
+**Target**: qi-code milestone - Full coding agent
+- **Complete Workflow Orchestration**: Full pattern library with intelligent selection
+- **Advanced Decision Engine**: Planning, reasoning, and causal analysis
+- **Multi-Agent Coordination**: Distributed task execution and collaboration
+- **Tool Layer Excellence**: Complete MCP server integration (Chroma, Web, Database, Memory, SQLite)
+- **Autonomous Goal Management**: Adaptive planning and goal-oriented behavior
+
+### v0.11.x - Continuous Learning System (PLANNED)
+**Target**: Self-improving agent capabilities
+- **Knowledge Evolution**: Automated learning pipelines
+- **Self-Optimization**: Continuous performance improvement
+- **Memory Consolidation**: Long-term knowledge synthesis
+- **Cross-Agent Learning**: Knowledge sharing between qi-prompt and qi-code
+
+### v1.0.x - Production Dual-Agent System (PLANNED)
+**Target**: Enterprise-ready deployment
+- **qi-prompt**: Mature context management and simple workflows
+- **qi-code**: Full agent capabilities with advanced workflows
+- **Unified Experience**: Seamless integration between both agents
+- **Enterprise Features**: Monitoring, security, and compliance
 
 ---
 

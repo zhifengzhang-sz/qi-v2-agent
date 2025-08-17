@@ -1,8 +1,25 @@
 # qi-v2-agent
 
-**v-0.8.0** - AI coding assistant with complete workflow system, portable binary compilation, and professional configuration management.
+**Dual-Agent Architecture** - Two specialized AI agents: **qi-prompt** (advanced prompt app) and **qi-code** (full coding agent)
+
+## 🤖 Agent Architecture
+
+### **qi-prompt** - Advanced Prompt Application *(Current: v-0.8.0, Target: v-0.8.x)*
+- **Focus**: Context management and simple workflows
+- **Strength**: Professional context optimization with RAG integration
+- **Workflows**: Well-defined, simple patterns (no fancy complexity)
+- **Current Status**: v-0.8.0 working implementation ✅
+- **Milestone**: v-0.8.x complete (qi-prompt enhanced with upgraded modules)
+
+### **qi-code** - Full Coding Agent *(Target: v-0.10.x)*
+- **Focus**: Complete workflow orchestration and tool ecosystem
+- **Strength**: Advanced agent capabilities with MCP server integration
+- **Workflows**: Full pattern library (ReAct, ReWOO, ADaPT) with intelligent selection
+- **Milestone**: v-0.10.x Advanced Agent Capabilities
 
 ## Install & Run
+
+### **qi-prompt** *(Currently Available)*
 
 ```bash
 bun install
@@ -13,6 +30,9 @@ cd app && bun run qi-prompt
 **Prerequisites**: 
 - **Development**: Node.js 18+, Bun, [Ollama](https://ollama.ai) running locally
 - **Production Binary**: Just the qi-prompt executable and your config files
+
+### **qi-code** *(Coming in v-0.10.x)*
+Full agent capabilities with advanced workflows and MCP integration - under development.
 
 ## Usage Examples
 
@@ -31,7 +51,7 @@ bun run qi-prompt --help           # Show all options
 - `--framework readline` - Basic terminal interface (default, works everywhere)  
 - `--framework ink` - Rich React-based UI with colors and animations
 
-## ✨ Key Features (v-0.8.0)
+## ✨ qi-prompt Features (v-0.8.0)
 
 ### 📁 File Reference System
 Use `@file` patterns to include file content in your prompts:
@@ -50,8 +70,10 @@ Use `@file` patterns to include file content in your prompts:
 
 ### 🔄 Simple Workflow System
 - **FILE_REFERENCE Workflow**: Processes `@file + prompt` patterns automatically
-- **Workflow Statistics**: Track execution performance with `/workflows` command
+- **Well-Defined Patterns**: Simple, clear workflows with no fancy complexity
 - **Bounded Complexity**: Max 3 operations per workflow for predictable performance
+- **Theoretically Sound**: Clean, straightforward design principles
+- **Workflow Statistics**: Track execution performance with `/workflows` command
 
 ### 🎛️ Multi-Provider LLM Support
 - **5 Providers**: Ollama (local), OpenRouter, Groq, Hugging Face, Together AI
@@ -149,16 +171,33 @@ bun run compile                 # Create portable binary
 bun --cwd app run study:rule-based      # Classification study
 ```
 
-## 📈 Version Roadmap
+## 📈 Dual-Agent Roadmap
 
+### **qi-prompt Evolution**
 - **v-0.4.x**: Pure prompt app ✅
 - **v-0.5.x**: Toolbox preview with file references ✅
 - **v-0.6.x**: Message-driven architecture with QiCore integration ✅
 - **v-0.7.x**: XState v5 agent state management ✅
-- **v-0.8.x**: **Current** - Binary compilation & professional configuration ← **HERE**
-- **v-0.9.x**: Full agent capabilities (qi-code integration)
-- **v-1.0.x**: Production-ready agent system
+- **v-0.8.0**: First working qi-prompt implementation ✅
+- **v-0.8.x**: **Target** - Enhanced Core Infrastructure ← **qi-prompt MILESTONE**
+  - qi-prompt enhanced with upgraded modules
+  - Advanced context management with RAG integration
+  - Enhanced state manager, model manager, MCP client integration
+  - Simple, well-defined workflows (no fancy complexity)
+
+### **qi-code Development Path**
+- **v-0.9.x**: Enhanced Workflow System
+  - Intelligent pattern selection (ReAct, ReWOO, ADaPT)
+  - Production-ready workflow execution
+- **v-0.10.x**: **qi-code MILESTONE** - Advanced Agent Capabilities
+  - Complete workflow orchestration
+  - Full tool layer with MCP server integration
+  - Multi-agent coordination
+- **v-0.11.x**: Continuous Learning System
+- **v-1.0.x**: Production-ready dual-agent system
 
 ---
 
-**Status**: v-0.8.0 complete with portable binary compilation, professional CLI arguments, and configuration management. No hardcoded paths, full portability achieved.
+**Status**: 
+- **qi-prompt v-0.8.0**: ✅ Working implementation, **v-0.8.x target**: Enhanced with upgraded modules
+- **qi-code**: 🚧 Under development (v-0.10.x milestone) - Full agent capabilities with advanced workflows and MCP integration
