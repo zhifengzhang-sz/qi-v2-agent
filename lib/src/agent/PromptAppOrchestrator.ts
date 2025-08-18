@@ -156,6 +156,16 @@ export class PromptAppOrchestrator implements IAgent {
   private abortController?: AbortController;
   private isProcessing = false;
 
+  // QiCore error factory method
+  private createQiError(
+    code: string,
+    message: string,
+    category: ErrorCategory,
+    context: Record<string, unknown> = {}
+  ): QiError {
+    return create(code, message, category, context);
+  }
+
   private config: AgentConfig;
   private isInitialized = false;
   private startTime?: Date;

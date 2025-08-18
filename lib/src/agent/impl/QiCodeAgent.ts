@@ -5,7 +5,17 @@
  * Internal to agent module - other modules cannot access this directly.
  */
 
-import { create, type ErrorCategory, type QiError } from '@qi/base';
+import {
+  create,
+  type ErrorCategory,
+  failure,
+  flatMap,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type { ClassificationResult, IClassifier } from '../../classifier/index.js';
 import type { CommandRequest, ICommandHandler } from '../../command/index.js';
 import type { IContextManager } from '../../context/index.js';
@@ -48,6 +58,16 @@ export class QiCodeAgent implements IAgent {
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
+
+  // QiCore error factory method
+  private createQiError(
+    code: string,
+    message: string,
+    category: ErrorCategory,
+    context: Record<string, unknown> = {}
+  ): QiError {
+    return create(code, message, category, context);
+  }
 
   private config: AgentConfig;
   private isInitialized = false;
@@ -102,87 +122,146 @@ export class QiCodeAgent implements IAgent {
     this.isInitialized = true;
   }
 
+  // Public interface - clean API that hides QiCore complexity
   async process(request: AgentRequest): Promise<AgentResponse> {
-    if (!this.isInitialized) {
-      throw new Error('Agent not initialized. Call initialize() first.');
+    const result = await this.processInternal(request);
+    return match(
+      (agentResponse: AgentResponse) => agentResponse,
+      (error: QiError) => this.transformQiErrorToResponse(error),
+      result
+    );
+  }
+
+  // Internal layer - QiCore functional programming patterns
+  private async processInternal(request: AgentRequest): Promise<Result<AgentResponse>> {
+    const initResult = await fromAsyncTryCatch(async () => {
+      if (!this.isInitialized) {
+        throw new Error('Agent not initialized. Call initialize() first.');
+      }
+      const startTime = Date.now();
+      this.requestCount++;
+      this.lastActivity = new Date();
+      return { ...request, startTime };
+    });
+
+    return await match(
+      async (initData: any) => {
+        const requestWithTime = { ...request, startTime: initData.startTime };
+
+        // Check for state management commands first
+        if (this.isStateCommand(requestWithTime.input)) {
+          const stateResult = await this.handleStateCommandInternal(requestWithTime.input);
+          return match(
+            (response: AgentResponse) =>
+              success({
+                ...response,
+                executionTime: Date.now() - requestWithTime.startTime,
+              }) as Result<AgentResponse, QiError>,
+            (error: QiError) => failure(error) as Result<AgentResponse, QiError>,
+            stateResult
+          );
+        }
+
+        return await this.processClassificationInternal(requestWithTime);
+      },
+      async (error: QiError) => failure(error) as Result<AgentResponse, QiError>,
+      initResult
+    );
+  }
+
+  private async processClassificationInternal(
+    request: AgentRequest & { startTime: number }
+  ): Promise<Result<AgentResponse>> {
+    if (!this.classifier) {
+      return failure(
+        this.createQiError(
+          'CLASSIFIER_NOT_AVAILABLE',
+          'Classifier not available',
+          'CONFIGURATION',
+          { input: request.input }
+        )
+      );
     }
 
-    const startTime = Date.now();
-    this.requestCount++;
-    this.lastActivity = new Date();
+    const classificationResult = await fromAsyncTryCatch(async () => {
+      return await this.classifier!.classify(request.input);
+    });
 
-    try {
-      // Step 1: Check for state management commands first
-      if (this.isStateCommand(request.input)) {
-        const response = await this.handleStateCommand(request.input);
-        const executionTime = Date.now() - startTime;
-        this.totalResponseTime += executionTime;
-        return {
-          ...response,
-          executionTime,
-        };
-      }
+    return await match(
+      async (classification: ClassificationResult) => {
+        let responseResult: Result<AgentResponse>;
 
-      // Step 2: Classify input
-      if (!this.classifier) {
-        throw new Error('Classifier not available');
-      }
+        switch (classification.type) {
+          case 'command':
+            responseResult = await this.handleCommandInternal(request, classification);
+            break;
+          case 'prompt':
+            responseResult = await this.handlePromptInternal(request, classification);
+            break;
+          case 'workflow':
+            responseResult = await this.handleWorkflowInternal(request, classification);
+            break;
+          default:
+            return failure(
+              this.createQiError(
+                'UNKNOWN_CLASSIFICATION_TYPE',
+                `Unknown classification type: ${classification.type}`,
+                'VALIDATION',
+                { classificationType: classification.type, input: request.input }
+              )
+            );
+        }
 
-      const classification = await this.classifier.classify(request.input);
+        return match(
+          (response: AgentResponse) => {
+            const executionTime = Date.now() - request.startTime;
+            this.totalResponseTime += executionTime;
 
-      // Step 3: Route based on classification
-      let response: AgentResponse;
+            return success({
+              ...response,
+              executionTime,
+              metadata: new Map([
+                ...Array.from(response.metadata.entries()),
+                [
+                  'classification',
+                  JSON.stringify({
+                    type: classification.type,
+                    confidence: classification.confidence,
+                    method: classification.method,
+                  }),
+                ],
+                ['agentProcessingTime', executionTime.toString()],
+              ]),
+            }) as Result<AgentResponse, QiError>;
+          },
+          (error: QiError) => failure(error) as Result<AgentResponse, QiError>,
+          responseResult
+        );
+      },
+      async (error: QiError) => failure(error) as Result<AgentResponse, QiError>,
+      classificationResult
+    );
+  }
 
-      switch (classification.type) {
-        case 'command':
-          response = await this.handleCommand(request, classification);
-          break;
-        case 'prompt':
-          response = await this.handlePrompt(request, classification);
-          break;
-        case 'workflow':
-          response = await this.handleWorkflow(request, classification);
-          break;
-        default:
-          throw new Error(`Unknown classification type: ${classification.type}`);
-      }
+  // Helper method to transform QiError to AgentResponse for public API
+  private transformQiErrorToResponse(qiError: QiError): AgentResponse {
+    const executionTime = 0; // Will be set properly in actual timing
+    this.totalResponseTime += executionTime;
 
-      const executionTime = Date.now() - startTime;
-      this.totalResponseTime += executionTime;
-
-      return {
-        ...response,
-        executionTime,
-        metadata: new Map([
-          ...Array.from(response.metadata.entries()),
-          [
-            'classification',
-            JSON.stringify({
-              type: classification.type,
-              confidence: classification.confidence,
-              method: classification.method,
-            }),
-          ],
-          ['agentProcessingTime', executionTime.toString()],
-        ]),
-      };
-    } catch (error) {
-      const executionTime = Date.now() - startTime;
-      this.totalResponseTime += executionTime;
-
-      return {
-        content: `Agent processing failed: ${error instanceof Error ? error.message : String(error)}`,
-        type: 'command' as const, // Default type for errors
-        confidence: 0,
-        executionTime,
-        metadata: new Map([
-          ['error', error instanceof Error ? error.message : String(error)],
-          ['errorType', 'agent-processing-error'],
-        ]),
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
+    return {
+      content: `Agent processing failed: ${qiError.message}`,
+      type: 'command' as const, // Default type for errors
+      confidence: 0,
+      executionTime,
+      metadata: new Map([
+        ['error', qiError.message],
+        ['errorCode', qiError.code],
+        ['errorCategory', qiError.category],
+        ['errorType', 'agent-processing-error'],
+      ]),
+      success: false,
+      error: qiError.message,
+    };
   }
 
   async *stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk> {
@@ -412,54 +491,175 @@ export class QiCodeAgent implements IAgent {
     }
   }
 
+  // Public interface for backward compatibility
   private async handleWorkflow(
     request: AgentRequest,
     classification: ClassificationResult
   ): Promise<AgentResponse> {
+    const result = await this.handleWorkflowInternal(request, classification);
+    return match(
+      (success: AgentResponse) => success,
+      (error: QiError) => this.createErrorResponse('workflow', error.message),
+      result
+    );
+  }
+
+  // Internal QiCore implementation
+  private async handleWorkflowInternal(
+    request: AgentRequest,
+    classification: ClassificationResult
+  ): Promise<Result<AgentResponse>> {
     if (!this.config.enableWorkflows) {
-      return this.createDisabledResponse('workflow', 'Workflow processing is disabled');
+      return success(this.createDisabledResponse('workflow', 'Workflow processing is disabled'));
     }
 
     if (!this.workflowExtractor || !this.workflowEngine) {
-      return this.createErrorResponse('workflow', 'Workflow components not available');
+      return failure(
+        this.createQiError(
+          'WORKFLOW_COMPONENTS_NOT_AVAILABLE',
+          'Workflow components not available',
+          'CONFIGURATION',
+          { input: request.input, classification: classification.type }
+        )
+      );
     }
 
-    try {
-      // 1. Create workflow execution context with proper isolation
-      const workflowContext = await this.createWorkflowExecutionContext(request);
+    const contextResult = await this.createWorkflowExecutionContextInternal(request);
 
-      // 2. Extract workflow specification using strategy selection
-      const extractionResult = await this.workflowExtractor.extractWorkflow(
+    return await match(
+      async (workflowContext: any) => {
+        const extractionResult = await this.extractWorkflowSpecInternal(request, workflowContext);
+
+        return await match(
+          async (extractionResultValue: any) => {
+            const executionResult = await this.executeWorkflowInternal(
+              request,
+              extractionResultValue,
+              workflowContext,
+              classification
+            );
+
+            return await match(
+              async (agentResponse: AgentResponse) => {
+                const cleanupResult = await this.cleanupWorkflowContextInternal(workflowContext);
+                return match(
+                  () => success(agentResponse) as Result<AgentResponse, QiError>,
+                  (error: QiError) => {
+                    this.logWorkflowError(request, error, {
+                      classification: classification.type,
+                      confidence: classification.confidence,
+                      timestamp: new Date().toISOString(),
+                    });
+                    return failure(error) as Result<AgentResponse, QiError>;
+                  },
+                  cleanupResult
+                );
+              },
+              async (error: QiError) => {
+                this.logWorkflowError(request, error, {
+                  classification: classification.type,
+                  confidence: classification.confidence,
+                  timestamp: new Date().toISOString(),
+                });
+                return failure(error) as Result<AgentResponse, QiError>;
+              },
+              executionResult
+            );
+          },
+          async (error: QiError) => {
+            this.logWorkflowError(request, error, {
+              classification: classification.type,
+              confidence: classification.confidence,
+              timestamp: new Date().toISOString(),
+            });
+            return failure(error) as Result<AgentResponse, QiError>;
+          },
+          extractionResult
+        );
+      },
+      async (error: QiError) => {
+        this.logWorkflowError(request, error, {
+          classification: classification.type,
+          confidence: classification.confidence,
+          timestamp: new Date().toISOString(),
+        });
+        return failure(error) as Result<AgentResponse, QiError>;
+      },
+      contextResult
+    );
+  }
+
+  private async createWorkflowExecutionContextInternal(
+    request: AgentRequest
+  ): Promise<Result<any>> {
+    return fromAsyncTryCatch(async () => {
+      const workflowId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      return {
+        id: workflowId,
+        sessionId: request.context.sessionId,
+        environmentContext: request.context.environmentContext,
+        availableTools: ['reasoning', 'search', 'general_tool'], // Simplified for now
+        resourceLimits: {
+          maxExecutionTime: 600000, // 10 minutes
+          maxMemoryUsage: 200 * 1024 * 1024, // 200MB
+          maxToolCalls: 50,
+          maxNodes: 20,
+        },
+        preferences: {
+          speedVsAccuracy: 'balanced',
+          allowParallelExecution: true,
+          allowIterativeExecution: true,
+        },
+      };
+    });
+  }
+
+  private async extractWorkflowSpecInternal(
+    request: AgentRequest,
+    workflowContext: any
+  ): Promise<Result<any>> {
+    return fromAsyncTryCatch(async () => {
+      const extractionResult = await this.workflowExtractor!.extractWorkflow(
         request.input,
         { method: 'hybrid', promptProvider: undefined },
         workflowContext
       );
 
       if (!extractionResult.success || !extractionResult.workflowSpec) {
-        return this.createErrorResponse(
-          'workflow',
-          `Workflow extraction failed: ${extractionResult.error || 'Unknown error'}`
-        );
+        throw new Error(`Workflow extraction failed: ${extractionResult.error || 'Unknown error'}`);
       }
 
-      // 3. Execute workflow using LangGraph engine with streaming
+      return extractionResult;
+    });
+  }
+
+  private async executeWorkflowInternal(
+    request: AgentRequest,
+    extractionResult: any,
+    workflowContext: any,
+    classification: ClassificationResult
+  ): Promise<Result<AgentResponse>> {
+    return fromAsyncTryCatch(async () => {
       const executionConfig = {
         sessionId: request.context.sessionId,
         contextId: workflowContext.id,
         streamingEnabled: true,
         checkpointingEnabled: true,
         progressCallback: (nodeId: string, progress: any) => {
-          // Handle real-time progress updates
           this.handleWorkflowProgress(nodeId, progress, workflowContext);
         },
       };
 
-      const workflowResult = await this.workflowEngine.executeWorkflow(
+      const workflowResult = await this.workflowEngine!.executeWorkflow(
         extractionResult.workflowSpec,
         executionConfig
       );
 
-      // 4. Map execution results back to AgentResponse
+      // Update conversation context with workflow results
+      await this.updateConversationContextWithWorkflow(request, workflowResult, extractionResult);
+
+      // Map execution results back to AgentResponse
       const agentResponse: AgentResponse = {
         content: this.formatWorkflowOutput(workflowResult, extractionResult),
         type: 'workflow',
@@ -478,26 +678,40 @@ export class QiCodeAgent implements IAgent {
         success: true,
       };
 
-      // 5. Update conversation context with workflow results
-      await this.updateConversationContextWithWorkflow(request, workflowResult, extractionResult);
-
-      // 6. Clean up workflow execution context
-      await this.cleanupWorkflowContext(workflowContext);
-
       return agentResponse;
-    } catch (error) {
-      // Comprehensive error handling and recovery strategy
-      const errorMessage = error instanceof Error ? error.message : String(error);
+    });
+  }
 
-      // Log error for debugging with structured context
-      this.logWorkflowError(request, error, {
-        classification: classification.type,
-        confidence: classification.confidence,
-        timestamp: new Date().toISOString(),
-      });
+  private async cleanupWorkflowContextInternal(workflowContext: any): Promise<Result<void>> {
+    return fromAsyncTryCatch(async () => {
+      await this.cleanupWorkflowContext(workflowContext);
+    });
+  }
 
-      return this.createErrorResponse('workflow', `Workflow execution failed: ${errorMessage}`);
-    }
+  // Internal QiCore handler methods
+
+  private async handleStateCommandInternal(input: string): Promise<Result<AgentResponse>> {
+    return await fromAsyncTryCatch(async () => {
+      return await this.handleStateCommand(input);
+    });
+  }
+
+  private async handleCommandInternal(
+    request: AgentRequest,
+    classification: ClassificationResult
+  ): Promise<Result<AgentResponse>> {
+    return await fromAsyncTryCatch(async () => {
+      return await this.handleCommand(request, classification);
+    });
+  }
+
+  private async handlePromptInternal(
+    request: AgentRequest,
+    classification: ClassificationResult
+  ): Promise<Result<AgentResponse>> {
+    return await fromAsyncTryCatch(async () => {
+      return await this.handlePrompt(request, classification);
+    });
   }
 
   // State Management Methods
@@ -707,34 +921,55 @@ export class QiCodeAgent implements IAgent {
     }
   }
 
-  private handleSessionCommand(_args: string[]): AgentResponse {
-    const session = this.stateManager.getCurrentSession();
+  // Legacy method for backward compatibility
+  private async handleSessionCommand(_args: string[]): Promise<AgentResponse> {
+    const result = await this.handleSessionCommandInternal(_args);
+    return match(
+      (success: AgentResponse) => success,
+      (error: QiError) => ({
+        content: `❌ Failed to get session info: ${error.message}`,
+        type: 'command' as const,
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([['error', 'session-command-failed']]),
+        success: false,
+        error: error.message,
+      }),
+      result
+    );
+  }
 
-    let content = '💾 Session Information:\n';
-    content += `  ID: ${session.id}\n`;
-    content += `  Created: ${session.createdAt.toISOString()}\n`;
-    content += `  Last Active: ${session.lastActiveAt.toISOString()}\n`;
-    content += `  Conversation History: ${session.conversationHistory.length} entries`;
+  // Internal QiCore implementation
+  private async handleSessionCommandInternal(_args: string[]): Promise<Result<AgentResponse>> {
+    return await fromAsyncTryCatch(async () => {
+      const session = this.stateManager.getCurrentSession();
 
-    if (session.conversationHistory.length > 0) {
-      content += '\n\nRecent entries:';
-      const recent = session.conversationHistory.slice(-3);
-      for (const entry of recent) {
-        content += `\n  ${entry.timestamp.toLocaleTimeString()} [${entry.type}]: ${entry.content.substring(0, 50)}${entry.content.length > 50 ? '...' : ''}`;
+      let content = '💾 Session Information:\n';
+      content += `  ID: ${session.id}\n`;
+      content += `  Created: ${session.createdAt.toISOString()}\n`;
+      content += `  Last Active: ${session.lastActiveAt.toISOString()}\n`;
+      content += `  Conversation History: ${session.conversationHistory.length} entries`;
+
+      if (session.conversationHistory.length > 0) {
+        content += '\n\nRecent entries:';
+        const recent = session.conversationHistory.slice(-3);
+        for (const entry of recent) {
+          content += `\n  ${entry.timestamp.toLocaleTimeString()} [${entry.type}]: ${entry.content.substring(0, 50)}${entry.content.length > 50 ? '...' : ''}`;
+        }
       }
-    }
 
-    return {
-      content,
-      type: 'command',
-      confidence: 1.0,
-      executionTime: 0,
-      metadata: new Map([
-        ['sessionId', session.id],
-        ['historyLength', session.conversationHistory.length.toString()],
-      ]),
-      success: true,
-    };
+      return {
+        content,
+        type: 'command' as const,
+        confidence: 1.0,
+        executionTime: 0,
+        metadata: new Map([
+          ['sessionId', session.id],
+          ['historyLength', session.conversationHistory.length.toString()],
+        ]),
+        success: true,
+      };
+    });
   }
 
   // Workflow Integration Methods
