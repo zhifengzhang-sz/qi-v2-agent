@@ -20,6 +20,183 @@ This project develops **two specialized AI agents** with distinct capabilities a
 
 ---
 
+## v0.8.1 - QiCore Two-Layer Architecture Implementation (IN PROGRESS)
+
+### 📅 **Release Date**: August 2025
+
+### 🎯 **Overview**
+**Critical QiCore Integration**: Complete implementation of QiCore two-layer architecture throughout lib/src. This release transforms the existing traditional TypeScript patterns into functional programming patterns using Result<T> monads, proper error handling with QiError, and clean interface layers that hide QiCore complexity from users. Based on comprehensive codebase analysis, this represents a fundamental architectural upgrade from ~5% QiCore integration to full two-layer design compliance.
+
+### 🏗️ **Two-Layer Design Principle**
+
+#### **Inner Layer - QiCore Functional Programming**
+- **Result<T> Patterns**: All internal operations use Result<T> monads with functional composition
+- **fromAsyncTryCatch**: Replace all try/catch blocks with QiCore exception boundaries  
+- **Functional Composition**: Use flatMap(), match(), and pipe operations for data flow
+- **QiError Categories**: Structured error handling with Configuration, Validation, Business, and System errors
+- **Pure Functions**: Eliminate side effects and embrace functional programming principles
+
+#### **Interface Layer - User-Friendly APIs**
+- **Clean Public APIs**: Hide Result<T> complexity from external consumers
+- **Traditional Return Types**: Convert Result<T> to standard TypeScript types at boundaries
+- **Error Transformation**: Transform QiError instances to standard Error objects for public APIs
+- **Backward Compatibility**: Maintain existing interface contracts while upgrading internals
+
+### ✨ **Major Implementation Areas**
+
+#### 🔧 **Agent Core Transformation**
+- **lib/src/agent/core/**: Complete Result<T> pattern implementation ✅ Target
+- **Public Interface**: Clean agent methods returning standard Promise<T> types
+- **Internal Layer**: All operations using fromAsyncTryCatch and Result<T> composition
+- **Error Handling**: QiError categorization with proper transformation at boundaries
+- **Functional Flows**: Replace imperative patterns with functional composition chains
+
+#### 🛠️ **Tool System Overhaul**  
+- **lib/src/tools/core/**: 6-phase pipeline with Result<T> throughout ✅ Target
+- **Tool Registry**: Internal Result<T> patterns with clean external tool interface
+- **Permission System**: QiError-based permission validation with clean API responses
+- **Resource Management**: Functional resource handling with proper cleanup patterns
+- **Security Layer**: Result<T> composition for multi-layer security validation
+
+#### 🎯 **Classification System Enhancement**
+- **lib/src/classifier/**: Transform custom result objects to Result<T> patterns ✅ Target
+- **Method Composition**: Functional composition of classification strategies
+- **Error Propagation**: Proper QiError categorization for classification failures
+- **Interface Consistency**: Clean classification APIs hiding internal Result<T> complexity
+- **Performance**: Optimize Result<T> chains for classification performance
+
+#### 📨 **Message Queue Integration**
+- **lib/src/message-queue/**: Complete QiCore message processing patterns ✅ Target
+- **Async Composition**: Result<T> patterns for async message handling
+- **Error Recovery**: Functional error recovery patterns with message replay
+- **Resource Management**: Proper queue lifecycle management with Result<T>
+- **Performance Monitoring**: Functional metrics collection and reporting
+
+### 🔧 **Implementation Strategy**
+
+#### **Phase 1: Core Module Transformation (Week 1-2)**
+```typescript
+// Before: Traditional async/await pattern
+public async processInput(input: string): Promise<AgentOutput> {
+  try {
+    const result = await this.classifier.classify(input);
+    return await this.executeWorkflow(result);
+  } catch (error) {
+    throw new Error(`Processing failed: ${error.message}`);
+  }
+}
+
+// After: Two-layer QiCore pattern
+// Internal layer - QiCore functional patterns
+private async processInputInternal(input: string): Promise<Result<AgentOutput>> {
+  return fromAsyncTryCatch(async () => input)
+    .flatMap(input => this.classifier.classifyInternal(input))
+    .flatMap(classification => this.executeWorkflowInternal(classification))
+    .flatMap(result => this.transformToOutput(result));
+}
+
+// Interface layer - Clean public API
+public async processInput(input: string): Promise<AgentOutput> {
+  const result = await this.processInputInternal(input);
+  return result.match(
+    success => success,
+    error => { throw new Error(error.message); }
+  );
+}
+```
+
+#### **Phase 2: Error System Standardization (Week 2)**
+```typescript
+// Before: Generic Error throwing
+throw new Error(`Classification failed: ${details}`);
+
+// After: Structured QiError with transformation
+// Internal: QiError usage
+return Result.failure(QiError.createValidationError(
+  'CLASSIFICATION_FAILED',
+  'Input classification failed',
+  { input, details }
+));
+
+// Interface: Error transformation
+.match(
+  success => success,
+  error => { throw new Error(`Classification failed: ${error.context.details}`); }
+)
+```
+
+#### **Phase 3: Functional Composition Implementation (Week 3)**
+- Replace all imperative control flow with functional composition
+- Implement proper Result<T> chaining throughout internal layers
+- Add comprehensive logging with QiCore structured logging patterns
+- Optimize performance of functional composition chains
+
+#### **Phase 4: Testing and Validation (Week 4)**
+- **Comprehensive Testing**: Test both internal QiCore layer and public interface layer
+- **Interface Contract Testing**: Ensure public APIs remain unchanged
+- **Error Handling Testing**: Validate error transformation works correctly
+- **Performance Testing**: Ensure functional patterns don't degrade performance
+- **Integration Testing**: Verify end-to-end workflows function correctly
+
+### 📈 **Quality Targets**
+
+#### **QiCore Integration Metrics**
+- **Before**: ~5% QiCore pattern usage
+- **After**: 100% QiCore compliance in internal layers
+- **Interface Layer**: Clean abstraction with 0% QiCore exposure
+- **Error Handling**: 100% QiError usage internally, clean Error transformation
+
+#### **Implementation Coverage**
+- **Agent Core**: Complete two-layer implementation ✅
+- **Tool System**: Full Result<T> pipeline with clean interface ✅  
+- **Classification**: Transform all classification methods ✅
+- **Message Queue**: Complete async Result<T> patterns ✅
+- **Utilities**: All shared utilities using QiCore patterns ✅
+
+#### **Testing Requirements**
+- **Unit Tests**: 90%+ coverage for both layers
+- **Integration Tests**: End-to-end workflow validation
+- **Interface Tests**: Public API contract compliance
+- **Performance Tests**: Functional pattern performance validation
+
+### 🚀 **Expected Benefits**
+
+#### **Architectural Excellence**
+- **Functional Programming**: Pure functions and immutable data patterns
+- **Error Resilience**: Structured error handling with proper categorization
+- **Type Safety**: Enhanced type safety with Result<T> monads
+- **Maintainability**: Clear separation between internal logic and public interfaces
+
+#### **Developer Experience**
+- **Clean APIs**: Public interfaces remain simple and intuitive
+- **Better Debugging**: Structured error context and logging
+- **Functional Composition**: Elegant internal code patterns
+- **Backward Compatibility**: Existing code continues to work unchanged
+
+#### **Production Readiness**
+- **Error Handling**: Comprehensive error categorization and handling
+- **Performance**: Optimized functional composition patterns
+- **Monitoring**: Enhanced logging and metrics with QiCore patterns
+- **Reliability**: Functional programming reduces side effects and bugs
+
+### 🎯 **Success Criteria**
+- ✅ **100% QiCore Compliance**: All internal operations use Result<T> patterns
+- ✅ **Clean Interface Layer**: Zero QiCore exposure in public APIs  
+- ✅ **Error Transformation**: Perfect QiError to Error transformation
+- ✅ **Performance Maintained**: No performance degradation from functional patterns
+- ✅ **Testing Coverage**: Comprehensive testing of both layers
+- ✅ **Documentation**: Clear documentation of two-layer design principles
+
+### 📋 **Implementation Timeline**
+- **Week 1**: Agent core and tool system transformation
+- **Week 2**: Classification and message queue implementation + error standardization
+- **Week 3**: Functional composition optimization and utilities
+- **Week 4**: Comprehensive testing and validation
+
+**Estimated Effort**: 140-200 hours (4-5 weeks for experienced developer)
+
+---
+
 ## v0.8.0 - qi-prompt First Working Implementation (COMPLETED)
 
 ### 📅 **Release Date**: August 2025

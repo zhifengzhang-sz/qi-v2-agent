@@ -3,7 +3,8 @@
 ## Framework Architecture Overview
 
 **Purpose**: Agent creation framework with extensible design structures  
-**Current Status**: v-0.8.0 Complete (~95% implementation)  
+**Current Status**: v-0.8.1 QiCore Two-Layer Architecture (IN PROGRESS)  
+**Priority**: Transform lib/src from traditional TypeScript to QiCore functional patterns
 **Examples**: qi-prompt (simple workflows) + qi-code (advanced capabilities)
 
 ### Core Design Philosophy
@@ -17,13 +18,82 @@ The qi-v2-agent project is a **framework for building specialized agents** with 
 - **Tool System**: Comprehensive execution ecosystem
 - **MCP Integration**: External service integration patterns
 
-## Current Implementation Status (v-0.8.0)
+## Current Implementation Status (v-0.8.1 IN PROGRESS)
+
+### 🎯 **PRIORITY: QiCore Two-Layer Architecture Implementation**
+**Critical Finding**: Analysis revealed lib/src has **~5% QiCore integration** instead of expected full compliance
+**Target**: Transform entire lib/src to proper two-layer architecture with 100% QiCore internal patterns
+
+#### **QiCore Integration Status**
+- **Current State**: Traditional TypeScript patterns with limited Result<T> usage
+- **Required Transformation**: Complete functional programming pattern implementation
+- **Two-Layer Design**: Inner QiCore layer + Clean interface abstraction layer
+- **Estimated Effort**: 140-200 hours (4-5 weeks)
 
 ### 📊 **Codebase Statistics**
 - **Total Implementation Files**: 177 TypeScript/TSX files
-- **Major Framework Components**: 8 core systems fully implemented
-- **Tool Implementations**: 14 tools operational
-- **Architecture Maturity**: ~95% framework complete
+- **QiCore Compliance**: ~5% (CRITICAL - needs 100% internal compliance)
+- **Architecture Pattern**: Traditional imperative → Functional QiCore transformation required
+- **Major Framework Components**: 8 core systems need QiCore integration
+
+### 🚧 **REQUIRED: QiCore Two-Layer Architecture Transformation**
+
+The following core systems require complete QiCore integration following the two-layer design principle:
+
+#### **🔧 Agent Core System - CRITICAL PRIORITY**
+```
+lib/src/agent/core/
+├── agent-core.ts           🚧 Traditional async/await → Result<T> patterns
+├── qi-agent.ts             🚧 Error throwing → QiError categorization
+└── implementations/        🚧 Interface layer → Clean API abstraction
+```
+**Status**: ~10% QiCore compliance - needs complete transformation
+**Impact**: Core agent functionality requires Result<T> composition patterns
+
+#### **🛠️ Tool Execution System - HIGH PRIORITY**
+```
+lib/src/tools/core/
+├── tool-executor.ts        🚧 6-phase pipeline → Result<T> throughout
+├── tool-registry.ts        🚧 Permission system → QiError validation
+└── security/              🚧 Multi-layer security → Functional composition
+```
+**Status**: ~5% QiCore compliance - traditional error handling patterns
+**Impact**: Tool execution needs functional composition with clean interface
+
+#### **🎯 Classification System - HIGH PRIORITY**
+```
+lib/src/classifier/
+├── classifier.ts           🚧 Custom result objects → Result<T> patterns
+├── methods/               🚧 Direct .value access → Functional composition
+└── shared/                🚧 Traditional patterns → QiCore integration
+```
+**Status**: ~3% QiCore compliance - violates fundamental QiCore principles
+**Impact**: Classification system needs complete functional programming overhaul
+
+#### **📨 Message Queue System - MEDIUM PRIORITY**
+```
+lib/src/message-queue/core/
+├── qi-async-message-queue.ts  🚧 Standard async → Result<T> composition
+├── message-factory.ts         🚧 Error handling → QiError patterns
+└── interfaces/               🚧 Interface consistency → Clean abstraction
+```
+**Status**: ~8% QiCore compliance - hybrid implementation
+**Impact**: Message processing needs consistent functional patterns
+
+### 🎯 **Two-Layer Design Implementation Requirements**
+
+#### **Inner Layer - QiCore Functional Programming**
+- **fromAsyncTryCatch**: Replace ALL try/catch blocks with QiCore exception boundaries
+- **Result<T> Composition**: Use flatMap(), match(), and pipe for all data flow
+- **QiError Categories**: Structured errors (Configuration, Validation, Business, System)
+- **Pure Functions**: Eliminate side effects and imperative patterns
+- **Functional Logging**: QiCore logger integration with structured context
+
+#### **Interface Layer - Clean Public APIs**
+- **Traditional Return Types**: Convert Result<T> to Promise<T> at boundaries
+- **Error Transformation**: Transform QiError → standard Error objects
+- **Backward Compatibility**: Maintain existing method signatures
+- **Zero QiCore Exposure**: Public APIs hide all functional programming complexity
 
 ### ✅ **COMPLETED: Core Framework Infrastructure**
 
@@ -291,11 +361,22 @@ interface ToolIntegrationFramework {
 
 ## Next Steps
 
-### **Immediate Actions (v-0.8.x Framework Enhancement)**
-1. **Enhance Core Infrastructure** following [v-0.8.x Implementation Guide](./impl.v-0.8.x.md)
-2. **Strengthen Framework Patterns** for agent creation
-3. **Improve Extension Points** for workflow and tool integration
-4. **Document Framework Usage** with clear agent creation examples
+### **IMMEDIATE PRIORITY (v-0.8.1 QiCore Two-Layer Architecture)**
+1. **Agent Core Transformation** - Implement Result<T> patterns in lib/src/agent/core/
+2. **Tool System Overhaul** - Convert 6-phase pipeline to functional composition patterns
+3. **Classification System Fix** - Replace custom result objects with Result<T> throughout
+4. **Message Queue Integration** - Add consistent QiCore patterns to async processing
+5. **Interface Layer Creation** - Build clean APIs that hide QiCore complexity
+6. **Error System Standardization** - Implement QiError categorization with transformation
+7. **Comprehensive Testing** - Test both internal QiCore layer and public interfaces
+
+### **Implementation Timeline (v-0.8.1)**
+- **Week 1-2**: Agent core and tool system QiCore transformation
+- **Week 2**: Classification system overhaul + error standardization  
+- **Week 3**: Message queue integration + functional composition optimization
+- **Week 4**: Interface layer completion + comprehensive testing and validation
+
+**Critical Success Factor**: Maintain 100% backward compatibility while achieving 100% internal QiCore compliance
 
 ### **Framework Evolution Strategy**
 - **v-0.8.x**: Strengthen core infrastructure and patterns
