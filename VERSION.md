@@ -22,7 +22,7 @@ This project develops **two specialized AI agents** with distinct capabilities a
 
 ## v0.8.0 - qi-prompt First Working Implementation (COMPLETED)
 
-### 📅 **Release Date**: January 2025
+### 📅 **Release Date**: August 2025
 
 ### 🎯 **Overview**
 **First working qi-prompt implementation**: Professional binary compilation with simple workflow patterns and foundational infrastructure. This release establishes qi-prompt as a functional prompt application while maintaining design simplicity. Provides the foundation for v-0.8.x module upgrades and eventual qi-code development. The qi-prompt milestone will be achieved at the end of v-0.8.x when all enhanced modules are integrated.
@@ -99,7 +99,7 @@ This project develops **two specialized AI agents** with distinct capabilities a
 
 ## v0.7.0 - Tool Layer Implementation (COMPLETED)
 
-### 📅 **Release Date**: January 2025
+### 📅 **Release Date**: August 2025
 
 ### 🎯 **Overview**
 Complete implementation of QiCore-integrated tool layer with advanced security framework, concurrent execution, and production-ready system tools. This release transforms the agent into a fully capable tool execution platform with comprehensive security controls and professional-grade architecture.

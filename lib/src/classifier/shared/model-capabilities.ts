@@ -14,7 +14,7 @@ export interface ModelCapabilities {
 
 /**
  * Known model capabilities based on Ollama documentation and testing
- * Updated: January 2025
+ * Updated: August 2025
  */
 const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
   // Llama models - Function calling support as of 3.1+
