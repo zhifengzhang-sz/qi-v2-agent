@@ -5,7 +5,15 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { create, failure, fromAsyncTryCatch, type QiError, type Result, success } from '@qi/base';
+import {
+  create,
+  failure,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type {
   AgentSpecialization,
   AppContext,
@@ -238,10 +246,23 @@ export class ContextManager implements IContextManager {
     };
 
     this.isolatedContexts.set(contextId, isolatedContext);
-    this.securityBoundaries.registerContext(contextId, isolatedContext);
-    this.stats.totalContextsCreated++;
 
-    return success(isolatedContext);
+    // Register with security boundaries - handle Result<T>
+    const registrationResult = this.securityBoundaries.registerContext(contextId, isolatedContext);
+    return match(
+      (): Result<IsolatedContext> => {
+        this.stats.totalContextsCreated++;
+        return success(isolatedContext);
+      },
+      (error): Result<IsolatedContext> =>
+        failure(
+          contextError('SECURITY_REGISTRATION_FAILED', 'Failed to register security context', {
+            contextId,
+            error,
+          })
+        ),
+      registrationResult
+    );
   }
 
   getIsolatedContext(id: string): IsolatedContext | null {
@@ -276,10 +297,19 @@ export class ContextManager implements IContextManager {
         }
 
         // Use security boundary manager for validation
-        const allowed = await this.securityBoundaries.validateAccess(contextId, operation);
-        this.auditContextAccess(contextId, operation, allowed);
+        const validationResult = await this.securityBoundaries.validateAccess(contextId, operation);
 
-        return allowed;
+        return match(
+          (allowed) => {
+            this.auditContextAccess(contextId, operation, allowed);
+            return allowed;
+          },
+          (error) => {
+            this.auditContextAccess(contextId, operation, false, error.message);
+            return false;
+          },
+          validationResult
+        );
       },
       (error: unknown) =>
         contextError('VALIDATION_FAILED', 'Context access validation failed', {
@@ -295,8 +325,19 @@ export class ContextManager implements IContextManager {
     this.conversationContexts.delete(contextId);
     this.isolatedContexts.delete(contextId);
 
-    // Clean up security boundaries
-    this.securityBoundaries.unregisterContext(contextId);
+    // Clean up security boundaries - handle Result<T>
+    const unregisterResult = this.securityBoundaries.unregisterContext(contextId);
+    match(
+      () => {
+        // Successfully unregistered
+      },
+      (error) => {
+        // Log the error but don't fail the entire termination
+        // Log error but don't fail the entire termination
+        console.warn(`Failed to unregister security context ${contextId}:`, error.message);
+      },
+      unregisterResult
+    );
 
     // Remove child contexts
     const childContexts = this.getChildContexts(contextId);

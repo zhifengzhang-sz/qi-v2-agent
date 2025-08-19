@@ -16,6 +16,7 @@ import { MessageStatus } from '@qi/agent/messaging/types/MessageTypes';
 import {
   create,
   failure,
+  flatMap,
   fromAsyncTryCatch,
   match,
   type QiError,
@@ -33,14 +34,47 @@ interface QueueError extends QiError {
     queueSize?: number;
     messageId?: string;
     messageType?: string;
+    timestamp?: string;
+    queueLength?: number;
   };
 }
 
-const queueError = (
+// System errors for infrastructure issues (limited retry)
+const systemError = (
   code: string,
   message: string,
   context: QueueError['context'] = {}
-): QueueError => create(code, message, 'SYSTEM', context) as QueueError;
+): QueueError =>
+  create(code, message, 'SYSTEM', {
+    timestamp: new Date().toISOString(),
+    queueLength: 0, // Will be overridden by caller if needed
+    ...context,
+  }) as QueueError;
+
+// Validation errors for invalid message format (never retry)
+const validationError = (
+  code: string,
+  message: string,
+  context: QueueError['context'] = {}
+): QueueError =>
+  create(code, message, 'VALIDATION', {
+    timestamp: new Date().toISOString(),
+    ...context,
+  }) as QueueError;
+
+// Resource errors for capacity issues (linear backoff)
+const resourceError = (
+  code: string,
+  message: string,
+  context: QueueError['context'] = {}
+): QueueError =>
+  create(code, message, 'RESOURCE', {
+    timestamp: new Date().toISOString(),
+    ...context,
+  }) as QueueError;
+
+// Legacy error function for backward compatibility
+const queueError = systemError;
 
 /**
  * Internal message wrapper for queue management
@@ -234,7 +268,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       // v-0.6.1: Event emission removed - pure message-driven
 
       return failure(
-        queueError('QUEUE_FULL', 'Queue has reached maximum size', {
+        resourceError('QUEUE_FULL', 'Queue has reached maximum size', {
           operation: 'enqueue',
           queueSize: this.queue.length,
           messageId: message.id,
@@ -462,21 +496,17 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
           await this.options.cleanupFn!();
         },
         (_error: unknown) =>
-          queueError('CLEANUP_FAILED', 'Cleanup function failed', {
+          systemError('CLEANUP_FAILED', 'Cleanup function failed', {
             operation: 'destroy',
           })
       );
 
-      // If cleanup failed, return the error using proper QiCore pattern
-      const errorResult = match(
-        () => null, // Success - continue with destroy
-        (error: QiError) => failure(error),
+      // Return cleanup error directly if it occurred
+      return match(
+        (): Result<undefined> => success(undefined), // Success - continue with destroy
+        (error: QiError): Result<undefined> => failure(error),
         cleanupResult
       );
-
-      if (errorResult !== null) {
-        return errorResult;
-      }
     }
 
     // v-0.6.1: Event subscriptions removed - pure message-driven

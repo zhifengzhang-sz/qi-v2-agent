@@ -14,6 +14,16 @@
  * - Pure display and input handling only
  */
 
+// QiCore imports for v-0.8.1
+import {
+  create,
+  failure,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type { ICommandHandler } from '../../command/abstractions/index.js';
 // v-0.6.1 Message Queue integration
 import type { QiAsyncMessageQueue } from '../../messaging/impl/QiAsyncMessageQueue.js';
@@ -39,6 +49,62 @@ import type {
 } from '../abstractions/IUIComponent.js';
 // HotkeyManager for hotkey support
 import { HotkeyManager } from '../keyboard/HotkeyManager.js';
+
+/**
+ * CLI-specific error factory functions using QiCore patterns
+ */
+const cliError = {
+  initializationFailed: (reason: string): QiError =>
+    create('CLI_INITIALIZATION_FAILED', `CLI initialization failed: ${reason}`, 'SYSTEM', {
+      reason,
+    }),
+
+  shutdownFailed: (reason: string): QiError =>
+    create('CLI_SHUTDOWN_FAILED', `CLI shutdown failed: ${reason}`, 'SYSTEM', { reason }),
+
+  invalidInput: (input: string): QiError =>
+    create('CLI_INVALID_INPUT', `Invalid CLI input: ${input}`, 'VALIDATION', { input }),
+
+  messageEnqueueFailed: (messageId: string, reason: string): QiError =>
+    create(
+      'CLI_MESSAGE_ENQUEUE_FAILED',
+      `Failed to enqueue message ${messageId}: ${reason}`,
+      'SYSTEM',
+      {
+        messageId,
+        reason,
+      }
+    ),
+
+  configurationError: (field: string, value: unknown): QiError =>
+    create('CLI_CONFIGURATION_ERROR', `Invalid configuration for ${field}`, 'VALIDATION', {
+      field,
+      value,
+    }),
+
+  componentError: (component: string, operation: string, reason: string): QiError =>
+    create(
+      'CLI_COMPONENT_ERROR',
+      `Component ${component} failed during ${operation}: ${reason}`,
+      'SYSTEM',
+      {
+        component,
+        operation,
+        reason,
+      }
+    ),
+
+  stateError: (operation: string, currentState: string): QiError =>
+    create(
+      'CLI_STATE_ERROR',
+      `Cannot perform ${operation} in state: ${currentState}`,
+      'VALIDATION',
+      {
+        operation,
+        currentState,
+      }
+    ),
+};
 
 /**
  * v-0.6.1 Pure Message-Driven CLI Architecture
@@ -106,97 +172,151 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
    * Initialize the CLI framework
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
-
-    // v-0.6.1: Minimal initialization - pure message-driven CLI
-    this.inputManager.initialize({
-      historySize: this.config.historySize,
-      autoComplete: this.config.autoComplete,
-      enableColors: this.config.colors,
-    });
-
-    // Essential: Connect input capture to message flow
-    // NOTE: This is only used for readline-based frameworks
-    // Ink/Hybrid frameworks handle input directly through React components
-    this.inputManager.onInput((input) => {
-      console.log(`[EventDrivenCLI] inputManager.onInput called: "${input}"`);
-      this.handleInput(input);
-    });
-
-    // Initialize HotkeyManager if hotkeys are enabled
-    if (this.config.enableHotkeys) {
-      this.hotkeyManager = new HotkeyManager(this.messageQueue, {
-        enableShiftTab: true,
-        enableEscape: true,
-        enableCtrlC: true,
-        passthrough: true,
-      });
-
-      console.log('[MessageDrivenCLI] HotkeyManager initialized');
+    if (this.isInitialized) {
+      return;
     }
 
-    this.isInitialized = true;
+    const result = await fromAsyncTryCatch(
+      async () => {
+        // v-0.6.1: Minimal initialization - pure message-driven CLI
+        this.inputManager.initialize({
+          historySize: this.config.historySize,
+          autoComplete: this.config.autoComplete,
+          enableColors: this.config.colors,
+        });
+
+        // Essential: Connect input capture to message flow
+        // NOTE: This is only used for readline-based frameworks
+        // Ink/Hybrid frameworks handle input directly through React components
+        this.inputManager.onInput((input) => {
+          console.log(`[MessageDrivenCLI] inputManager.onInput called: "${input}"`);
+          const handleResult = this.handleInputInternal(input);
+          match(
+            () => {}, // Success case - input handled
+            (error) => console.error('Input handling error:', error),
+            handleResult
+          );
+        });
+
+        // Initialize HotkeyManager if hotkeys are enabled
+        if (this.config.enableHotkeys) {
+          this.hotkeyManager = new HotkeyManager(this.messageQueue, {
+            enableShiftTab: true,
+            enableEscape: true,
+            enableCtrlC: true,
+            passthrough: true,
+          });
+
+          console.log('[MessageDrivenCLI] HotkeyManager initialized');
+        }
+
+        this.isInitialized = true;
+      },
+      (error) => cliError.initializationFailed(String(error))
+    );
+
+    // Handle QiCore Result<T> but maintain interface compatibility
+    return match(
+      () => {}, // Success - return void
+      (error) => {
+        console.error('CLI initialization failed:', error);
+        throw new Error(error.message);
+      },
+      result
+    );
   }
 
   /**
    * Start the CLI
    */
   async start(): Promise<void> {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
+    const result = await fromAsyncTryCatch(
+      async () => {
+        if (!this.isInitialized) {
+          await this.initialize();
+        }
 
-    if (this.isStarted) {
-      return;
-    }
+        if (this.isStarted) {
+          return;
+        }
 
-    this.terminal.writeLine('🚀 Message-Driven CLI Ready');
-    this.terminal.writeLine('============================');
-    this.terminal.writeLine('💡 Type /exit to quit');
-    if (this.config.enableHotkeys) {
-      this.terminal.writeLine('⌨️  ESC: Cancel operation, Shift+Tab: Cycle modes');
-    }
-    this.terminal.writeLine('');
+        this.terminal.writeLine('🚀 Message-Driven CLI Ready');
+        this.terminal.writeLine('============================');
+        this.terminal.writeLine('💡 Type /exit to quit');
+        if (this.config.enableHotkeys) {
+          this.terminal.writeLine('⌨️  ESC: Cancel operation, Shift+Tab: Cycle modes');
+        }
+        this.terminal.writeLine('');
 
-    // Enable hotkeys after startup
-    if (this.hotkeyManager) {
-      this.hotkeyManager.enable();
-      console.log('[MessageDrivenCLI] HotkeyManager enabled');
-    }
+        // Enable hotkeys after startup
+        if (this.hotkeyManager) {
+          this.hotkeyManager.enable();
+          console.log('[MessageDrivenCLI] HotkeyManager enabled');
+        }
 
-    // Show initial prompt
-    this.inputManager.showPrompt();
+        // Show initial prompt
+        this.inputManager.showPrompt();
 
-    this.isStarted = true;
+        this.isStarted = true;
+      },
+      (error) => cliError.initializationFailed(`Start failed: ${error}`)
+    );
+
+    // Handle QiCore Result<T> but maintain interface compatibility
+    return match(
+      () => {}, // Success - return void
+      (error) => {
+        console.error('CLI start failed:', error);
+        throw new Error(error.message);
+      },
+      result
+    );
   }
 
   /**
    * Shutdown the CLI
    */
   async shutdown(): Promise<void> {
-    if (!this.isStarted) return;
-
-    // Cancel any active operations
-    if (this.state.isProcessing) {
-      // v-0.6.1: Direct cancellation instead of events
-      this.state.isProcessing = false;
+    if (!this.isStarted) {
+      return;
     }
 
-    // Cleanup components
-    this.progressRenderer.destroy();
-    this.modeRenderer.destroy();
-    this.streamRenderer.destroy();
-    this.inputManager.close();
+    const result = await fromAsyncTryCatch(
+      async () => {
+        // Cancel any active operations
+        if (this.state.isProcessing) {
+          // v-0.6.1: Direct cancellation instead of events
+          this.state.isProcessing = false;
+        }
 
-    // Cleanup HotkeyManager
-    if (this.hotkeyManager) {
-      this.hotkeyManager.destroy();
-      console.log('[MessageDrivenCLI] HotkeyManager destroyed');
-    }
-    // v-0.6.1: No eventManager to destroy
+        // Cleanup components
+        this.progressRenderer.destroy();
+        this.modeRenderer.destroy();
+        this.streamRenderer.destroy();
+        this.inputManager.close();
 
-    this.isStarted = false;
-    // v-0.6.1: No shutdown events
+        // Cleanup HotkeyManager
+        if (this.hotkeyManager) {
+          this.hotkeyManager.destroy();
+          console.log('[MessageDrivenCLI] HotkeyManager destroyed');
+        }
+        // v-0.6.1: No eventManager to destroy
+
+        this.isStarted = false;
+        // v-0.6.1: No shutdown events
+      },
+      (error) => cliError.shutdownFailed(String(error))
+    );
+
+    // Handle QiCore Result<T> but maintain interface compatibility
+    return match(
+      () => {}, // Success - return void
+      (error) => {
+        console.error('CLI shutdown failed:', error);
+        throw new Error(error.message);
+      },
+      result
+    );
   }
 
   // State management (delegated to components)
@@ -206,8 +326,24 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   setMode(mode: CLIMode): void {
-    // v-0.6.1: Simplified mode setting
+    // v-0.6.1: Simplified mode setting with QiCore validation
+    const result = this.setModeInternal(mode);
+    match(
+      () => {}, // Success - return void
+      (error) => {
+        console.error('Set mode error:', error);
+        // Don't change mode on error
+      },
+      result
+    );
+  }
+
+  private setModeInternal(mode: CLIMode): Result<void> {
+    if (!mode || !['interactive', 'command', 'streaming'].includes(mode)) {
+      return failure(cliError.configurationError('mode', mode));
+    }
     this.state.mode = mode;
+    return success(undefined);
   }
 
   getMode(): CLIMode {
@@ -217,8 +353,22 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   // Input/Output (delegated to injected components)
 
   showPrompt(): void {
-    if (this.isPromptActive()) {
-      this.inputManager.showPrompt();
+    const result = this.showPromptInternal();
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Show prompt error:', error),
+      result
+    );
+  }
+
+  private showPromptInternal(): Result<void> {
+    try {
+      if (this.isPromptActive()) {
+        this.inputManager.showPrompt();
+      }
+      return success(undefined);
+    } catch (error) {
+      return failure(cliError.componentError('inputManager', 'showPrompt', String(error)));
     }
   }
 
@@ -229,14 +379,28 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   // v-0.6.1: handleInput moved to line 351 to follow design specification
 
   displayMessage(content: string, _type?: CLIMessageType): void {
-    // Only responsibility: display (EXACT design specification)
-    this.terminal.writeLine(content);
+    const result = this.displayMessageInternal(content, _type);
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Display message error:', error),
+      result
+    );
+  }
 
-    // CRITICAL: Reset processing state when displaying final message
-    this.state.isProcessing = false;
+  private displayMessageInternal(content: string, _type?: CLIMessageType): Result<void> {
+    try {
+      // Only responsibility: display (EXACT design specification)
+      this.terminal.writeLine(content);
 
-    // Essential: Show prompt for next input
-    this.inputManager.showPrompt();
+      // CRITICAL: Reset processing state when displaying final message
+      this.state.isProcessing = false;
+
+      // Essential: Show prompt for next input
+      this.inputManager.showPrompt();
+      return success(undefined);
+    } catch (error) {
+      return failure(cliError.componentError('terminal', 'displayMessage', String(error)));
+    }
   }
 
   /**
@@ -248,29 +412,116 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   displayProgress(phase: string, progress: number, details?: string): void {
-    this.progressRenderer.updateProgress(progress, phase, details);
+    const result = this.displayProgressInternal(phase, progress, details);
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Display progress error:', error),
+      result
+    );
+  }
+
+  private displayProgressInternal(phase: string, progress: number, details?: string): Result<void> {
+    try {
+      if (progress < 0 || progress > 100) {
+        return failure(cliError.configurationError('progress', progress));
+      }
+      this.progressRenderer.updateProgress(progress, phase, details);
+      return success(undefined);
+    } catch (error) {
+      return failure(cliError.componentError('progressRenderer', 'displayProgress', String(error)));
+    }
   }
 
   // Streaming methods (delegated to streamRenderer)
   startStreaming(): void {
-    this.state.isStreamingActive = true;
-    this.streamRenderer.startStreaming();
+    const result = this.startStreamingInternal();
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Start streaming error:', error),
+      result
+    );
+  }
+
+  private startStreamingInternal(): Result<void> {
+    try {
+      if (this.state.isStreamingActive) {
+        return failure(cliError.stateError('startStreaming', 'already streaming'));
+      }
+      this.state.isStreamingActive = true;
+      this.streamRenderer.startStreaming();
+      return success(undefined);
+    } catch (error) {
+      return failure(cliError.componentError('streamRenderer', 'startStreaming', String(error)));
+    }
   }
 
   addStreamingChunk(content: string): void {
-    this.streamRenderer.addChunk(content);
+    const result = this.addStreamingChunkInternal(content);
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Add streaming chunk error:', error),
+      result
+    );
+  }
+
+  private addStreamingChunkInternal(content: string): Result<void> {
+    try {
+      if (!this.state.isStreamingActive) {
+        return failure(cliError.stateError('addStreamingChunk', 'not streaming'));
+      }
+      this.streamRenderer.addChunk(content);
+      return success(undefined);
+    } catch (error) {
+      return failure(cliError.componentError('streamRenderer', 'addStreamingChunk', String(error)));
+    }
   }
 
   completeStreaming(message?: string): void {
-    this.state.isStreamingActive = false;
-    this.streamRenderer.complete(message);
-    this.showPrompt();
+    const result = this.completeStreamingInternal(message);
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Complete streaming error:', error),
+      result
+    );
+  }
+
+  private completeStreamingInternal(message?: string): Result<void> {
+    try {
+      this.state.isStreamingActive = false;
+      this.streamRenderer.complete(message);
+      const promptResult = this.showPromptInternal();
+      return match(
+        (): Result<void> => success(undefined),
+        (error: QiError): Result<void> => failure(error),
+        promptResult
+      );
+    } catch (error) {
+      return failure(cliError.componentError('streamRenderer', 'completeStreaming', String(error)));
+    }
   }
 
   cancelStreaming(): void {
-    this.state.isStreamingActive = false;
-    this.streamRenderer.cancel();
-    this.showPrompt();
+    const result = this.cancelStreamingInternal();
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Cancel streaming error:', error),
+      result
+    );
+  }
+
+  private cancelStreamingInternal(): Result<void> {
+    try {
+      this.state.isStreamingActive = false;
+      this.streamRenderer.cancel();
+      const promptResult = this.showPromptInternal();
+      return match(
+        (): Result<void> => success(undefined),
+        (error: QiError): Result<void> => failure(error),
+        promptResult
+      );
+    } catch (error) {
+      return failure(cliError.componentError('streamRenderer', 'cancelStreaming', String(error)));
+    }
   }
 
   // Event methods (deprecated for v-0.6.1 message-driven architecture)
@@ -353,15 +604,34 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   updateConfig(newConfig: Partial<CLIConfig>): void {
-    this.config = { ...this.config, ...newConfig };
+    const result = this.updateConfigInternal(newConfig);
+    match(
+      () => {}, // Success - return void
+      (error) => console.error('Update config error:', error),
+      result
+    );
+  }
 
-    // Update component configurations
-    this.progressRenderer.updateConfig({ animated: this.config.animations });
-    this.streamRenderer.updateConfig({ throttleMs: this.config.streamingThrottle });
-    this.inputManager.updateConfig({
-      historySize: this.config.historySize,
-      autoComplete: this.config.autoComplete,
-    });
+  private updateConfigInternal(newConfig: Partial<CLIConfig>): Result<void> {
+    try {
+      if (!newConfig || typeof newConfig !== 'object') {
+        return failure(cliError.configurationError('config', newConfig));
+      }
+
+      this.config = { ...this.config, ...newConfig };
+
+      // Update component configurations
+      this.progressRenderer.updateConfig({ animated: this.config.animations });
+      this.streamRenderer.updateConfig({ throttleMs: this.config.streamingThrottle });
+      this.inputManager.updateConfig({
+        historySize: this.config.historySize,
+        autoComplete: this.config.autoComplete,
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(cliError.configurationError('updateConfig', String(error)));
+    }
   }
 
   getConfig(): CLIConfig {
@@ -372,20 +642,44 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
 
   // v-0.6.1: Agent callbacks removed - communication through message queue only
 
-  // Design specification: handleInput() method
+  // Public interface method - maintains compatibility
   handleInput(input: string): void {
+    const result = this.handleInputInternal(input);
+    match(
+      () => {}, // Success - return void
+      (error) => {
+        console.error('Input handling error:', error);
+        // Don't throw, just log error to maintain CLI stability
+      },
+      result
+    );
+  }
+
+  // Internal QiCore implementation
+  private handleInputInternal(input: string): Result<void> {
     console.log(`[MessageDrivenCLI] handleInput called with: "${input}"`);
+
+    // Validate input
+    if (typeof input !== 'string') {
+      return failure(cliError.invalidInput('Input must be a string'));
+    }
+
     // Handle essential commands directly for functionality
     if (input.trim() === '/exit' || input.trim() === '/quit') {
-      this.terminal.writeLine('👋 Goodbye!');
-      process.exit(0);
-      return;
+      try {
+        this.terminal.writeLine('👋 Goodbye!');
+        process.exit(0);
+        return success(undefined);
+      } catch (error) {
+        return failure(cliError.componentError('terminal', 'exit', String(error)));
+      }
     }
 
     // All other input goes to message queue
     console.log(`[MessageDrivenCLI] Enqueuing to message queue`);
+    const messageId = Math.random().toString(36).substring(2, 15);
     const userInputMessage: UserInputMessage = {
-      id: Math.random().toString(36).substring(2, 15),
+      id: messageId,
       type: MessageType.USER_INPUT,
       timestamp: new Date(),
       priority: MessagePriority.NORMAL,
@@ -393,7 +687,17 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
       raw: false,
       source: 'cli',
     };
-    this.messageQueue.enqueue(userInputMessage);
+
+    const enqueueResult = this.messageQueue.enqueue(userInputMessage);
+    return match(
+      (): Result<void> => {
+        this.state.isProcessing = true;
+        return success(undefined);
+      },
+      (error: QiError): Result<void> =>
+        failure(cliError.messageEnqueueFailed(messageId, error.message)),
+      enqueueResult
+    );
   }
 
   // v-0.6.1: Pure message-driven CLI - only handleInput and displayMessage

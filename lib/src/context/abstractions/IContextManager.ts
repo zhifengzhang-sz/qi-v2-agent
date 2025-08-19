@@ -78,11 +78,12 @@ export interface ContextManagerStatistics {
  * Security boundary manager interface
  */
 export interface ISecurityBoundaryManager {
-  registerContext(contextId: string, context: IsolatedContext): void;
-  unregisterContext(contextId: string): void;
-  validateAccess(contextId: string, operation: string): Promise<boolean>;
-  enforcePathRestrictions(contextId: string, path: string): boolean;
-  enforceToolRestrictions(contextId: string, tool: string): boolean;
-  enforceCommandRestrictions(contextId: string, command: string): boolean;
-  getViolationCount(contextId: string): number;
+  registerContext(contextId: string, context: IsolatedContext): Result<void>;
+  unregisterContext(contextId: string): Result<void>;
+  validateAccess(contextId: string, operation: string): Promise<Result<boolean>>;
+  enforcePathRestrictions(contextId: string, path: string): Result<boolean>;
+  enforceToolRestrictions(contextId: string, tool: string): Result<boolean>;
+  enforceCommandRestrictions(contextId: string, command: string): Result<boolean>;
+  getViolationCount(contextId: string): Result<number>;
+  getAccessLog(contextId?: string): Result<readonly ContextAccessAudit[]>;
 }
