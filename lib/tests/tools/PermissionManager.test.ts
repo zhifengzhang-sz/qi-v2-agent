@@ -9,8 +9,8 @@
  * - Condition evaluation and pattern matching
  */
 
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { success, failure, validationError } from '@qi/base';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { success, failure, validationError, match } from '@qi/base';
 import {
   PermissionManager,
   UserRole,
@@ -19,22 +19,15 @@ import {
 } from '@qi/agent/tools/security/PermissionManager.js';
 import type { ToolContext, PermissionResult } from '@qi/agent/tools/core/interfaces/ITool.js';
 
-// Use real logger with silent configuration for tests
-import { createQiLogger } from '@qi/agent/utils/QiCoreLogger.js';
+// PermissionManager creates its own internal logger
 
 describe('PermissionManager QiCore Functional Patterns', () => {
   let permissionManager: PermissionManager;
   let mockToolContext: ToolContext;
 
   beforeEach(() => {
-    // Use real logger with test-friendly configuration
-    const logger = createQiLogger({
-      name: 'PermissionManager',
-      level: 'error', // Only log errors during tests
-      pretty: false, // Disable pretty printing for cleaner test output
-    });
-    
-    permissionManager = new PermissionManager(logger);
+    // PermissionManager constructor takes no parameters - creates its own logger
+    permissionManager = new PermissionManager();
     
     mockToolContext = {
       sessionId: 'test-session',
@@ -60,17 +53,18 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       expect(roleResult.tag).toBe('success');
 
       // Add permission rule for admin to read files
-      const addRuleResult = permissionManager.addPermissionRule(
-        UserRole.ADMIN,
-        PermissionAction.read,
-        ResourceType.FILE,
-        '/test/**'
-      );
+      const testRule = {
+        role: UserRole.ADMIN,
+        resource: ResourceType.FILE,
+        action: PermissionAction.READ,
+        pathPattern: '/test/**'
+      };
+      const addRuleResult = permissionManager.addPermissionRule(testRule);
       expect(addRuleResult.tag).toBe('success');
 
       const permissionResult = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/test/file.txt',
         mockToolContext
       );
@@ -109,7 +103,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
 
       const permissionResult = await permissionManager.checkToolPermission(
         'InvalidTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/test/file.txt',
         mockToolContext
       );
@@ -210,7 +204,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       // Readonly should have file read access
       const readResult = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/data/report.pdf',
         readonlyContext
       );
@@ -246,7 +240,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       // Guest should have limited read access (only /tmp/**)
       const tmpReadResult = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/tmp/guest-file.txt',
         guestContext
       );
@@ -259,7 +253,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       // Guest should NOT have access outside /tmp
       const systemReadResult = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/etc/passwd',
         guestContext
       );
@@ -336,7 +330,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       const customRule = {
         role: UserRole.DEVELOPER,
         resource: ResourceType.DATABASE,
-        action: PermissionAction.read,
+        action: PermissionAction.READ,
         pathPattern: '/data/dev/**',
       };
 
@@ -352,7 +346,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       const invalidRule = {
         role: 'invalid-role' as UserRole,
         resource: ResourceType.FILE,
-        action: PermissionAction.read,
+        action: PermissionAction.READ,
       };
 
       const addResult = permissionManager.addPermissionRule(invalidRule);
@@ -364,11 +358,11 @@ describe('PermissionManager QiCore Functional Patterns', () => {
     });
 
     it('should remove permission rules with Result<T> indicating count', () => {
-      // Add a custom rule first
+      // Add a custom rule that doesn't exist in defaults
       const customRule = {
         role: UserRole.OPERATOR,
-        resource: ResourceType.SYSTEM,
-        action: PermissionAction.EXECUTE,
+        resource: ResourceType.DATABASE,
+        action: PermissionAction.READ,
       };
 
       permissionManager.addPermissionRule(customRule);
@@ -376,8 +370,8 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       // Remove the rule
       const removeResult = permissionManager.removePermissionRule(
         UserRole.OPERATOR,
-        ResourceType.SYSTEM,
-        PermissionAction.EXECUTE
+        ResourceType.DATABASE,
+        PermissionAction.READ
       );
 
       expect(removeResult.tag).toBe('success');
@@ -424,7 +418,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       for (const toolName of fileTools) {
         const result = await permissionManager.checkToolPermission(
           toolName,
-          PermissionAction.read,
+          PermissionAction.READ,
           '/src/file.js',
           mockToolContext
         );
@@ -483,7 +477,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
 
       await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/data/sensitive.txt',
         auditContext
       );
@@ -495,7 +489,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       expect(lastEntry.userId).toBe('audit-user');
       expect(lastEntry.toolName).toBe('ReadTool');
       expect(lastEntry.resource).toBe('/data/sensitive.txt');
-      expect(lastEntry.action).toBe(PermissionAction.read);
+      expect(lastEntry.action).toBe(PermissionAction.READ);
       expect(typeof lastEntry.allowed).toBe('boolean');
     });
 
@@ -539,7 +533,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       // Should allow access to files under /tmp
       const tmpFileResult = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/tmp/nested/file.txt',
         patternContext
       );
@@ -552,7 +546,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       // Should deny access to files outside /tmp
       const rootFileResult = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/root/secret.txt',
         patternContext
       );
@@ -595,7 +589,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
 
       const result = await permissionManager.checkToolPermission(
         'ReadTool',
-        PermissionAction.read,
+        PermissionAction.READ,
         '/var/log/app.log',
         sessionOnlyContext
       );

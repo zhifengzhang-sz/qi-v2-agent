@@ -534,8 +534,13 @@ export class PermissionManager {
   }
 
   private matchesPathPattern(path: string, pattern: string): boolean {
-    // Simple glob pattern matching (implement more sophisticated matching as needed)
-    const regexPattern = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\?/g, '.');
+    // Improved glob pattern matching with proper ** handling
+    // Use placeholders to avoid conflicts between ** and * replacements
+    const regexPattern = pattern
+      .replace(/\*\*/g, '__DOUBLE_STAR__') // Placeholder for **
+      .replace(/\*/g, '[^/]*') // Single * becomes [^/]*
+      .replace(/__DOUBLE_STAR__/g, '.*') // ** becomes .*
+      .replace(/\?/g, '.'); // ? becomes .
 
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(path);
