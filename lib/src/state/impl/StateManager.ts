@@ -103,32 +103,31 @@ export class StateManager implements IStateManager {
   // LLM configuration management
   // ==========================================================================
 
-  async loadLLMConfig(configFilePath: string, schemaFilePath?: string): Promise<void> {
+  async loadLLMConfig(configPath: string): Promise<void> {
     const result = await fromAsyncTryCatch(
       async () => {
+        // Construct file paths from directory path (original design)
+        const configFilePath = join(configPath, 'llm-providers.yaml');
+        const actualSchemaFilePath = join(configPath, 'llm-providers.schema.json');
+
         const builderResult = await ConfigBuilder.fromYamlFile(configFilePath);
         const config = match(
           (builder: unknown) => {
-            if (schemaFilePath) {
-              return match(
-                (validatedConfig: unknown) => validatedConfig,
-                (error: QiError) => {
-                  throw new Error(`Config validation failed: ${error.message}`);
-                },
-                (
-                  builder as {
-                    validateWithSchemaFile: (path: string) => {
-                      build: () => Result<unknown, QiError>;
-                    };
-                  }
-                )
-                  .validateWithSchemaFile(schemaFilePath)
-                  .build()
-              );
-            } else {
-              // No schema validation, just build
-              return (builder as { build: () => Result<unknown, QiError> }).build();
-            }
+            return match(
+              (validatedConfig: unknown) => validatedConfig,
+              (error: QiError) => {
+                throw new Error(`Config validation failed: ${error.message}`);
+              },
+              (
+                builder as {
+                  validateWithSchemaFile: (path: string) => {
+                    build: () => Result<unknown, QiError>;
+                  };
+                }
+              )
+                .validateWithSchemaFile(actualSchemaFilePath)
+                .build()
+            );
           },
           (error: QiError) => {
             throw new Error(`Config loading failed: ${error.message}`);
@@ -137,13 +136,17 @@ export class StateManager implements IStateManager {
         );
 
         // Extract LLM config using proper pattern
-        const llmSection = match(
-          (section: any) => section,
-          (error: QiError) => {
-            throw new Error(`LLM config not found: ${error.message}`);
-          },
-          (config as { get: (key: string) => Result<any, QiError> }).get('llm')
-        );
+        const configData = config as any;
+
+        // The config is wrapped in a state.data structure after validation
+        const actualConfig = configData.state?.data || configData;
+
+        if (!actualConfig.llm) {
+          throw new Error(
+            `LLM config section not found in configuration file: ${configFilePath}. Available keys: ${Object.keys(actualConfig).join(', ')}`
+          );
+        }
+        const llmSection = actualConfig.llm;
 
         // Update the state machine with loaded config
         const { classifierConfig, promptConfig } = this.extractLLMConfigs({ llm: llmSection });

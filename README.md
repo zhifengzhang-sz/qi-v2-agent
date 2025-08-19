@@ -38,17 +38,21 @@ Full agent capabilities with advanced workflows and MCP integration - under deve
 
 ```bash
 # Development usage
-bun run qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json --env-path .env
+bun run qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path config/.env
 bun run qi-prompt --framework ink --config-path /path/to/config.yaml --schema-path /path/to/schema.json
 bun run qi-prompt --help           # Show all options
 
 # Production binary usage (NEW in v-0.8.0)
-./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json --env-path .env
+./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path config/.env
 ./app/qi-prompt --framework ink --config-path ./config.yaml --schema-path ./schema.json --env-path ./.env
+
+# Alternative: Use qi-prompt specific configuration
+./app/qi-prompt --config-path config/qi-prompt.yaml --schema-path config/qi-prompt.schema.json --env-path config/.env
 ```
 
 **Framework Options:**
-- `--framework readline` - Basic terminal interface (default, works everywhere)  
+- `--framework hybrid` - Auto-detects best framework (default)
+- `--framework readline` - Basic terminal interface (works everywhere)  
 - `--framework ink` - Rich React-based UI with colors and animations
 
 ## ✨ qi-prompt Features (v-0.8.0)
@@ -144,7 +148,7 @@ The CLI provides responsive keyboard shortcuts for efficient interaction:
 bun run compile                          # Creates app/qi-prompt executable
 
 # Run compiled binary with config files
-./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json --env-path .env
+./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path config/.env
 ./app/qi-prompt --framework ink --config-path /path/to/config.yaml --schema-path /path/to/schema.json
 ./app/qi-prompt --help                   # Show all binary options
 ```
