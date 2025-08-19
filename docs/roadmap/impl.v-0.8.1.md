@@ -1,344 +1,189 @@
-# v-0.8.1 QiCore Two-Layer Architecture Implementation Plan
+# v-0.8.1 QiCore Simplified Architecture Implementation Plan
 
 ## Executive Summary
 
-**Objective**: Transform lib/src from ~5% QiCore integration to 100% internal QiCore compliance with clean interface abstraction
-**Timeline**: 4 weeks (140-200 hours estimated effort)  
-**Priority**: Critical architectural upgrade for functional programming compliance
-**Approach**: Systematic module-by-module transformation with comprehensive testing
+**Objective**: Transform qi-v2-agent to selective QiCore integration - two-layer architecture for external modules, direct QiCore for internal components
+**Timeline**: 3 weeks (90-120 hours estimated effort - 40% reduction from original plan)  
+**Priority**: Critical architectural upgrade with simplified, focused approach
+**Approach**: External APIs get two-layer abstraction, internal modules use QiCore directly
+**Key Insight**: Unnecessary complexity removed - two-layer pattern only where it adds value
 
-## Current State Analysis
+## Architecture Clarification (Updated)
 
-### QiCore Integration Assessment
-- **Agent Core**: ~10% compliance (some Result<T> usage, mostly traditional patterns)
-- **Tool System**: ~5% compliance (traditional error handling, no functional composition)
-- **Classification**: ~3% compliance (custom result objects, direct .value access violations)
-- **Message Queue**: ~8% compliance (hybrid implementation, inconsistent patterns)
-- **Overall**: ~5% QiCore integration (Critical gap from expected 100%)
+### Module Classification Strategy
 
-### Critical Issues Identified
-1. **No fromAsyncTryCatch Usage**: All modules use traditional try/catch blocks
-2. **Custom Result Objects**: Classification system uses non-QiCore result patterns  
-3. **Direct .value Access**: Fundamental QiCore violations throughout
-4. **Missing QiError Categories**: Generic Error throwing instead of structured QiError
-5. **No Functional Composition**: Imperative patterns instead of flatMap/pipe chains
+#### **EXTERNAL MODULES** (Two-Layer QiCore Architecture Required)
+These modules are exported from `lib/src/index.ts` and need clean public APIs:
+- **Agent Framework** (`lib/src/agent/`) - PromptAppOrchestrator, BaseAgent
+- **Classification System** (`lib/src/classifier/`) - Public classification APIs  
+- **Context Management** (`lib/src/context/`) - Public context APIs
+- **Prompt Processing** (`lib/src/prompt/`) - Prompt handler interfaces
+- **State Management** (`lib/src/state/`) - StateManager factory
+- **Workflow Engine** (`lib/src/workflow/`) - Workflow processing APIs
+- **qi-prompt CLI** (`app/src/prompt/qi-prompt.ts`) - Main application
 
-## Implementation Plan
+#### **INTERNAL MODULES** (Direct QiCore Usage)
+These implementation details should use QiCore directly without abstraction layers:
+- **Message Queue** (`lib/src/messaging/impl/QiAsyncMessageQueue.ts`)
+- **Context Manager Implementation** (`lib/src/context/impl/ContextManager.ts`)
+- **Security Boundary Manager** (`lib/src/context/impl/SecurityBoundaryManager.ts`) 
+- **State Persistence** (`lib/src/state/persistence/`)
+- **CLI Framework** (`lib/src/cli/`) - Internal UI/interaction logic
+- **Tool Context Management** (`lib/src/tools/context/`)
+- **Internal utilities** (performance tracking, error types, etc.)
 
-### Phase 1: Agent Core Transformation (Week 1-2, 60-80 hours)
+### Current State Assessment
+- **External Modules**: ~35% QiCore compliant (partial Result<T> usage)
+- **Internal Modules**: ~15% QiCore compliant (mixed patterns throughout)
+- **Overall Progress**: Foundation established, error handling improvements committed
+- **Recent Progress**: Test failures resolved, stable foundation for continued work
 
-#### **Module Priority Order**
-1. `lib/src/agent/core/agent-core.ts` - Core agent orchestration
-2. `lib/src/agent/implementations/qi-code-agent.ts` - Code agent implementation  
-3. `lib/src/agent/implementations/qi-prompt-agent.ts` - Prompt agent implementation
+### Architectural Benefits of Simplified Approach
+1. **40% Effort Reduction**: Internal modules no longer need unnecessary abstraction
+2. **Performance Gains**: Direct QiCore usage eliminates wrapper overhead
+3. **Clearer Boundaries**: Explicit separation between public APIs and implementation
+4. **Focused Complexity**: Two-layer pattern only where external consumers benefit
+5. **Easier Maintenance**: Reduced code duplication and simpler patterns
 
-#### **Transformation Tasks**
+## Simplified Implementation Plan
 
-##### **1.1 Agent Core Internal Layer (Week 1, 30-40 hours)**
-```typescript
-// Target transformation pattern
-class AgentCore {
-  // Public interface - unchanged
-  public async processInput(input: string): Promise<AgentOutput> {
-    const result = await this.processInputInternal(input);
-    return this.transformToPublicAPI(result);
-  }
-  
-  // Internal QiCore implementation
-  private async processInputInternal(input: string): Promise<Result<AgentOutput>> {
-    return this.validateInput(input)
-      .flatMap(validInput => this.classifyInput(validInput))
-      .flatMap(classification => this.executeWorkflow(classification))
-      .flatMap(workflowResult => this.processOutput(workflowResult));
-  }
-}
-```
+### Phase 1: External Module Two-Layer Implementation (Week 1, 40-50 hours)
 
-**Tasks**:
-- [ ] Replace all try/catch with fromAsyncTryCatch
-- [ ] Convert all async methods to Promise<Result<T>>
-- [ ] Add comprehensive QiError categorization
-- [ ] Implement functional composition chains
-- [ ] Add structured logging with QiCore patterns
+#### **External Module Priority Order**
+1. `lib/src/agent/PromptAppOrchestrator.ts` - Core orchestration (EXTERNAL)
+2. `app/src/prompt/qi-prompt.ts` - Main CLI application (EXTERNAL)  
+3. `lib/src/classifier/index.ts` - Classification API (EXTERNAL)
+4. `lib/src/context/index.ts` - Context management API (EXTERNAL)
 
-##### **1.2 Interface Layer Creation (Week 1, 15-20 hours)**
-```typescript
-// Error transformation patterns
-private transformToPublicAPI(result: Result<AgentOutput>): Promise<AgentOutput> {
-  return result.match(
-    success => Promise.resolve(success),
-    error => {
-      const publicError = this.transformQiError(error);
-      return Promise.reject(publicError);
-    }
-  );
-}
+#### **Two-Layer Transformation Tasks**
 
-private transformQiError(qiError: QiError): Error {
-  switch (qiError.category) {
-    case 'VALIDATION':
-      return new Error(`Invalid input: ${qiError.message}`);
-    case 'CONFIGURATION':
-      return new Error(`Configuration error: ${qiError.message}`);
-    case 'BUSINESS':
-      return new Error(`Processing failed: ${qiError.message}`);
-    default:
-      return new Error(`System error: ${qiError.message}`);
-  }
-}
-```
+##### **1.1 External Agent Framework Two-Layer Pattern**
+**Target Files**: `lib/src/agent/PromptAppOrchestrator.ts`, `app/src/prompt/qi-prompt.ts`
 
-**Tasks**:
-- [ ] Create public API transformation methods
-- [ ] Implement QiError to Error transformation
-- [ ] Ensure backward compatibility of all methods
-- [ ] Add interface documentation
+**Key Changes**:
+- ✅ Error handling improvements committed (Phase 1 complete)
+- Convert public methods to maintain current interfaces
+- Add internal QiCore Result<T> implementation layer
+- Transform QiError to traditional Error for external consumers
+- Implement functional composition chains internally
 
-##### **1.3 Testing Implementation (Week 2, 15-20 hours)**
-- [ ] Unit tests for internal QiCore layer
-- [ ] Interface contract tests for public APIs
-- [ ] Error transformation validation tests
-- [ ] Integration tests for end-to-end workflows
-- [ ] Performance regression tests
+##### **1.2 External Classification API**  
+**Target Files**: `lib/src/classifier/index.ts` (public exports)
 
-### Phase 2: Tool System & Classification Overhaul (Week 2, 60-80 hours)
+**Key Changes**:
+- Maintain current classification interfaces unchanged
+- Add internal Result<T> composition for classification methods
+- Transform internal QiCore patterns to public API responses
+- Remove .value access violations internally while preserving external API
 
-#### **Tool System Priority (30-40 hours)**
+##### **1.3 External Context & Workflow APIs**
+**Target Files**: `lib/src/context/index.ts`, `lib/src/workflow/index.ts`
 
-##### **2.1 Tool Executor Transformation**
-```typescript
-// 6-phase pipeline with Result<T> patterns
-class ToolExecutor {
-  public async executeTool(tool: Tool, params: ToolParams): Promise<ToolOutput> {
-    const result = await this.executeToolInternal(tool, params);
-    return this.transformToolResult(result);
-  }
-  
-  private async executeToolInternal(tool: Tool, params: ToolParams): Promise<Result<ToolOutput>> {
-    return this.discoverTool(tool)
-      .flatMap(discovered => this.validateTool(discovered, params))
-      .flatMap(validated => this.checkSecurity(validated))
-      .flatMap(secure => this.executeTool(secure))
-      .flatMap(executed => this.processResult(executed))
-      .flatMap(processed => this.cleanup(processed));
-  }
-}
-```
+**Key Changes**:
+- Preserve existing public method signatures
+- Implement internal QiCore patterns with Result<T>
+- Add proper error transformation layers
+- Maintain backward compatibility for external consumers
 
-**Tasks**:
-- [ ] Transform 6-phase pipeline to Result<T> composition
-- [ ] Add QiError categories for each phase failure
-- [ ] Implement functional security validation
-- [ ] Add resource management with Result<T>
-- [ ] Create clean tool execution interface
+### Phase 2: Internal Module Direct QiCore Implementation (Week 2, 30-40 hours)
 
-##### **2.2 Tool Registry & Security**
-- [ ] Permission system with QiError validation
-- [ ] Security boundaries using functional composition
-- [ ] Tool discovery with Result<T> patterns
-- [ ] Resource quota management
+#### **Internal Module Priority Order**
+1. `lib/src/messaging/impl/QiAsyncMessageQueue.ts` - Message handling (INTERNAL)
+2. `lib/src/context/impl/ContextManager.ts` - Context implementation (INTERNAL)  
+3. `lib/src/state/persistence/StatePersistence.ts` - State storage (INTERNAL)
+4. `lib/src/cli/impl/MessageDrivenCLI.ts` - CLI implementation (INTERNAL)
 
-#### **Classification System Priority (30-40 hours)**
+#### **Direct QiCore Implementation Tasks**
 
-##### **2.3 Classification Core Fix**
-```typescript
-// Fix critical QiCore violations
-class ClassificationSystem {
-  // Public interface
-  public async classify(input: string): Promise<AgentType> {
-    const result = await this.classifyInternal(input);
-    return result.match(
-      agentType => agentType,
-      error => { throw new Error(`Classification failed: ${error.message}`); }
-    );
-  }
-  
-  // Internal QiCore patterns - NO MORE .value ACCESS
-  private async classifyInternal(input: string): Promise<Result<AgentType>> {
-    return this.validateClassificationInput(input)
-      .flatMap(valid => this.executeClassificationMethods(valid))
-      .flatMap(results => this.selectBestClassification(results))
-      .flatMap(selected => this.enrichClassification(selected));
-  }
-}
-```
+##### **2.1 Message Queue Direct QiCore Usage**
+**Target**: `lib/src/messaging/impl/QiAsyncMessageQueue.ts`
 
-**Tasks**:
-- [ ] **CRITICAL**: Remove all direct .value access violations
-- [ ] Replace custom result objects with Result<T>
-- [ ] Transform all classification methods to functional patterns
-- [ ] Add comprehensive error categorization
-- [ ] Implement method composition with flatMap
+**Approach**: Use QiCore directly without abstraction layers
+- Implement Result<T> patterns throughout
+- Use fromAsyncTryCatch for all async operations  
+- Apply functional composition with flatMap/pipe
+- No external API compatibility concerns - pure internal optimization
 
-### Phase 3: Message Queue & Utilities Integration (Week 3, 40-60 hours)
+##### **2.2 Context Manager Implementation**
+**Target**: `lib/src/context/impl/ContextManager.ts`, `SecurityBoundaryManager.ts`
 
-#### **Message Queue System (25-35 hours)**
+**Approach**: Direct QiCore functional patterns
+- Replace traditional error handling with QiError categories
+- Implement Result<T> composition chains
+- Remove try-catch blocks in favor of fromAsyncTryCatch
+- Optimize for performance without external API constraints
 
-##### **3.1 QiAsyncMessageQueue Enhancement**
-```typescript
-class QiAsyncMessageQueue {
-  public async addMessage(message: QiMessage): Promise<void> {
-    const result = await this.addMessageInternal(message);
-    return result.match(
-      success => undefined,
-      error => { throw new Error(`Failed to add message: ${error.message}`); }
-    );
-  }
-  
-  private async addMessageInternal(message: QiMessage): Promise<Result<void>> {
-    return this.validateMessage(message)
-      .flatMap(valid => this.checkQueueCapacity())
-      .flatMap(capacity => this.processMessage(valid))
-      .flatMap(processed => this.updateQueueState(processed));
-  }
-}
-```
+##### **2.3 Internal CLI and State Systems**
+**Target**: `lib/src/cli/impl/`, `lib/src/state/persistence/`
 
-**Tasks**:
-- [ ] Convert message processing to Result<T> patterns
-- [ ] Add QiError categorization for queue failures
-- [ ] Implement functional message validation
-- [ ] Add queue lifecycle management with Result<T>
-- [ ] Create clean async interface
+**Approach**: Pure QiCore implementation
+- Internal utilities use full functional composition
+- Performance-optimized Result<T> chains
+- Direct QiError usage without transformation
+- Simplified patterns without external API concerns
 
-#### **Utilities & Configuration (15-25 hours)**
-- [ ] Transform validation utilities to Result<T>
-- [ ] Add QiCore logging integration
-- [ ] Convert configuration loading to functional patterns
-- [ ] Implement state management with Result<T>
+### Phase 3: Integration, Testing & Validation (Week 3, 30-40 hours)
 
-### Phase 4: Testing, Documentation & Validation (Week 4, 40-60 hours)
+#### **Integration Testing (15-20 hours)**
+- Test external module two-layer interfaces work correctly
+- Verify internal modules use QiCore patterns properly  
+- End-to-end workflow testing across mixed architecture
+- Performance validation of simplified approach
 
-#### **Comprehensive Testing (25-35 hours)**
-
-##### **4.1 Internal Layer Testing**
-- [ ] Result<T> composition chain tests
-- [ ] QiError categorization validation
-- [ ] Functional composition performance tests
-- [ ] Pure function isolation tests
-- [ ] Exception boundary tests with fromAsyncTryCatch
-
-##### **4.2 Interface Layer Testing**  
-- [ ] Public API contract compliance tests
-- [ ] Error transformation validation
-- [ ] Backward compatibility verification
-- [ ] Integration testing for end-to-end workflows
-- [ ] Performance regression analysis
-
-#### **Documentation & Validation (15-25 hours)**
-- [ ] Update all module documentation
-- [ ] Create migration guides for developers
-- [ ] Performance analysis and optimization
-- [ ] Final QiCore compliance verification
-- [ ] Production readiness checklist
-
-## Resource Requirements
-
-### Development Team
-- **Lead Developer**: Experienced with functional programming and QiCore patterns
-- **Supporting Developer**: TypeScript and testing expertise
-- **QA Engineer**: Interface testing and validation focus
-
-### Technical Resources
-- **Development Environment**: Full access to lib/src codebase
-- **Testing Infrastructure**: Comprehensive test suite capabilities  
-- **Performance Monitoring**: Tools to measure functional composition performance
-- **Documentation Tools**: Technical writing and diagram creation
-
-## Risk Assessment & Mitigation
-
-### High Risk Items
-
-#### **Risk**: Breaking Public API Contracts
-**Probability**: Medium  
-**Impact**: High  
-**Mitigation**: 
-- Comprehensive interface contract testing
-- Backward compatibility validation at each step
-- Staged rollout with feature flags
-
-#### **Risk**: Performance Degradation from Functional Patterns
-**Probability**: Low  
-**Impact**: Medium  
-**Mitigation**:
-- Performance benchmarking throughout development
-- Optimize Result<T> composition chains
-- Monitor and profile functional composition performance
-
-#### **Risk**: Complex Error Transformation Issues
-**Probability**: Medium  
-**Impact**: Medium  
-**Mitigation**:
-- Comprehensive error scenario testing
-- Clear error transformation documentation
-- Error handling regression tests
-
-### Medium Risk Items
-
-#### **Risk**: Developer Learning Curve for QiCore Patterns
-**Probability**: Medium  
-**Impact**: Low  
-**Mitigation**:
-- QiCore pattern training sessions
-- Code review focus on functional patterns
-- Documentation of common patterns
-
-#### **Risk**: Integration Issues Between Modules
-**Probability**: Low  
-**Impact**: Medium  
-**Mitigation**:
-- Integration testing at each phase
-- Cross-module compatibility validation
-- Staged module transformation approach
+#### **Documentation & Finalization (15-20 hours)**
+- Update module documentation to reflect external vs internal patterns
+- Create developer guidelines for external vs internal module development  
+- Performance analysis comparing simplified vs original approach
+- Production readiness checklist and deployment preparation
 
 ## Success Metrics
 
-### Compliance Metrics
-- **QiCore Internal Compliance**: Target 100% (from current ~5%)
-- **Interface Layer Quality**: Zero QiCore exposure in public APIs
-- **Error Handling**: 100% QiError usage internally, clean transformation
-- **Functional Pattern Usage**: 100% fromAsyncTryCatch adoption
-
-### Quality Metrics
-- **Test Coverage**: 90%+ for both internal and interface layers
-- **Performance**: No degradation from functional patterns  
-- **Error Handling**: Comprehensive error categorization and recovery
-- **Documentation**: Complete documentation of two-layer architecture
+### Architecture Quality Metrics
+- **External Module Compliance**: Clean two-layer QiCore integration with backward-compatible APIs
+- **Internal Module Optimization**: Direct QiCore usage achieving 100% functional programming patterns
+- **Code Simplification**: 40% reduction in abstraction layers compared to original plan
+- **Performance**: No regression, likely improvements from simplified internal patterns
 
 ### Delivery Metrics
-- **On-Time Delivery**: Complete v-0.8.1 within 4-week timeline
-- **Code Quality**: All TypeScript and linting checks pass
-- **Integration Success**: All existing functionality continues to work
-- **Production Readiness**: Ready for production deployment
+- **Timeline**: 3-week completion (reduced from original 4-week estimate)
+- **Test Coverage**: All existing tests continue passing
+- **API Compatibility**: Zero breaking changes to external interfaces
+- **Internal Efficiency**: Performance gains from direct QiCore usage in internal modules
 
-## Milestone Checkpoints
+## Milestone Checkpoints (Updated)
 
-### Week 1 Checkpoint
-- ✅ Agent core internal layer transformation complete
-- ✅ Interface layer creation with error transformation
-- ✅ Basic testing framework established
-- 📊 **Progress**: 30-35% complete
+### Week 1 Checkpoint: External Module Two-Layer Implementation
+- ✅ Error handling improvements committed (completed)
+- ⏳ PromptAppOrchestrator two-layer QiCore integration
+- ⏳ qi-prompt CLI two-layer compliance  
+- ⏳ Classification and Context API transformations
+- 📊 **Progress**: 40-50% complete
 
-### Week 2 Checkpoint  
-- ✅ Tool system functional composition complete
-- ✅ Classification system QiCore violations fixed
-- ✅ Comprehensive testing for transformed modules
-- 📊 **Progress**: 60-70% complete
+### Week 2 Checkpoint: Internal Module Direct QiCore  
+- ⏳ Message queue direct QiCore implementation
+- ⏳ Context manager internal optimization
+- ⏳ CLI and state system QiCore patterns
+- ⏳ Internal utility transformations
+- 📊 **Progress**: 75-85% complete
 
-### Week 3 Checkpoint
-- ✅ Message queue QiCore integration complete
-- ✅ Utilities and configuration transformation
-- ✅ Performance optimization complete
-- 📊 **Progress**: 85-90% complete
-
-### Week 4 Checkpoint
-- ✅ Comprehensive testing and validation complete
-- ✅ Documentation and migration guides complete
-- ✅ Production readiness verification
+### Week 3 Checkpoint: Integration & Finalization
+- ⏳ Cross-module integration testing
+- ⏳ Performance validation and optimization
+- ⏳ Documentation updates and guidelines
+- ⏳ Production readiness verification
 - 📊 **Progress**: 100% complete
 
 ## Conclusion
 
-This comprehensive implementation plan transforms the qi-v2-agent framework from traditional TypeScript patterns to full QiCore functional programming compliance while maintaining clean, user-friendly public interfaces. The systematic approach ensures both architectural excellence and practical usability, establishing a solid foundation for future agent development.
+This simplified implementation plan achieves full QiCore integration through a focused, efficient approach:
 
-**Expected Outcome**: A production-ready framework with 100% internal QiCore compliance, clean interface abstraction, and comprehensive testing that serves as a model for functional programming in TypeScript applications.
+**Key Innovation**: Selective architecture - two-layer patterns only for external APIs, direct QiCore for internal components
+
+**Benefits Achieved**:
+1. **40% Effort Reduction**: From 4 weeks to 3 weeks through architectural simplification
+2. **Cleaner Code**: Eliminated unnecessary abstraction layers in internal modules  
+3. **Better Performance**: Direct QiCore usage optimizes internal operations
+4. **Maintainable Architecture**: Clear boundaries between public APIs and implementation
+5. **Future-Proof Foundation**: Scalable pattern for additional module development
+
+**Expected Outcome**: A production-ready framework with strategic QiCore integration that balances external API usability with internal functional programming excellence, serving as an architectural model for TypeScript/QiCore hybrid applications.
