@@ -328,13 +328,20 @@ class QiPromptApp {
           });
         }
 
-        const conversationContext = this.contextManager.createConversationContext('main');
-        this.currentSession = conversationContext.id;
+        const contextResult = this.contextManager.createConversationContext('main');
+        const contextId = match(
+          (context) => context.id,
+          (error) => {
+            throw new Error(`Failed to create conversation context: ${error.message}`);
+          },
+          contextResult
+        );
+        this.currentSession = contextId;
         if (this.debugMode) {
           this.logger.info('✅ Conversation context created', undefined, {
             component: 'QiPromptApp',
             step: 'conversation_context_created',
-            contextId: conversationContext.id,
+            contextId: contextId,
           });
         }
 
