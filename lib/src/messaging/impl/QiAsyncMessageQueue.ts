@@ -39,42 +39,64 @@ interface QueueError extends QiError {
   };
 }
 
-// System errors for infrastructure issues (limited retry)
-const systemError = (
-  code: string,
-  message: string,
-  context: QueueError['context'] = {}
-): QueueError =>
-  create(code, message, 'SYSTEM', {
-    timestamp: new Date().toISOString(),
-    queueLength: 0, // Will be overridden by caller if needed
-    ...context,
-  }) as QueueError;
+// Message queue specific error factories with granular categorization
+const queueError = {
+  // Message validation errors
+  invalidMessage: (messageId: string, reason: string): QueueError =>
+    create('INVALID_MESSAGE', `Invalid message: ${messageId}`, 'VALIDATION', {
+      messageId,
+      reason,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
 
-// Validation errors for invalid message format (never retry)
-const validationError = (
-  code: string,
-  message: string,
-  context: QueueError['context'] = {}
-): QueueError =>
-  create(code, message, 'VALIDATION', {
-    timestamp: new Date().toISOString(),
-    ...context,
-  }) as QueueError;
+  // Queue state errors
+  alreadyStarted: (operation: string): QueueError =>
+    create('QUEUE_ALREADY_STARTED', `Queue already started - cannot ${operation}`, 'VALIDATION', {
+      operation,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
 
-// Resource errors for capacity issues (linear backoff)
-const resourceError = (
-  code: string,
-  message: string,
-  context: QueueError['context'] = {}
-): QueueError =>
-  create(code, message, 'RESOURCE', {
-    timestamp: new Date().toISOString(),
-    ...context,
-  }) as QueueError;
+  queueDone: (messageId: string): QueueError =>
+    create('QUEUE_DONE', 'Cannot enqueue to completed queue', 'VALIDATION', {
+      messageId,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
 
-// Legacy error function for backward compatibility
-const queueError = systemError;
+  queueInError: (messageId: string): QueueError =>
+    create('QUEUE_ERROR', 'Cannot enqueue to error queue', 'VALIDATION', {
+      messageId,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
+
+  // Capacity errors
+  queueFull: (messageId: string, maxSize: number, currentSize: number): QueueError =>
+    create('QUEUE_FULL', 'Queue has reached maximum size', 'RESOURCE', {
+      messageId,
+      maxSize,
+      currentSize,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
+
+  // System errors
+  queueDestroyed: (): QueueError =>
+    create('QUEUE_DESTROYED', 'Queue was destroyed', 'SYSTEM', {
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
+
+  cleanupFailed: (reason: string): QueueError =>
+    create('CLEANUP_FAILED', `Cleanup function failed: ${reason}`, 'SYSTEM', {
+      reason,
+      timestamp: new Date().toISOString(),
+    }) as QueueError,
+
+  // Legacy system error for backward compatibility
+  systemError: (code: string, message: string, context: QueueError['context'] = {}): QueueError =>
+    create(code, message, 'SYSTEM', {
+      timestamp: new Date().toISOString(),
+      queueLength: 0,
+      ...context,
+    }) as QueueError,
+};
 
 /**
  * Internal message wrapper for queue management
@@ -151,14 +173,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     if (this.state.started) {
       this.debug.error(`CRITICAL ERROR: Queue already started - this causes infinite loops!`);
       this.debug.error(`Stack trace:`, new Error().stack);
-      const error = queueError(
-        'ALREADY_STARTED',
-        'Queue can only be iterated once. Multiple iterations cause message duplication and infinite loops.',
-        {
-          operation: 'asyncIterator',
-          queueSize: this.queue.length,
-        }
-      );
+      const error = queueError.alreadyStarted('iterate');
       throw error;
     }
 
@@ -227,7 +242,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
     // Check for error state
     if (this.state.hasError) {
-      return Promise.reject(queueError('QUEUE_ERROR', 'Queue is in error state'));
+      return Promise.reject(queueError.systemError('QUEUE_ERROR', 'Queue is in error state'));
     }
 
     // Wait for new message - core h2A non-blocking pattern
@@ -244,37 +259,18 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     this.debug.log(`Enqueuing message ID: ${message.id}, type: ${message.type}`);
     // Validate queue state
     if (this.state.isDone) {
-      return failure(
-        queueError('QUEUE_DONE', 'Cannot enqueue to completed queue', {
-          operation: 'enqueue',
-          messageId: message.id,
-          messageType: message.type,
-        })
-      );
+      return failure(queueError.queueDone(message.id));
     }
 
     if (this.state.hasError) {
-      return failure(
-        queueError('QUEUE_ERROR', 'Cannot enqueue to error queue', {
-          operation: 'enqueue',
-          messageId: message.id,
-          messageType: message.type,
-        })
-      );
+      return failure(queueError.queueInError(message.id));
     }
 
     // Check size limits
     if (this.options.maxSize > 0 && this.queue.length >= this.options.maxSize) {
       // v-0.6.1: Event emission removed - pure message-driven
 
-      return failure(
-        resourceError('QUEUE_FULL', 'Queue has reached maximum size', {
-          operation: 'enqueue',
-          queueSize: this.queue.length,
-          messageId: message.id,
-          messageType: message.type,
-        })
-      );
+      return failure(queueError.queueFull(message.id, this.options.maxSize, this.queue.length));
     }
 
     // Create queued message (not inserted yet to avoid duplication when a reader is waiting)
@@ -481,7 +477,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
     // Reject any waiting readers
     if (this.readReject) {
-      this.readReject(queueError('QUEUE_DESTROYED', 'Queue was destroyed'));
+      this.readReject(queueError.queueDestroyed());
       this.readResolve = undefined;
       this.readReject = undefined;
     }
@@ -495,10 +491,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
         async () => {
           await this.options.cleanupFn!();
         },
-        (_error: unknown) =>
-          systemError('CLEANUP_FAILED', 'Cleanup function failed', {
-            operation: 'destroy',
-          })
+        (_error: unknown) => queueError.cleanupFailed('destroy operation')
       );
 
       // Return cleanup error directly if it occurred

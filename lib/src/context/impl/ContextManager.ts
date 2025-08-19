@@ -29,15 +29,81 @@ import type {
 import { SecurityBoundaryManager } from './SecurityBoundaryManager.js';
 
 /**
- * Context error factory
+ * Context-specific error factory functions with granular categorization
  */
-function contextError(
-  code: string,
-  message: string,
-  context: Record<string, unknown> = {}
-): QiError {
-  return create(code, message, 'SYSTEM', { context });
-}
+const contextError = {
+  // Context validation errors
+  invalidConfiguration: (field: string, value: unknown): QiError =>
+    create('INVALID_CONFIGURATION', `Invalid context configuration for ${field}`, 'VALIDATION', {
+      field,
+      value,
+    }),
+
+  parentContextNotFound: (parentId: string): QiError =>
+    create('PARENT_CONTEXT_NOT_FOUND', `Parent context not found: ${parentId}`, 'VALIDATION', {
+      parentId,
+    }),
+
+  contextNotFound: (contextId: string): QiError =>
+    create('CONTEXT_NOT_FOUND', `Context not found: ${contextId}`, 'VALIDATION', { contextId }),
+
+  contextExpired: (contextId: string, expiresAt: Date): QiError =>
+    create('CONTEXT_EXPIRED', `Context expired: ${contextId}`, 'VALIDATION', {
+      contextId,
+      expiresAt: expiresAt.toISOString(),
+    }),
+
+  // Security boundary errors
+  securityRegistrationFailed: (contextId: string, reason: string): QiError =>
+    create(
+      'SECURITY_REGISTRATION_FAILED',
+      `Failed to register security context: ${contextId}`,
+      'AUTHORIZATION',
+      { contextId, reason }
+    ),
+
+  securityUnregistrationFailed: (contextId: string, reason: string): QiError =>
+    create(
+      'SECURITY_UNREGISTRATION_FAILED',
+      `Failed to unregister security context: ${contextId}`,
+      'AUTHORIZATION',
+      { contextId, reason }
+    ),
+
+  accessValidationFailed: (contextId: string, operation: string, reason: string): QiError =>
+    create(
+      'ACCESS_VALIDATION_FAILED',
+      `Access validation failed for context ${contextId}, operation: ${operation}`,
+      'AUTHORIZATION',
+      { contextId, operation, reason }
+    ),
+
+  // System-level errors
+  initializationFailed: (reason: string): QiError =>
+    create('CONTEXT_MANAGER_INIT_FAILED', `Context manager initialization failed`, 'SYSTEM', {
+      reason,
+    }),
+
+  shutdownFailed: (reason: string): QiError =>
+    create('CONTEXT_MANAGER_SHUTDOWN_FAILED', `Context manager shutdown failed`, 'SYSTEM', {
+      reason,
+    }),
+
+  cleanupFailed: (reason: string): QiError =>
+    create('CONTEXT_CLEANUP_FAILED', `Context cleanup operation failed`, 'SYSTEM', { reason }),
+
+  // State corruption errors
+  stateCorruption: (contextId: string, details: string): QiError =>
+    create(
+      'CONTEXT_STATE_CORRUPTION',
+      `Context state corruption detected: ${contextId}`,
+      'SYSTEM',
+      {
+        contextId,
+        details,
+      }
+    ),
+};
 
 /**
  * Main context manager implementation
@@ -72,8 +138,7 @@ export class ContextManager implements IContextManager {
           60000 // Every minute
         );
       },
-      (error: unknown) =>
-        contextError('INIT_FAILED', 'Failed to initialize context manager', { error })
+      (error: unknown) => contextError.initializationFailed(String(error))
     );
   }
 
@@ -93,8 +158,7 @@ export class ContextManager implements IContextManager {
         this.conversationContexts.clear();
         this.isolatedContexts.clear();
       },
-      (error: unknown) =>
-        contextError('SHUTDOWN_FAILED', 'Failed to shutdown context manager', { error })
+      (error: unknown) => contextError.shutdownFailed(String(error))
     );
   }
 
@@ -129,9 +193,7 @@ export class ContextManager implements IContextManager {
 
     // Validate parent context if specified
     if (parentId && !this.conversationContexts.has(parentId)) {
-      return failure(
-        contextError('PARENT_NOT_FOUND', `Parent context ${parentId} not found`, { parentId })
-      );
+      return failure(contextError.parentContextNotFound(parentId));
     }
 
     const context: ConversationContext = {
@@ -175,9 +237,7 @@ export class ContextManager implements IContextManager {
   addMessageToContext(contextId: string, message: ContextMessage): Result<void> {
     const context = this.conversationContexts.get(contextId);
     if (!context) {
-      return failure(
-        contextError('CONTEXT_NOT_FOUND', `Context ${contextId} not found`, { contextId })
-      );
+      return failure(contextError.contextNotFound(contextId));
     }
 
     // Create updated context with new message
@@ -196,9 +256,7 @@ export class ContextManager implements IContextManager {
   ): Result<void> {
     const context = this.conversationContexts.get(contextId);
     if (!context) {
-      return failure(
-        contextError('CONTEXT_NOT_FOUND', `Context ${contextId} not found`, { contextId })
-      );
+      return failure(contextError.contextNotFound(contextId));
     }
 
     const updatedContext: ConversationContext = {
@@ -217,51 +275,62 @@ export class ContextManager implements IContextManager {
   // Isolated Context Management
 
   createIsolatedContext(config: IsolatedContextConfig): Result<IsolatedContext> {
-    const contextId = this.generateContextId();
-    const now = new Date();
-
     // Validate parent context exists
-    if (!this.conversationContexts.has(config.parentContextId)) {
-      return failure(
-        contextError('PARENT_NOT_FOUND', `Parent context ${config.parentContextId} not found`, {
-          parentContextId: config.parentContextId,
-        })
-      );
-    }
-
-    const isolatedContext: IsolatedContext = {
-      id: contextId,
-      parentContextId: config.parentContextId,
-      task: config.task,
-      allowedOperations: this.filterOperationsBySpecialization(
-        config.specialization,
-        config.restrictions
-      ),
-      allowedPaths: [...config.restrictions.allowedPaths],
-      timeLimit: config.timeLimit || 300000, // 5 minutes default
-      memoryLimit: config.memoryLimit || 100 * 1024 * 1024, // 100MB default
-      boundaries: this.createSecurityBoundaries(config.restrictions),
-      createdAt: now,
-      expiresAt: new Date(now.getTime() + (config.timeLimit || 300000)),
+    const validateParentContext = (): Result<void> => {
+      if (!this.conversationContexts.has(config.parentContextId)) {
+        return failure(contextError.parentContextNotFound(config.parentContextId));
+      }
+      return success(undefined);
     };
 
-    this.isolatedContexts.set(contextId, isolatedContext);
+    // Create isolated context with configuration
+    const createContextData = (): IsolatedContext => {
+      const contextId = this.generateContextId();
+      const now = new Date();
 
-    // Register with security boundaries - handle Result<T>
-    const registrationResult = this.securityBoundaries.registerContext(contextId, isolatedContext);
-    return match(
-      (): Result<IsolatedContext> => {
-        this.stats.totalContextsCreated++;
-        return success(isolatedContext);
-      },
-      (error): Result<IsolatedContext> =>
-        failure(
-          contextError('SECURITY_REGISTRATION_FAILED', 'Failed to register security context', {
-            contextId,
-            error,
-          })
+      return {
+        id: contextId,
+        parentContextId: config.parentContextId,
+        task: config.task,
+        allowedOperations: this.filterOperationsBySpecialization(
+          config.specialization,
+          config.restrictions
         ),
-      registrationResult
+        allowedPaths: [...config.restrictions.allowedPaths],
+        timeLimit: config.timeLimit || 300000, // 5 minutes default
+        memoryLimit: config.memoryLimit || 100 * 1024 * 1024, // 100MB default
+        boundaries: this.createSecurityBoundaries(config.restrictions),
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + (config.timeLimit || 300000)),
+      };
+    };
+
+    // Register context and handle security boundaries
+    const registerAndStore = (isolatedContext: IsolatedContext): Result<IsolatedContext> => {
+      this.isolatedContexts.set(isolatedContext.id, isolatedContext);
+
+      const registrationResult = this.securityBoundaries.registerContext(
+        isolatedContext.id,
+        isolatedContext
+      );
+
+      return match(
+        (): Result<IsolatedContext> => {
+          this.stats.totalContextsCreated++;
+          return success(isolatedContext);
+        },
+        (error): Result<IsolatedContext> =>
+          failure(contextError.securityRegistrationFailed(isolatedContext.id, String(error))),
+        registrationResult
+      );
+    };
+
+    // Functional composition chain
+    const validationResult = validateParentContext();
+    return match(
+      () => registerAndStore(createContextData()),
+      (error) => failure(error),
+      validationResult
     );
   }
 
@@ -281,42 +350,67 @@ export class ContextManager implements IContextManager {
   }
 
   async validateContextAccess(contextId: string, operation: string): Promise<Result<boolean>> {
+    // Get and validate context exists
+    const getContext = (): Result<IsolatedContext> => {
+      const context = this.isolatedContexts.get(contextId);
+      if (!context) {
+        this.auditContextAccess(contextId, operation, false, 'Context not found');
+        return failure(contextError.contextNotFound(contextId));
+      }
+      return success(context);
+    };
+
+    // Check if context has expired
+    const checkExpiration = (context: IsolatedContext): Result<IsolatedContext> => {
+      if (new Date() > context.expiresAt) {
+        this.terminateContext(contextId);
+        this.auditContextAccess(contextId, operation, false, 'Context expired');
+        return failure(contextError.contextExpired(contextId, context.expiresAt));
+      }
+      return success(context);
+    };
+
+    // Validate access through security boundaries
+    const validateAccess = async (context: IsolatedContext): Promise<Result<boolean>> => {
+      const validationResult = await this.securityBoundaries.validateAccess(contextId, operation);
+
+      return match(
+        (allowed) => {
+          this.auditContextAccess(contextId, operation, allowed);
+          return success(allowed);
+        },
+        (error) => {
+          this.auditContextAccess(contextId, operation, false, error.message);
+          return success(false); // Convert validation error to denied access
+        },
+        validationResult
+      );
+    };
+
     return fromAsyncTryCatch(
       async () => {
-        const context = this.isolatedContexts.get(contextId);
-        if (!context) {
-          this.auditContextAccess(contextId, operation, false, 'Context not found');
-          return false;
-        }
-
-        // Check expiration
-        if (new Date() > context.expiresAt) {
-          this.terminateContext(contextId);
-          this.auditContextAccess(contextId, operation, false, 'Context expired');
-          return false;
-        }
-
-        // Use security boundary manager for validation
-        const validationResult = await this.securityBoundaries.validateAccess(contextId, operation);
-
+        const contextResult = getContext();
         return match(
-          (allowed) => {
-            this.auditContextAccess(contextId, operation, allowed);
-            return allowed;
+          async (context) => {
+            const expirationResult = checkExpiration(context);
+            return match(
+              async (validContext) => {
+                const accessResult = await validateAccess(validContext);
+                return match(
+                  (allowed) => allowed,
+                  () => false,
+                  accessResult
+                );
+              },
+              () => Promise.resolve(false), // Expired context = access denied
+              expirationResult
+            );
           },
-          (error) => {
-            this.auditContextAccess(contextId, operation, false, error.message);
-            return false;
-          },
-          validationResult
+          () => Promise.resolve(false), // Context not found = access denied
+          contextResult
         );
       },
-      (error: unknown) =>
-        contextError('VALIDATION_FAILED', 'Context access validation failed', {
-          contextId,
-          operation,
-          error,
-        })
+      (error: unknown) => contextError.accessValidationFailed(contextId, operation, String(error))
     );
   }
 
@@ -373,7 +467,7 @@ export class ContextManager implements IContextManager {
         this.stats.expiredContextsCleanedUp += cleaned;
         return cleaned;
       },
-      (error: unknown) => contextError('CLEANUP_FAILED', 'Context cleanup failed', { error })
+      (error: unknown) => contextError.cleanupFailed(String(error))
     );
   }
 

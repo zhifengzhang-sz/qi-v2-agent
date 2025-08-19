@@ -357,7 +357,7 @@ describe('QiAsyncMessageQueue', () => {
       
       expect(() => {
         queue[Symbol.asyncIterator]();
-      }).toThrow('Queue can only be iterated once');
+      }).toThrow('Queue already started - cannot iterate');
     });
   });
 

@@ -659,45 +659,79 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   private handleInputInternal(input: string): Result<void> {
     console.log(`[MessageDrivenCLI] handleInput called with: "${input}"`);
 
-    // Validate input
-    if (typeof input !== 'string') {
-      return failure(cliError.invalidInput('Input must be a string'));
-    }
-
-    // Handle essential commands directly for functionality
-    if (input.trim() === '/exit' || input.trim() === '/quit') {
-      try {
-        this.terminal.writeLine('👋 Goodbye!');
-        process.exit(0);
-        return success(undefined);
-      } catch (error) {
-        return failure(cliError.componentError('terminal', 'exit', String(error)));
+    // Validate input with pure function
+    const validateInput = (userInput: string): Result<string> => {
+      if (typeof userInput !== 'string') {
+        return failure(cliError.invalidInput('Input must be a string'));
       }
-    }
-
-    // All other input goes to message queue
-    console.log(`[MessageDrivenCLI] Enqueuing to message queue`);
-    const messageId = Math.random().toString(36).substring(2, 15);
-    const userInputMessage: UserInputMessage = {
-      id: messageId,
-      type: MessageType.USER_INPUT,
-      timestamp: new Date(),
-      priority: MessagePriority.NORMAL,
-      input: input,
-      raw: false,
-      source: 'cli',
+      return success(userInput.trim());
     };
 
-    const enqueueResult = this.messageQueue.enqueue(userInputMessage);
+    // Handle essential commands with functional pattern
+    const handleSystemCommands = (trimmedInput: string): Result<'exit' | 'message'> => {
+      if (trimmedInput === '/exit' || trimmedInput === '/quit') {
+        try {
+          this.terminal.writeLine('👋 Goodbye!');
+          process.exit(0);
+          return success('exit');
+        } catch (error) {
+          return failure(cliError.componentError('terminal', 'exit', String(error)));
+        }
+      }
+      return success('message');
+    };
+
+    // Create and enqueue user message
+    const createAndEnqueueMessage = (originalInput: string): Result<void> => {
+      const messageId = this.generateMessageId();
+      const userInputMessage: UserInputMessage = {
+        id: messageId,
+        type: MessageType.USER_INPUT,
+        timestamp: new Date(),
+        priority: MessagePriority.NORMAL,
+        input: originalInput,
+        raw: false,
+        source: 'cli',
+      };
+
+      console.log(`[MessageDrivenCLI] Enqueuing to message queue`);
+      const enqueueResult = this.messageQueue.enqueue(userInputMessage);
+
+      return match(
+        (): Result<void> => {
+          this.state.isProcessing = true;
+          return success(undefined);
+        },
+        (error: QiError): Result<void> =>
+          failure(cliError.messageEnqueueFailed(messageId, error.message)),
+        enqueueResult
+      );
+    };
+
+    // Functional composition chain
+    const validationResult = validateInput(input);
     return match(
-      (): Result<void> => {
-        this.state.isProcessing = true;
-        return success(undefined);
+      (trimmedInput) => {
+        const commandResult = handleSystemCommands(trimmedInput);
+        return match(
+          (commandType) => {
+            if (commandType === 'exit') {
+              return success(undefined); // Exit handled
+            }
+            return createAndEnqueueMessage(input); // Process as message
+          },
+          (error) => failure(error),
+          commandResult
+        );
       },
-      (error: QiError): Result<void> =>
-        failure(cliError.messageEnqueueFailed(messageId, error.message)),
-      enqueueResult
+      (error) => failure(error),
+      validationResult
     );
+  }
+
+  // Helper function for message ID generation
+  private generateMessageId(): string {
+    return Math.random().toString(36).substring(2, 15);
   }
 
   // v-0.6.1: Pure message-driven CLI - only handleInput and displayMessage
