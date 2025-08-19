@@ -456,13 +456,26 @@ class QiPromptApp {
 
         return undefined;
       },
-      (error) =>
-        create(
+      (error) => {
+        // Robust error message extraction
+        let errorMessage: string;
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = String((error as any).message);
+        } else {
+          errorMessage = String(error);
+        }
+
+        return create(
           'INITIALIZATION_FAILED',
-          `Failed to initialize QiPromptApp: ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to initialize QiPromptApp: ${errorMessage}`,
           'SYSTEM',
-          { error }
-        )
+          { originalError: errorMessage }
+        );
+      }
     );
   }
 
