@@ -196,14 +196,28 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
     return globalSchemaRegistry.getSchema(this.config.schemaName);
   }
 
+  /**
+   * Public interface - maintains backward compatibility
+   */
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+    const result = await this.classifyQiCore(input, context);
+    return this.transformToPublicAPI(result);
+  }
+
+  /**
+   * Internal QiCore implementation with functional composition
+   */
+  private async classifyQiCore(
+    input: string,
+    context?: ProcessingContext
+  ): Promise<Result<ClassificationResult, QiError>> {
     // Initialize if needed - will throw explicit errors if prerequisites fail
     if (!this.initialized) {
       await this.initializeLLM();
       this.initialized = true;
     }
 
-    const classificationResult = await fromAsyncTryCatch(
+    return fromAsyncTryCatch(
       async () => {
         return await this.classifyInternal(input, context);
       },
@@ -220,14 +234,21 @@ export class LangChainFunctionCallingClassificationMethod implements IClassifica
           }
         )
     );
+  }
 
-    // Convert Result<T> to ClassificationResult or throw explicit error
+  /**
+   * Transform QiCore Result<T> to public API response
+   */
+  private transformToPublicAPI(
+    result: Result<ClassificationResult, QiError>
+  ): ClassificationResult {
     return match(
-      (result) => result,
-      (error) => {
+      (classificationResult: ClassificationResult) => classificationResult,
+      (error: QiError) => {
+        // Transform QiError to exception for backward compatibility
         throw new Error(`LangChain function calling method failed: ${error.message}`);
       },
-      classificationResult
+      result
     );
   }
 

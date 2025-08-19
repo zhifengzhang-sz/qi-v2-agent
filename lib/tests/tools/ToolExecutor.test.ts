@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { success, failure, validationError, systemError } from '@qi/base';
+import { success, failure, validationError, systemError, match } from '@qi/base';
 import { ToolExecutor } from '@qi/agent/tools/core/executor/ToolExecutor.js';
 import type { 
   ITool, 
@@ -430,12 +430,6 @@ describe('ToolExecutor QiCore 6-Phase Pipeline', () => {
     });
   });
 
-  // TODO: Fix batch execution test
-  // describe('Batch Execution', () => {
-  //   it('should handle concurrent and sequential execution properly', async () => {
-  //     // Implementation pending - complex mock setup needed
-  //   });
-  // });
 
   describe('Error Handling', () => {
     it('should provide proper error context', async () => {
@@ -461,6 +455,452 @@ describe('ToolExecutor QiCore 6-Phase Pipeline', () => {
           return;
         }
       }
+    });
+  });
+
+  describe('ToolExecutor Error Transformation - transformToQiError', () => {
+    
+    // Helper function to create test call and progress objects
+    const createTestCallAndProgress = (callId: string, toolName: string, state: string = 'execution') => {
+      const mockCall = {
+        callId,
+        toolName,
+        input: {},
+        context: mockContext,
+        timestamp: Date.now()
+      };
+      const mockProgress = {
+        callId,
+        toolName,
+        state: state as any,
+        startTime: Date.now() - 2000,
+        progress: 0.5
+      };
+      return { mockCall, mockProgress };
+    };
+
+    describe('Error Categorization by Message Pattern', () => {
+      
+      it('should categorize timeout errors as SYSTEM category', () => {
+        const timeoutError = new Error('Operation timeout occurred');
+        const { mockCall, mockProgress } = createTestCallAndProgress('test-1', 'testTool');
+        
+        // Access private method for testing using bracket notation
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          timeoutError,
+          mockProgress,
+          Date.now() - 1000
+        );
+        
+        expect(result.code).toBe('EXECUTION_TIMEOUT');
+        expect(result.category).toBe('SYSTEM');
+        expect(result.message).toContain('timeout');
+        expect(result.context.toolName).toBe('testTool');
+        expect(result.context.callId).toBe('test-1');
+        expect(result.context.phase).toBe('execution');
+      });
+
+      it('should categorize permission denied errors as VALIDATION category', () => {
+        const permissionError = new Error('permission denied to access resource');
+        const { mockCall, mockProgress } = createTestCallAndProgress('test-2', 'fileTool', 'security');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          permissionError,
+          mockProgress,
+          Date.now() - 500
+        );
+        
+        expect(result.code).toBe('PERMISSION_DENIED');
+        expect(result.category).toBe('VALIDATION');
+        expect(result.message).toContain('permission denied');
+        expect(result.context.toolName).toBe('fileTool');
+        expect(result.context.phase).toBe('security');
+      });
+
+      it('should categorize validation errors as VALIDATION category', () => {
+        const validationError = new Error('invalid input parameter: missing required field');
+        const { mockCall, mockProgress } = createTestCallAndProgress('test-3', 'validatorTool', 'validation');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          validationError,
+          mockProgress,
+          Date.now() - 200
+        );
+        
+        expect(result.code).toBe('VALIDATION_ERROR');
+        expect(result.category).toBe('VALIDATION');
+        expect(result.message).toContain('validation failed');
+        expect(result.context.toolName).toBe('validatorTool');
+      });
+
+      it('should categorize generic errors as SYSTEM category by default', () => {
+        const genericError = new Error('Unexpected runtime error occurred');
+        const { mockCall, mockProgress } = createTestCallAndProgress('test-4', 'genericTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          genericError,
+          mockProgress,
+          Date.now() - 300
+        );
+        
+        expect(result.code).toBe('EXECUTION_ERROR');
+        expect(result.category).toBe('SYSTEM');
+        expect(result.message).toContain('Unexpected runtime error occurred');
+        expect(result.context.toolName).toBe('genericTool');
+      });
+    });
+
+    describe('Context Enrichment', () => {
+      
+      it('should preserve original error message and add context', () => {
+        const originalMessage = 'Very specific error message with details';
+        const error = new Error(originalMessage);
+        const { mockCall, mockProgress } = createTestCallAndProgress('context-test-1', 'contextTool', 'processing');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          error,
+          mockProgress,
+          Date.now() - 1500
+        );
+        
+        expect(result.message).toContain(originalMessage);
+        expect(result.context.toolName).toBe('contextTool');
+        expect(result.context.callId).toBe('context-test-1');
+        expect(result.context.phase).toBe('processing');
+        expect(result.context.executionTime).toBeGreaterThan(1000);
+        expect(result.context.originalError).toBe(originalMessage);
+      });
+
+      it('should include execution time in context', () => {
+        const error = new Error('Test timing error');
+        const startTime = Date.now() - 2000; // 2 seconds ago
+        const { mockCall, mockProgress } = createTestCallAndProgress('timing-test', 'timingTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          error,
+          mockProgress,
+          startTime
+        );
+        
+        expect(result.context.executionTime).toBeGreaterThanOrEqual(1900);
+        expect(result.context.executionTime).toBeLessThan(3000);
+      });
+
+      it('should handle retry attempt context', () => {
+        const error = new Error('Network connection failed');
+        const { mockCall, mockProgress } = createTestCallAndProgress('retry-test', 'networkTool');
+        // Add retry attempt to progress
+        const progressWithRetry = { ...mockProgress, retryAttempt: 2 };
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          error,
+          progressWithRetry,
+          Date.now() - 1000
+        );
+        
+        expect(result.context.toolName).toBe('networkTool');
+        expect(result.context.phase).toBe('execution');
+        // Note: retryAttempt may not be in context depending on implementation
+      });
+    });
+
+    describe('Error Message Pattern Detection', () => {
+      
+      it('should detect various timeout patterns', () => {
+        const timeoutPatterns = [
+          'timeout',
+          'cancelled',
+          'operation timeout',
+          'request timeout'
+        ];
+        
+        timeoutPatterns.forEach((pattern, index) => {
+          const error = new Error(`Error: ${pattern} occurred`);
+          const { mockCall, mockProgress } = createTestCallAndProgress(`timeout-${index}`, 'testTool');
+          const result = (executor as any)['transformToQiError'](
+            mockCall,
+            error,
+            mockProgress,
+            Date.now() - 1000
+          );
+          
+          expect(result.code).toBe('EXECUTION_TIMEOUT');
+          expect(result.category).toBe('SYSTEM');
+        });
+      });
+
+      it('should detect various permission patterns', () => {
+        const permissionPatterns = [
+          'permission denied',
+          'access denied',
+          'permission'
+        ];
+        
+        permissionPatterns.forEach((pattern, index) => {
+          const error = new Error(`Error: ${pattern}`);
+          const { mockCall, mockProgress } = createTestCallAndProgress(`perm-${index}`, 'testTool', 'security');
+          const result = (executor as any)['transformToQiError'](
+            mockCall,
+            error,
+            mockProgress,
+            Date.now() - 1000
+          );
+          
+          expect(result.code).toBe('PERMISSION_DENIED');
+          expect(result.category).toBe('VALIDATION');
+        });
+      });
+
+      it('should detect various validation patterns', () => {
+        const validationPatterns = [
+          'validation failed',
+          'invalid input',
+          'validation',
+          'invalid'
+        ];
+        
+        validationPatterns.forEach((pattern, index) => {
+          const error = new Error(`Error: ${pattern}`);
+          const { mockCall, mockProgress } = createTestCallAndProgress(`val-${index}`, 'testTool', 'validation');
+          const result = (executor as any)['transformToQiError'](
+            mockCall,
+            error,
+            mockProgress,
+            Date.now() - 1000
+          );
+          
+          expect(result.code).toBe('VALIDATION_ERROR');
+          expect(result.category).toBe('VALIDATION');
+        });
+      });
+    });
+
+    describe('Edge Cases and Error Handling', () => {
+      
+      it('should handle mixed error indicators with priority', () => {
+        // Error with multiple keywords - timeout should take precedence
+        const mixedError = new Error('timeout occurred during validation of network connection');
+        const { mockCall, mockProgress } = createTestCallAndProgress('mixed-test', 'mixedTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          mixedError,
+          mockProgress,
+          Date.now() - 1000
+        );
+        
+        expect(result.code).toBe('EXECUTION_TIMEOUT');
+        expect(result.category).toBe('SYSTEM');
+      });
+
+      it('should handle case-sensitive error detection correctly', () => {
+        const lowerCaseError = new Error('permission denied access');
+        const { mockCall, mockProgress } = createTestCallAndProgress('case-test', 'caseTool', 'security');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          lowerCaseError,
+          mockProgress,
+          Date.now() - 1000
+        );
+        
+        expect(result.code).toBe('PERMISSION_DENIED');
+        expect(result.category).toBe('VALIDATION');
+      });
+
+      it('should handle null or undefined error messages gracefully', () => {
+        const nullError = new Error();
+        nullError.message = '' as any; // Use empty string instead of null to avoid TypeError
+        const { mockCall, mockProgress } = createTestCallAndProgress('null-test', 'nullTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          nullError,
+          mockProgress,
+          Date.now() - 1000
+        );
+        
+        expect(result.code).toBe('EXECUTION_ERROR');
+        expect(result.category).toBe('SYSTEM');
+        expect(result.context.toolName).toBe('nullTool');
+      });
+
+      it('should handle non-Error objects', () => {
+        const plainObject = { message: 'Plain object error', name: 'CustomError' };
+        const { mockCall, mockProgress } = createTestCallAndProgress('object-test', 'objectTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          plainObject,
+          mockProgress,
+          Date.now() - 1000
+        );
+        
+        expect(result.message).toContain('[object Object]');
+        expect(result.context.toolName).toBe('objectTool');
+        expect(result.context.originalError).toBe('[object Object]');
+      });
+    });
+
+    describe('QiCore Pattern Compliance in Error Transformation', () => {
+      
+      it('should create properly structured QiError objects', () => {
+        const error = new Error('Test error for structure validation');
+        const { mockCall, mockProgress } = createTestCallAndProgress('structure-test', 'structureTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          error,
+          mockProgress,
+          Date.now() - 1000
+        );
+        
+        // Verify QiError structure
+        expect(result).toHaveProperty('code');
+        expect(result).toHaveProperty('message');
+        expect(result).toHaveProperty('category');
+        expect(result).toHaveProperty('context');
+        
+        // Verify context structure
+        expect(result.context).toHaveProperty('toolName');
+        expect(result.context).toHaveProperty('callId');
+        expect(result.context).toHaveProperty('phase');
+        expect(result.context).toHaveProperty('executionTime');
+        expect(result.context).toHaveProperty('originalError');
+        
+        // Verify field types
+        expect(typeof result.code).toBe('string');
+        expect(typeof result.message).toBe('string');
+        expect(typeof result.category).toBe('string');
+        expect(typeof result.context).toBe('object');
+        expect(typeof result.context.executionTime).toBe('number');
+      });
+
+      it('should maintain error transformation consistency', () => {
+        // Test that similar errors produce consistent results
+        const error1 = new Error('Network timeout occurred');
+        const error2 = new Error('Request timeout happened');
+        
+        const { mockCall: mockCall1, mockProgress: mockProgress1 } = createTestCallAndProgress('consistency-1', 'tool1');
+        const { mockCall: mockCall2, mockProgress: mockProgress2 } = createTestCallAndProgress('consistency-2', 'tool2');
+        
+        const result1 = (executor as any)['transformToQiError'](
+          mockCall1,
+          error1,
+          mockProgress1,
+          Date.now() - 1000
+        );
+        
+        const result2 = (executor as any)['transformToQiError'](
+          mockCall2,
+          error2,
+          mockProgress2,
+          Date.now() - 1000
+        );
+        
+        // Both should be categorized as timeout errors
+        expect(result1.code).toBe('EXECUTION_TIMEOUT');
+        expect(result2.code).toBe('EXECUTION_TIMEOUT');
+        expect(result1.category).toBe(result2.category);
+        expect(result1.category).toBe('SYSTEM');
+      });
+
+      it('should preserve error traceability through context', () => {
+        const error = new Error('Traceable error message');
+        error.stack = 'Error: Traceable error message\n    at test (test.js:1:1)';
+        const { mockCall, mockProgress } = createTestCallAndProgress('trace-test', 'traceTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          error,
+          mockProgress,
+          Date.now() - 1500
+        );
+        
+        expect(result.context.originalError).toBe('Traceable error message');
+        expect(result.context.toolName).toBe('traceTool');
+        expect(result.context.callId).toBe('trace-test');
+        expect(result.context.executionTime).toBeGreaterThan(1000);
+        
+        // Verify we can trace back to original error
+        expect(result.message).toContain('Traceable error message');
+      });
+    });
+
+    describe('Real-world Error Scenarios', () => {
+      
+      it('should handle file system permission errors', () => {
+        const fsError = new Error('EACCES: permission denied, open \'/protected/file.txt\'');
+        const { mockCall, mockProgress } = createTestCallAndProgress('fs-test', 'fileSystemTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          fsError,
+          mockProgress,
+          Date.now() - 800
+        );
+        
+        expect(result.code).toBe('PERMISSION_DENIED');
+        expect(result.category).toBe('VALIDATION');
+        expect(result.message).toContain('permission denied');
+        expect(result.context.toolName).toBe('fileSystemTool');
+      });
+
+      it('should handle HTTP timeout errors', () => {
+        const httpError = new Error('Request timeout: no response received within 30000ms');
+        const { mockCall, mockProgress } = createTestCallAndProgress('http-test', 'httpTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          httpError,
+          mockProgress,
+          Date.now() - 30000
+        );
+        
+        expect(result.code).toBe('EXECUTION_TIMEOUT');
+        expect(result.category).toBe('SYSTEM');
+        expect(result.context.executionTime).toBeGreaterThan(29000);
+      });
+
+      it('should handle validation schema errors', () => {
+        const schemaError = new Error('validation error: required property "email" is missing');
+        const { mockCall, mockProgress } = createTestCallAndProgress('schema-test', 'validationTool', 'validation');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          schemaError,
+          mockProgress,
+          Date.now() - 100
+        );
+        
+        expect(result.code).toBe('VALIDATION_ERROR');
+        expect(result.category).toBe('VALIDATION');
+        expect(result.message).toContain('validation failed');
+        expect(result.context.phase).toBe('validation');
+      });
+
+      it('should handle database connection timeouts', () => {
+        const dbError = new Error('Connection timeout: Unable to connect to database within timeout period');
+        const { mockCall, mockProgress } = createTestCallAndProgress('db-test', 'databaseTool');
+        
+        const result = (executor as any)['transformToQiError'](
+          mockCall,
+          dbError,
+          mockProgress,
+          Date.now() - 5000
+        );
+        
+        expect(result.code).toBe('EXECUTION_TIMEOUT');
+        expect(result.category).toBe('SYSTEM');
+        expect(result.context.executionTime).toBeGreaterThan(4000);
+      });
     });
   });
 });

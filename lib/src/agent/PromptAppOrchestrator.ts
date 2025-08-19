@@ -20,7 +20,16 @@ import {
 } from '@qi/agent/context/utils/ContextAwarePrompting';
 import type { IPromptHandler, PromptOptions, PromptResponse } from '@qi/agent/prompt';
 import type { IStateManager } from '@qi/agent/state';
-import { create, type ErrorCategory, type QiError } from '@qi/base';
+import {
+  create,
+  type ErrorCategory,
+  failure,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import type { QiAsyncMessageQueue } from '../messaging/impl/QiAsyncMessageQueue.js';
 import type { QiMessage } from '../messaging/types/MessageTypes.js';
 import { createDebugLogger } from '../utils/DebugLogger.js';
@@ -79,9 +88,9 @@ export interface AgentEvents {
 }
 
 /**
- * Agent error factory using QiCore patterns
+ * PromptAppOrchestrator error factory using QiCore patterns
  */
-const _createAgentError = (
+const createPromptAppError = (
   code: string,
   message: string,
   category: ErrorCategory,
@@ -230,11 +239,18 @@ export class PromptAppOrchestrator implements IAgent {
     this.isInitialized = true;
   }
 
+  /**
+   * Public interface - maintains backward compatibility
+   */
   async process(request: AgentRequest): Promise<AgentResponse> {
-    if (!this.isInitialized) {
-      throw new Error('PromptApp not initialized. Call initialize() first.');
-    }
+    const result = await this.processInternal(request);
+    return this.transformToPublicAPI(result);
+  }
 
+  /**
+   * Internal QiCore implementation with functional composition
+   */
+  private async processInternal(request: AgentRequest): Promise<Result<AgentResponse, QiError>> {
     const startTime = Date.now();
     this.requestCount++;
     this.lastActivity = new Date();
@@ -243,44 +259,235 @@ export class PromptAppOrchestrator implements IAgent {
     // Create new abort controller for this request
     this.abortController = new AbortController();
 
-    try {
-      // v-0.6.1: Pure processing - classify input explicitly
-      const parsed = parseInput(request.input);
+    return fromAsyncTryCatch(
+      async () => {
+        // Validation chain using QiCore functional composition
+        const validatedRequest = await this.validateRequest(request);
 
-      // Check for cancellation
-      if (this.abortController?.signal.aborted) {
-        throw new Error('Request was cancelled');
-      }
+        return match(
+          async (req: AgentRequest) => {
+            const parsedInput = this.parseInput(req);
 
-      // v-0.6.1: Pure processing only
+            return match(
+              async (parsed: ParsedInput) => {
+                // Check cancellation using QiCore patterns
+                const cancellationCheck = this.checkCancellation();
 
-      let response: AgentResponse;
+                return match(
+                  async () => {
+                    // Route to appropriate handler using functional composition
+                    const handlerResult = await this.routeToHandler(request, parsed);
 
-      switch (parsed.type) {
-        case 'command':
-          response = await this.handleCommand(request, parsed.content);
-          break;
-        case 'workflow':
-          this.debug.warn(
-            `Input "${parsed.content}" classified as workflow - this should not happen for simple prompts!`
+                    return match(
+                      async (response: AgentResponse) => {
+                        // Final cancellation check and response enrichment
+                        const finalCancellationCheck = this.checkCancellation();
+
+                        return match(
+                          () => {
+                            const enriched = this.enrichResponse(response, startTime, parsed.type);
+                            return match(
+                              (finalResponse: AgentResponse) => finalResponse,
+                              (error: QiError) => {
+                                throw new Error(error.message);
+                              },
+                              enriched
+                            );
+                          },
+                          (error: QiError) => {
+                            throw new Error(error.message);
+                          },
+                          finalCancellationCheck
+                        );
+                      },
+                      (error: QiError) => {
+                        throw new Error(error.message);
+                      },
+                      handlerResult
+                    );
+                  },
+                  (error: QiError) => {
+                    throw new Error(error.message);
+                  },
+                  cancellationCheck
+                );
+              },
+              (error: QiError) => {
+                throw new Error(error.message);
+              },
+              parsedInput
+            );
+          },
+          (error: QiError) => {
+            throw new Error(error.message);
+          },
+          validatedRequest
+        );
+      },
+      (error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Transform traditional errors to QiError with proper categorization
+        if (errorMessage.includes('cancelled')) {
+          return createPromptAppError(
+            'REQUEST_CANCELLED',
+            'Request was cancelled by user or timeout',
+            'BUSINESS',
+            { requestId: request.context?.sessionId, startTime }
           );
-          response = await this.handleWorkflow(request, parsed.content);
-          break;
-        case 'prompt':
-          this.debug.log(`✅ Input "${parsed.content}" correctly classified as prompt`);
-          response = await this.handlePrompt(request, parsed.content);
-          break;
-        default:
-          throw new Error(`Unknown input type: ${parsed.type}`);
+        }
+        if (errorMessage.includes('not initialized')) {
+          return createPromptAppError(
+            'INITIALIZATION_ERROR',
+            'PromptApp not initialized. Call initialize() first.',
+            'CONFIGURATION',
+            { requestId: request.context?.sessionId }
+          );
+        }
+        return createPromptAppError(
+          'PROCESSING_ERROR',
+          `Processing failed: ${errorMessage}`,
+          'SYSTEM',
+          { requestId: request.context?.sessionId, originalError: errorMessage, startTime }
+        );
       }
+    ).finally(() => {
+      this.isProcessing = false;
+      this.abortController = undefined;
+    });
+  }
 
-      // Check for cancellation after processing
-      if (this.abortController?.signal.aborted) {
-        throw new Error('Request was cancelled during processing');
+  /**
+   * Transform QiCore Result<T> to public API response
+   */
+  private transformToPublicAPI(result: Result<AgentResponse, QiError>): AgentResponse {
+    return match(
+      (response: AgentResponse) => response,
+      (error: QiError) => {
+        const executionTime = Date.now() - ((error.context?.startTime as number) || Date.now());
+        this.totalResponseTime += executionTime;
+
+        // Check if it was a cancellation for metadata
+        const wasCancelled = error.code === 'REQUEST_CANCELLED';
+
+        // Transform QiError to AgentResponse for backward compatibility
+        return {
+          content: `Processing failed: ${error.message}`,
+          type: 'prompt' as const,
+          confidence: 0,
+          executionTime,
+          metadata: new Map([
+            ['error', error.message],
+            ['errorCode', error.code],
+            ['errorCategory', error.category],
+            ['cancelled', wasCancelled.toString()],
+            ['orchestrator', 'PromptApp'],
+          ]),
+          success: false,
+          error: error.message,
+        };
+      },
+      result
+    );
+  }
+
+  /**
+   * QiCore helper methods for functional composition
+   */
+
+  private async validateRequest(request: AgentRequest): Promise<Result<AgentRequest, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        if (!this.isInitialized) {
+          throw new Error('PromptApp not initialized. Call initialize() first.');
+        }
+        if (!request || !request.input) {
+          throw new Error('Invalid request: missing input');
+        }
+        return request;
+      },
+      (error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createPromptAppError('REQUEST_VALIDATION_ERROR', errorMessage, 'VALIDATION', {
+          requestInput: request?.input,
+        });
       }
+    );
+  }
 
-      // v-0.6.1: Pure processing
+  private parseInput(request: AgentRequest): Result<ParsedInput, QiError> {
+    try {
+      const parsed = parseInput(request.input);
+      return success(parsed);
+    } catch (error) {
+      return failure(
+        createPromptAppError(
+          'INPUT_PARSING_ERROR',
+          `Failed to parse input: ${error instanceof Error ? error.message : String(error)}`,
+          'VALIDATION',
+          { input: request.input }
+        )
+      );
+    }
+  }
 
+  private checkCancellation(): Result<void, QiError> {
+    if (this.abortController?.signal.aborted) {
+      return failure(
+        createPromptAppError('REQUEST_CANCELLED', 'Request was cancelled', 'BUSINESS', {
+          aborted: true,
+        })
+      );
+    }
+    return success(undefined);
+  }
+
+  private async routeToHandler(
+    request: AgentRequest,
+    parsed: ParsedInput
+  ): Promise<Result<AgentResponse, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        let response: AgentResponse;
+
+        switch (parsed.type) {
+          case 'command':
+            response = await this.handleCommand(request, parsed.content);
+            break;
+          case 'workflow':
+            this.debug.warn(
+              `Input "${parsed.content}" classified as workflow - this should not happen for simple prompts!`
+            );
+            response = await this.handleWorkflow(request, parsed.content);
+            break;
+          case 'prompt':
+            this.debug.log(`✅ Input "${parsed.content}" correctly classified as prompt`);
+            response = await this.handlePrompt(request, parsed.content);
+            break;
+          default:
+            throw new Error(`Unknown input type: ${parsed.type}`);
+        }
+
+        return response;
+      },
+      (error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createPromptAppError(
+          'HANDLER_EXECUTION_ERROR',
+          `Handler execution failed: ${errorMessage}`,
+          'SYSTEM',
+          { inputType: parsed.type, content: parsed.content, originalError: errorMessage }
+        );
+      }
+    );
+  }
+
+  private enrichResponse(
+    response: AgentResponse,
+    startTime: number,
+    inputType: InputType
+  ): Result<AgentResponse, QiError> {
+    try {
       const executionTime = Date.now() - startTime;
       this.totalResponseTime += executionTime;
 
@@ -289,40 +496,22 @@ export class PromptAppOrchestrator implements IAgent {
         executionTime,
         metadata: new Map([
           ...Array.from(response.metadata.entries()),
-          ['inputType', parsed.type],
+          ['inputType', inputType],
           ['parser', '2-category'],
           ['orchestrator', 'PromptApp'],
         ]),
       };
 
-      // v-0.6.1: Pure processing - return response only
-
-      return finalResponse;
+      return success(finalResponse);
     } catch (error) {
-      const executionTime = Date.now() - startTime;
-      this.totalResponseTime += executionTime;
-
-      // Check if it was a cancellation
-      const wasCancelled = error instanceof Error && error.message.includes('cancelled');
-
-      // v-0.6.1: Pure processing - just return error response
-
-      return {
-        content: `Processing failed: ${error instanceof Error ? error.message : String(error)}`,
-        type: 'prompt' as const,
-        confidence: 0,
-        executionTime,
-        metadata: new Map([
-          ['error', error instanceof Error ? error.message : String(error)],
-          ['cancelled', wasCancelled.toString()],
-          ['orchestrator', 'PromptApp'],
-        ]),
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    } finally {
-      this.isProcessing = false;
-      this.abortController = undefined;
+      return failure(
+        createPromptAppError(
+          'RESPONSE_ENRICHMENT_ERROR',
+          `Failed to enrich response: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { startTime, inputType, originalError: error }
+        )
+      );
     }
   }
 

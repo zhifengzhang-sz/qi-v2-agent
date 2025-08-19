@@ -45,6 +45,7 @@ interface ToolExecutionError extends QiError {
     phase?: string;
     retryAttempt?: number;
     executionTime?: number;
+    originalError?: string;
   };
 }
 
@@ -167,12 +168,86 @@ export class ToolExecutor implements IToolExecutor {
       // Final result
       yield success(processedResult as ToolResult<TOutput>);
     } catch (error) {
-      const errorResult = this.handleExecutionError(call, error, progress, startTime);
-      yield failure(errorResult);
+      // Transform traditional error to QiError using QiCore patterns
+      const qiError = this.transformToQiError(call, error, progress, startTime);
+      yield failure(qiError);
     } finally {
       this.activeExecutions.delete(call.callId);
       this.stats.activeCalls--;
     }
+  }
+
+  /**
+   * Transform traditional errors to QiError using QiCore patterns
+   */
+  private transformToQiError(
+    call: ToolCall,
+    error: unknown,
+    progress: ExecutionProgress,
+    startTime: number
+  ): QiError {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const executionTime = Date.now() - startTime;
+
+    // Categorize errors appropriately
+    if (errorMessage.includes('timeout') || errorMessage.includes('cancelled')) {
+      return toolExecutionError(
+        'EXECUTION_TIMEOUT',
+        `Tool execution timed out: ${errorMessage}`,
+        'SYSTEM',
+        {
+          toolName: call.toolName,
+          callId: call.callId,
+          phase: progress.state,
+          executionTime,
+          originalError: errorMessage,
+        }
+      );
+    }
+
+    if (errorMessage.includes('permission') || errorMessage.includes('access denied')) {
+      return toolExecutionError(
+        'PERMISSION_DENIED',
+        `Tool execution permission denied: ${errorMessage}`,
+        'VALIDATION',
+        {
+          toolName: call.toolName,
+          callId: call.callId,
+          phase: progress.state,
+          executionTime,
+          originalError: errorMessage,
+        }
+      );
+    }
+
+    if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+      return toolExecutionError(
+        'VALIDATION_ERROR',
+        `Tool execution validation failed: ${errorMessage}`,
+        'VALIDATION',
+        {
+          toolName: call.toolName,
+          callId: call.callId,
+          phase: progress.state,
+          executionTime,
+          originalError: errorMessage,
+        }
+      );
+    }
+
+    // Default to system error
+    return toolExecutionError(
+      'EXECUTION_ERROR',
+      `Tool execution failed: ${errorMessage}`,
+      'SYSTEM',
+      {
+        toolName: call.toolName,
+        callId: call.callId,
+        phase: progress.state,
+        executionTime,
+        originalError: errorMessage,
+      }
+    );
   }
 
   /**

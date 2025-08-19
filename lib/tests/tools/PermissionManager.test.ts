@@ -9,7 +9,7 @@
  * - Condition evaluation and pattern matching
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { success, failure, validationError } from '@qi/base';
 import {
   PermissionManager,
@@ -19,22 +19,22 @@ import {
 } from '@qi/agent/tools/security/PermissionManager.js';
 import type { ToolContext, PermissionResult } from '@qi/agent/tools/core/interfaces/ITool.js';
 
-// Mock QiCore logger
-vi.mock('@qi/agent/utils/QiCoreLogger.js', () => ({
-  createQiLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  }),
-}));
+// Use real logger with silent configuration for tests
+import { createQiLogger } from '@qi/agent/utils/QiCoreLogger.js';
 
 describe('PermissionManager QiCore Functional Patterns', () => {
   let permissionManager: PermissionManager;
   let mockToolContext: ToolContext;
 
   beforeEach(() => {
-    permissionManager = new PermissionManager();
+    // Use real logger with test-friendly configuration
+    const logger = createQiLogger({
+      name: 'PermissionManager',
+      level: 'error', // Only log errors during tests
+      pretty: false, // Disable pretty printing for cleaner test output
+    });
+    
+    permissionManager = new PermissionManager(logger);
     
     mockToolContext = {
       sessionId: 'test-session',
@@ -54,10 +54,19 @@ describe('PermissionManager QiCore Functional Patterns', () => {
   });
 
   describe('Result<T> Pattern Compliance', () => {
-    it.skip('should return Result<PermissionResult> for successful permission checks', async () => {
-      // Set user role to admin (should have all permissions)
+    it('should return Result<PermissionResult> for successful permission checks', async () => {
+      // Set user role to admin and add permission rule
       const roleResult = permissionManager.setUserRole('test-user', UserRole.ADMIN);
       expect(roleResult.tag).toBe('success');
+
+      // Add permission rule for admin to read files
+      const addRuleResult = permissionManager.addPermissionRule(
+        UserRole.ADMIN,
+        PermissionAction.read,
+        ResourceType.FILE,
+        '/test/**'
+      );
+      expect(addRuleResult.tag).toBe('success');
 
       const permissionResult = await permissionManager.checkToolPermission(
         'ReadTool',
@@ -96,7 +105,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
 
     it('should handle errors with proper QiError Result<T> patterns', async () => {
       // Test with invalid tool name that causes internal error
-      vi.spyOn(console, 'warn').mockImplementation(() => {}); // Suppress console warnings
+      // Error handling test - using real implementation with controlled logger
 
       const permissionResult = await permissionManager.checkToolPermission(
         'InvalidTool',
@@ -111,7 +120,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
         expect(permissionResult.value.allowed).toBe(false);
       }
 
-      vi.restoreAllMocks();
+      // Test completed - real implementation handles cleanup automatically
     });
   });
 
@@ -189,7 +198,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       }
     });
 
-    it.skip('should enforce readonly role permissions correctly', async () => {
+    it('should enforce readonly role permissions correctly', async () => {
       const setRoleResult = permissionManager.setUserRole('readonly-user', UserRole.READONLY);
       expect(setRoleResult.tag).toBe('success');
 
@@ -225,7 +234,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       }
     });
 
-    it.skip('should enforce guest role permissions correctly', async () => {
+    it('should enforce guest role permissions correctly', async () => {
       const setRoleResult = permissionManager.setUserRole('guest-user', UserRole.GUEST);
       expect(setRoleResult.tag).toBe('success');
 
@@ -354,7 +363,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       }
     });
 
-    it.skip('should remove permission rules with Result<T> indicating count', () => {
+    it('should remove permission rules with Result<T> indicating count', () => {
       // Add a custom rule first
       const customRule = {
         role: UserRole.OPERATOR,
@@ -406,7 +415,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
   });
 
   describe('Resource Type Detection', () => {
-    it.skip('should detect file tools and resources correctly', async () => {
+    it('should detect file tools and resources correctly', async () => {
       permissionManager.setUserRole('test-user', UserRole.DEVELOPER);
 
       // File tools should map to FILE resource type
@@ -518,7 +527,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
   });
 
   describe('Path Pattern Matching', () => {
-    it.skip('should handle glob pattern matching for path-based permissions', async () => {
+    it('should handle glob pattern matching for path-based permissions', async () => {
       // Guest role has pathPattern: '/tmp/**' for file read access
       permissionManager.setUserRole('pattern-user', UserRole.GUEST);
 
@@ -576,7 +585,7 @@ describe('PermissionManager QiCore Functional Patterns', () => {
       }
     });
 
-    it.skip('should handle session-only context (no userId)', async () => {
+    it('should handle session-only context (no userId)', async () => {
       permissionManager.setSessionRole('test-session', UserRole.OPERATOR);
 
       const sessionOnlyContext: ToolContext = {

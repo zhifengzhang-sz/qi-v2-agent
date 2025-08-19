@@ -133,62 +133,97 @@ export class OllamaNativeClassificationMethod implements IClassificationMethod {
 Respond with valid JSON matching the required schema.`;
   }
 
+  /**
+   * Public interface - maintains backward compatibility
+   */
   async classify(input: string, context?: ProcessingContext): Promise<ClassificationResult> {
+    const result = await this.classifyInternal(input, context);
+    return this.transformToPublicAPI(result);
+  }
+
+  /**
+   * Internal QiCore implementation with functional composition
+   */
+  private async classifyInternal(
+    input: string,
+    context?: ProcessingContext
+  ): Promise<Result<ClassificationResult, QiError>> {
     const startTime = Date.now();
     this.totalClassifications++;
 
-    try {
-      // Pre-filter commands using existing detection logic
-      const commandResult = detectCommand(input, {
-        commandPrefix: '/',
-        fileReferencePrefix: '',
-        extendedThinkingTriggers: [],
-        conversationControlFlags: [],
-      });
-      if (commandResult !== null) {
+    return fromAsyncTryCatch(
+      async () => {
+        // Pre-filter commands using existing detection logic
+        const commandResult = detectCommand(input, {
+          commandPrefix: '/',
+          fileReferencePrefix: '',
+          extendedThinkingTriggers: [],
+          conversationControlFlags: [],
+        });
+
+        if (commandResult !== null) {
+          const duration = Date.now() - startTime;
+          this.totalLatencyMs += duration;
+          this.successfulClassifications++;
+
+          // Add timing metadata to the existing result
+          const metadata = new Map(commandResult.metadata);
+          metadata.set('duration_ms', duration.toString());
+          metadata.set('provider', 'ollama-native');
+
+          return {
+            ...commandResult,
+            method: 'ollama-native' as ClassificationMethod,
+            metadata,
+          };
+        }
+
+        // For non-commands, use Ollama native structured output
+        const classificationResult = await this.performOllamaClassification(input, context);
+
+        // Handle Result<T> pattern using QiCore functional composition
         const duration = Date.now() - startTime;
         this.totalLatencyMs += duration;
-        this.successfulClassifications++;
 
-        // Add timing metadata to the existing result
-        const metadata = new Map(commandResult.metadata);
-        metadata.set('duration_ms', duration.toString());
-        metadata.set('provider', 'ollama-native');
+        return match(
+          (result: ClassificationResult) => {
+            this.successfulClassifications++;
+            return result;
+          },
+          (error: QiError) => {
+            throw new Error(`Classification failed: ${error.message}`);
+          },
+          classificationResult
+        );
+      },
+      (error: unknown) => {
+        const duration = Date.now() - startTime;
+        this.totalLatencyMs += duration;
 
-        return {
-          ...commandResult,
-          method: 'ollama-native' as ClassificationMethod,
-          metadata,
-        };
+        return createOllamaNativeClassificationError(
+          'CLASSIFICATION_ERROR',
+          `Ollama native classification failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { originalError: error instanceof Error ? error.message : String(error), duration }
+        );
       }
+    );
+  }
 
-      // For non-commands, use Ollama native structured output
-      const classificationResult = await this.performOllamaClassification(input, context);
-
-      // Handle Result<T> pattern using QiCore match() - NO .tag access
-      const duration = Date.now() - startTime;
-      this.totalLatencyMs += duration;
-
-      return match(
-        (result: ClassificationResult) => {
-          this.successfulClassifications++;
-          return result;
-        },
-        (error: QiError) => {
-          throw new Error(`Classification failed: ${error.message}`);
-        },
-        classificationResult
-      );
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      this.totalLatencyMs += duration;
-
-      // Performance tracking removed to prevent global state contamination
-
-      throw new Error(
-        `Ollama native classification failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+  /**
+   * Transform QiCore Result<T> to public API response
+   */
+  private transformToPublicAPI(
+    result: Result<ClassificationResult, QiError>
+  ): ClassificationResult {
+    return match(
+      (classificationResult: ClassificationResult) => classificationResult,
+      (error: QiError) => {
+        // Transform QiError to exception for backward compatibility
+        throw new Error(`Ollama native classification failed: ${error.message}`);
+      },
+      result
+    );
   }
 
   getMethodName(): ClassificationMethod {
@@ -206,15 +241,27 @@ Respond with valid JSON matching the required schema.`;
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/api/tags`);
-      if (!response.ok) return false;
+    const result = await fromAsyncTryCatch(
+      async () => {
+        const response = await fetch(`${this.config.baseUrl}/api/tags`);
+        if (!response.ok) return false;
 
-      const data = (await response.json()) as { models?: Array<{ name: string }> };
-      return data.models?.some((model) => model.name === this.config.modelId) || false;
-    } catch {
-      return false;
-    }
+        const data = (await response.json()) as { models?: Array<{ name: string }> };
+        return data.models?.some((model) => model.name === this.config.modelId) || false;
+      },
+      () =>
+        createOllamaNativeClassificationError(
+          'AVAILABILITY_CHECK_FAILED',
+          'Failed to check Ollama availability',
+          'NETWORK'
+        )
+    );
+
+    return match(
+      (available: boolean) => available,
+      () => false,
+      result
+    );
   }
 
   // Private methods
@@ -260,42 +307,20 @@ Respond with valid JSON matching the required schema.`;
   }
 
   private selectSchema(): Result<SchemaEntry, QiError> {
-    try {
-      // 🔧 REAL FIX: Don't use adaptive schema selection at all!
-      // Just get the explicitly configured schema by name to ensure deterministic behavior
-      return globalSchemaRegistry.getSchema(this.config.schemaName || 'minimal');
-    } catch (error) {
-      return failure(
-        createOllamaNativeClassificationError(
-          'SCHEMA_SELECTION_FAILED',
-          `Schema selection failed: ${error instanceof Error ? error.message : String(error)}`,
-          'SYSTEM',
-          { error: String(error) }
-        )
-      );
-    }
+    // Pure QiCore - no try/catch, just return the Result<T> directly
+    return globalSchemaRegistry.getSchema(this.config.schemaName || 'minimal');
   }
 
   private buildPrompt(input: string, context?: ProcessingContext): Result<string, QiError> {
-    try {
-      const contextStr = this.formatContext(context);
+    // Pure QiCore - no try/catch for simple string operations
+    const contextStr = this.formatContext(context);
 
-      // Use pre-built template with simple string replacement
-      const prompt = this.promptTemplate
-        .replace('{{INPUT}}', input)
-        .replace('{{CONTEXT}}', contextStr);
+    // Use pre-built template with simple string replacement
+    const prompt = this.promptTemplate
+      .replace('{{INPUT}}', input)
+      .replace('{{CONTEXT}}', contextStr);
 
-      return success(prompt);
-    } catch (error) {
-      return failure(
-        createOllamaNativeClassificationError(
-          'PROMPT_BUILD_FAILED',
-          `Failed to build classification prompt: ${error instanceof Error ? error.message : String(error)}`,
-          'SYSTEM',
-          { input, error: String(error) }
-        )
-      );
-    }
+    return success(prompt);
   }
 
   private createOllamaJsonSchema(): Result<object, QiError> {
