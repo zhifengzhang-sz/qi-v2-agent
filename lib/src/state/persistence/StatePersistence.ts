@@ -224,23 +224,24 @@ export class StatePersistence {
 
     // Functional composition: validate → create persisted state → serialize → write
     const validationResult = validateContext(context);
+
     return match(
-      (validCtx) => {
+      async (validCtx: AgentStateContext) => {
         const stateResult = createPersistedState(validCtx);
         return match(
-          (persistedState) => {
+          async (persistedState: PersistedState) => {
             const serializedResult = serializeState(persistedState);
             return match(
-              (stateJson) => writeStateFile(stateJson),
-              (error) => Promise.resolve(failure(error)),
+              (stateJson: string) => writeStateFile(stateJson),
+              (error: QiError) => Promise.resolve(failure(error)),
               serializedResult
             );
           },
-          (error) => Promise.resolve(failure(error)),
+          (error: QiError) => Promise.resolve(failure(error)),
           stateResult
         );
       },
-      (error) => Promise.resolve(failure(error)),
+      (error: QiError) => Promise.resolve(failure(error)),
       validationResult
     );
   }
@@ -294,44 +295,32 @@ export class StatePersistence {
       return success(sess);
     };
 
-    return fromAsyncTryCatch(
-      async () => {
-        return match(
-          async (validSession) => {
-            const persistedSession: PersistedSession = {
-              timestamp: new Date().toISOString(),
-              sessionData: validSession,
-            };
+    const validationResult = validateSession(session);
 
-            const sessionFile = join(SESSIONS_DIR, `${validSession.id}.json`);
-            try {
-              const sessionJson = JSON.stringify(persistedSession, null, 2);
-              await writeFile(sessionFile, sessionJson, 'utf-8');
-            } catch (writeError) {
-              if (writeError && typeof writeError === 'object' && 'code' in writeError) {
-                throw mapFileSystemError(writeError as NodeJS.ErrnoException, sessionFile, 'write');
-              }
-              throw persistenceError.serializationError(persistedSession, String(writeError));
-            }
+    return match(
+      async (validSession: SessionData) => {
+        const persistedSession: PersistedSession = {
+          timestamp: new Date().toISOString(),
+          sessionData: validSession,
+        };
+
+        const sessionFile = join(SESSIONS_DIR, `${validSession.id}.json`);
+
+        return fromAsyncTryCatch(
+          async () => {
+            const sessionJson = JSON.stringify(persistedSession, null, 2);
+            await writeFile(sessionFile, sessionJson, 'utf-8');
           },
           (error) => {
-            throw error;
-          },
-          validateSession(session)
+            if (error && typeof error === 'object' && 'code' in error) {
+              return mapFileSystemError(error as NodeJS.ErrnoException, sessionFile, 'write');
+            }
+            return persistenceError.serializationError(persistedSession, String(error));
+          }
         );
       },
-      (error) => {
-        // Handle QiError objects directly
-        if (error && typeof error === 'object' && 'code' in error && 'category' in error) {
-          return error as QiError;
-        }
-        return create(
-          'SAVE_SESSION_ERROR',
-          `Failed to save session ${session.id}: ${error}`,
-          'SYSTEM',
-          { sessionId: session.id }
-        );
-      }
+      (error: QiError) => Promise.resolve(failure(error)),
+      validationResult
     );
   }
 
@@ -454,9 +443,8 @@ export class StatePersistence {
       async () => {
         const sessionIdsResult = await StatePersistence.listSessions();
 
-        // Use proper QiCore pattern - no throwing inside match
         return match(
-          async (sessionIds) => {
+          async (sessionIds: string[]) => {
             let deletedCount = 0;
             const cutoffTime = Date.now() - maxAgeMs;
 
@@ -465,7 +453,7 @@ export class StatePersistence {
 
               // Use proper match pattern - no side effects in match
               const shouldDelete = match(
-                (sessionData) => {
+                (sessionData: SessionData | null) => {
                   if (sessionData) {
                     const lastActive = new Date(sessionData.lastActiveAt).getTime();
                     return lastActive < cutoffTime;
@@ -496,7 +484,7 @@ export class StatePersistence {
 
             return deletedCount;
           },
-          (error) => {
+          (error: QiError) => {
             throw error; // Let fromAsyncTryCatch handle this
           },
           sessionIdsResult

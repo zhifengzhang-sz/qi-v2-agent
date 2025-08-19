@@ -229,7 +229,7 @@ class QiPromptApp {
             }
           );
         }
-        await this.stateManager.loadLLMConfig(this.promptConfigPath, this.promptSchemaPath);
+        await this.stateManager.loadLLMConfig(this.promptConfigPath);
 
         // Create config helper that uses StateManager as source
         this.configHelper = createAppConfigHelper(this.stateManager);
