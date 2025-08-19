@@ -4,6 +4,7 @@
  * Manages execution contexts, environment isolation, and contextual information flow
  */
 
+import type { Result } from '@qi/base';
 import type {
   AppContext,
   ContextAccessAudit,
@@ -25,24 +26,24 @@ export interface IContextManager {
   createConversationContext(
     type: 'main' | 'sub-agent' | 'tool',
     parentId?: string
-  ): ConversationContext;
+  ): Result<ConversationContext>;
   getConversationContext(id: string): ConversationContext | null;
-  addMessageToContext(contextId: string, message: ContextMessage): void;
-  updateConversationContext(contextId: string, updates: Partial<ConversationContext>): void;
+  addMessageToContext(contextId: string, message: ContextMessage): Result<void>;
+  updateConversationContext(contextId: string, updates: Partial<ConversationContext>): Result<void>;
 
   // Isolated Context Management for Sub-Agents
-  createIsolatedContext(config: IsolatedContextConfig): IsolatedContext;
+  createIsolatedContext(config: IsolatedContextConfig): Result<IsolatedContext>;
   getIsolatedContext(id: string): IsolatedContext | null;
-  validateContextAccess(contextId: string, operation: string): Promise<boolean>;
+  validateContextAccess(contextId: string, operation: string): Promise<Result<boolean>>;
   terminateContext(contextId: string): void;
 
   // Context Lifecycle Management
-  cleanupExpiredContexts(): Promise<number>;
+  cleanupExpiredContexts(): Promise<Result<number>>;
   getActiveContexts(): readonly ConversationContext[];
   getActiveIsolatedContexts(): readonly IsolatedContext[];
 
   // Security and Boundary Enforcement
-  enforceSecurityBoundaries(contextId: string, operation: string): Promise<boolean>;
+  enforceSecurityBoundaries(contextId: string, operation: string): Promise<Result<boolean>>;
   auditContextAccess(contextId: string, operation: string, result: boolean, reason?: string): void;
   getAccessAuditLog(contextId?: string): readonly ContextAccessAudit[];
 
@@ -56,8 +57,8 @@ export interface IContextManager {
   getContextStatistics(): ContextManagerStatistics;
 
   // Lifecycle
-  initialize(): Promise<void>;
-  shutdown(): Promise<void>;
+  initialize(): Promise<Result<void>>;
+  shutdown(): Promise<Result<void>>;
 }
 
 /**

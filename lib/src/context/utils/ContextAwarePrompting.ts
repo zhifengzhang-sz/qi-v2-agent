@@ -5,6 +5,7 @@
  * Now uses LangChain ChatPromptTemplate for proper message structure
  */
 
+import { match } from '@qi/base';
 import { LangChainPromptHandler } from '../../prompt/impl/LangChainPromptHandler.js';
 import type { IPromptHandler, PromptOptions, PromptResponse } from '../../prompt/index.js';
 import { isDebugEnabled } from '../../utils/DebugLogger.js';
@@ -64,7 +65,7 @@ export class ContextAwarePromptHandler {
 
       // Update context with new interaction
       if (result.success) {
-        this.contextManager.addMessageToContext(contextId, {
+        const userMessageResult = this.contextManager.addMessageToContext(contextId, {
           id: `msg_${Date.now()}_user`,
           role: 'user',
           content: prompt,
@@ -76,7 +77,15 @@ export class ContextAwarePromptHandler {
           ]),
         });
 
-        this.contextManager.addMessageToContext(contextId, {
+        match(
+          () => {}, // Success - continue
+          (error) => {
+            console.warn(`Failed to add user message to context: ${error.message}`);
+          },
+          userMessageResult
+        );
+
+        const assistantMessageResult = this.contextManager.addMessageToContext(contextId, {
           id: `msg_${Date.now()}_assistant`,
           role: 'assistant',
           content: result.data,
@@ -90,6 +99,14 @@ export class ContextAwarePromptHandler {
             ],
           ]),
         });
+
+        match(
+          () => {}, // Success - continue
+          (error) => {
+            console.warn(`Failed to add assistant message to context: ${error.message}`);
+          },
+          assistantMessageResult
+        );
       }
 
       return result;
@@ -115,10 +132,20 @@ export class ContextAwarePromptHandler {
     task: string,
     timeLimit: number = 300000 // 5 minutes
   ): Promise<string> {
-    const subContext = this.contextManager.createConversationContext('sub-agent', parentContextId);
+    const contextResult = this.contextManager.createConversationContext(
+      'sub-agent',
+      parentContextId
+    );
+    const subContextId = match(
+      (context) => context.id,
+      (error) => {
+        throw new Error(`Failed to create sub-conversation context: ${error.message}`);
+      },
+      contextResult
+    );
 
     // Add task description as system message
-    this.contextManager.addMessageToContext(subContext.id, {
+    const messageResult = this.contextManager.addMessageToContext(subContextId, {
       id: `msg_${Date.now()}_system`,
       role: 'system',
       content: `Sub-conversation started for task: ${task}`,
@@ -130,7 +157,15 @@ export class ContextAwarePromptHandler {
       ]),
     });
 
-    return subContext.id;
+    match(
+      () => {}, // Success - continue
+      (error) => {
+        throw new Error(`Failed to add message to context: ${error.message}`);
+      },
+      messageResult
+    );
+
+    return subContextId;
   }
 
   /**
@@ -287,7 +322,7 @@ export class ContextAwarePromptHandler {
       if (includeMessages) {
         // Copy messages to target context
         for (const message of fromContext.messages) {
-          this.contextManager.addMessageToContext(toContextId, {
+          const transferResult = this.contextManager.addMessageToContext(toContextId, {
             ...message,
             id: `transferred_${message.id}`,
             metadata: new Map([
@@ -296,11 +331,19 @@ export class ContextAwarePromptHandler {
               ['transferredAt', new Date().toISOString()],
             ]),
           });
+
+          match(
+            () => {}, // Success - continue
+            (error) => {
+              console.warn(`Failed to transfer message ${message.id}: ${error.message}`);
+            },
+            transferResult
+          );
         }
       }
 
       // Add transfer notification
-      this.contextManager.addMessageToContext(toContextId, {
+      const notificationResult = this.contextManager.addMessageToContext(toContextId, {
         id: `transfer_${Date.now()}`,
         role: 'system',
         content: `Context transferred from ${fromContextId}`,
@@ -310,6 +353,14 @@ export class ContextAwarePromptHandler {
           ['sourceContext', fromContextId],
         ]),
       });
+
+      match(
+        () => {}, // Success - continue
+        (error) => {
+          console.warn(`Failed to add transfer notification: ${error.message}`);
+        },
+        notificationResult
+      );
 
       return true;
     } catch (error) {

@@ -420,8 +420,15 @@ export class QiCodeAgent implements IAgent {
 
         if (!contextId) {
           // Create new conversation context for this session
-          const newContext = this.contextManager.createConversationContext('main');
-          contextId = newContext.id;
+          const contextResult = this.contextManager.createConversationContext('main');
+          const newContextId = match(
+            (context) => context.id,
+            (error) => {
+              throw new Error(`Failed to create conversation context: ${error.message}`);
+            },
+            contextResult
+          );
+          contextId = newContextId;
 
           // Map session to context for future requests
           this.sessionContextMap.set(sessionId, contextId);
@@ -431,8 +438,15 @@ export class QiCodeAgent implements IAgent {
         const existingContext = this.contextManager.getConversationContext(contextId);
         if (!existingContext) {
           // Context was cleaned up, create a new one
-          const newContext = this.contextManager.createConversationContext('main');
-          contextId = newContext.id;
+          const contextResult = this.contextManager.createConversationContext('main');
+          const newContextId = match(
+            (context) => context.id,
+            (error) => {
+              throw new Error(`Failed to create conversation context: ${error.message}`);
+            },
+            contextResult
+          );
+          contextId = newContextId;
           this.sessionContextMap.set(sessionId, contextId);
         }
 
@@ -1028,7 +1042,7 @@ export class QiCodeAgent implements IAgent {
 
     if (contextId) {
       // Add workflow execution as conversation entry
-      this.contextManager.addMessageToContext(contextId, {
+      const messageResult = this.contextManager.addMessageToContext(contextId, {
         id: `workflow_msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: workflowResult.finalState?.output || 'Workflow completed',
@@ -1041,6 +1055,15 @@ export class QiCodeAgent implements IAgent {
           ['executionTime', (workflowResult.performance?.totalTime || 0).toString()],
         ]),
       });
+
+      // Handle potential error when adding message
+      match(
+        () => {}, // Success - continue
+        (error) => {
+          console.warn(`Failed to add workflow message to context: ${error.message}`);
+        },
+        messageResult
+      );
     }
   }
 

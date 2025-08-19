@@ -74,9 +74,9 @@ const createMockStateManager = (): IStateManager => ({
 
 // Mock context manager
 const createMockContextManager = (): any => ({
-  initialize: vi.fn().mockResolvedValue(undefined),
-  shutdown: vi.fn().mockResolvedValue(undefined),
-  createConversationContext: vi.fn(() => ({ 
+  initialize: vi.fn().mockResolvedValue(success(undefined)),
+  shutdown: vi.fn().mockResolvedValue(success(undefined)),
+  createConversationContext: vi.fn(() => success({ 
     id: 'test-context-id',
     messages: [],
     metadata: new Map(),
@@ -88,7 +88,7 @@ const createMockContextManager = (): any => ({
   })),
   clearContext: vi.fn(),
   updateEnvironmentContext: vi.fn(),
-  addMessageToContext: vi.fn(),
+  addMessageToContext: vi.fn(() => success(undefined)),
 });
 
 // Mock prompt handler

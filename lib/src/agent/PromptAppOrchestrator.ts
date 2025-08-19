@@ -735,8 +735,15 @@ export class PromptAppOrchestrator implements IAgent {
 
         if (!contextId) {
           // Create new conversation context for this session
-          const newContext = this.contextManager.createConversationContext('main');
-          contextId = newContext.id;
+          const contextResult = this.contextManager.createConversationContext('main');
+          const newContextId = match(
+            (context) => context.id,
+            (error) => {
+              throw new Error(`Failed to create conversation context: ${error.message}`);
+            },
+            contextResult
+          );
+          contextId = newContextId;
           this.sessionContextMap.set(sessionId, contextId);
         }
 
@@ -744,8 +751,15 @@ export class PromptAppOrchestrator implements IAgent {
         const existingContext = this.contextManager.getConversationContext(contextId);
         if (!existingContext) {
           // Context was cleaned up, create a new one
-          const newContext = this.contextManager.createConversationContext('main');
-          contextId = newContext.id;
+          const contextResult = this.contextManager.createConversationContext('main');
+          const newContextId = match(
+            (context) => context.id,
+            (error) => {
+              throw new Error(`Failed to create conversation context: ${error.message}`);
+            },
+            contextResult
+          );
+          contextId = newContextId;
           this.sessionContextMap.set(sessionId, contextId);
         }
 

@@ -13,7 +13,15 @@ import type {
 // v-0.6.1: QueueEventCallback and QueueEventType removed - pure message-driven
 import type { MessageStats, QiMessage } from '@qi/agent/messaging/types/MessageTypes';
 import { MessageStatus } from '@qi/agent/messaging/types/MessageTypes';
-import { create, failure, match, type QiError, type Result, success } from '@qi/base';
+import {
+  create,
+  failure,
+  fromAsyncTryCatch,
+  match,
+  type QiError,
+  type Result,
+  success,
+} from '@qi/base';
 import { createDebugLogger } from '../../utils/DebugLogger.js';
 
 /**
@@ -447,16 +455,27 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     // Clear queue
     this.queue = [];
 
-    // Call cleanup function if provided
+    // Call cleanup function if provided - use QiCore pattern
     if (this.options.cleanupFn) {
-      try {
-        await this.options.cleanupFn();
-      } catch (_error) {
-        return failure(
+      const cleanupResult = await fromAsyncTryCatch(
+        async () => {
+          await this.options.cleanupFn!();
+        },
+        (_error: unknown) =>
           queueError('CLEANUP_FAILED', 'Cleanup function failed', {
             operation: 'destroy',
           })
-        );
+      );
+
+      // If cleanup failed, return the error using proper QiCore pattern
+      const errorResult = match(
+        () => null, // Success - continue with destroy
+        (error: QiError) => failure(error),
+        cleanupResult
+      );
+
+      if (errorResult !== null) {
+        return errorResult;
       }
     }
 
