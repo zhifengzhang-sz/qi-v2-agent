@@ -26,6 +26,9 @@ node_modules/
 **/dist/
 **/node_modules/
 
+# Compiled binaries
+app/qi-prompt
+
 # Environment files
 .env
 .env.local
