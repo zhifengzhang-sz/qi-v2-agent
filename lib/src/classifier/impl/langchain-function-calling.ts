@@ -587,12 +587,8 @@ ${contextStr}
       }
     }
 
-    // Default fallback
-    return {
-      type: 'prompt',
-      confidence: 0.5,
-      reasoning: 'Unable to extract structured output from LLM response',
-    };
+    // No fallback - throw error if we can't extract structured output
+    throw new Error('Unable to extract structured output from LLM response');
   }
 
   private trackPerformance(startTime: number, success: boolean): void {

@@ -180,7 +180,9 @@ export function detectFileReference(
   input: string,
   config: CommandDetectionConfig = DEFAULT_COMMAND_CONFIG
 ): { references: string[]; remainingText: string } | null {
-  const fileReferenceRegex = new RegExp(`\\${config.fileReferencePrefix}([\\w\\-./]+)`, 'g');
+  // Properly escape the prefix and construct the regex pattern
+  const escapedPrefix = config.fileReferencePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const fileReferenceRegex = new RegExp(`${escapedPrefix}([\\w\\-./]+)`, 'g');
   const matches = Array.from(input.matchAll(fileReferenceRegex));
 
   if (matches.length === 0) {

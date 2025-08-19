@@ -11,6 +11,7 @@ import {
   type ErrorCategory,
   failure,
   fromAsyncTryCatch,
+  match,
   type QiError,
   type Result,
   success,
@@ -97,9 +98,16 @@ export class OllamaNativeClassificationMethod implements IClassificationMethod {
 
     // Select schema once during construction
     const schemaResult = this.selectSchema();
-    if (schemaResult.tag === 'success') {
-      this.selectedSchema = schemaResult.value;
-    }
+    match(
+      (schema: SchemaEntry) => {
+        this.selectedSchema = schema;
+      },
+      (_error: QiError) => {
+        // Schema will remain undefined - will fail later in classify()
+        console.warn('Failed to select schema during Ollama native classifier construction');
+      },
+      schemaResult
+    );
 
     // Build prompt template once during construction
     this.promptTemplate = `Classify the following user input into one of two categories:
@@ -157,21 +165,20 @@ Respond with valid JSON matching the required schema.`;
       // For non-commands, use Ollama native structured output
       const classificationResult = await this.performOllamaClassification(input, context);
 
-      // Handle Result<T> pattern properly
-      if (classificationResult.tag === 'failure') {
-        const duration = Date.now() - startTime;
-        this.totalLatencyMs += duration;
-        throw new Error(`Classification failed: ${classificationResult.error.message}`);
-      }
-
-      // Success case - extract the ClassificationResult
+      // Handle Result<T> pattern using QiCore match() - NO .tag access
       const duration = Date.now() - startTime;
       this.totalLatencyMs += duration;
-      this.successfulClassifications++;
 
-      // Performance tracking removed to prevent global state contamination
-
-      return classificationResult.value;
+      return match(
+        (result: ClassificationResult) => {
+          this.successfulClassifications++;
+          return result;
+        },
+        (error: QiError) => {
+          throw new Error(`Classification failed: ${error.message}`);
+        },
+        classificationResult
+      );
     } catch (error) {
       const duration = Date.now() - startTime;
       this.totalLatencyMs += duration;
@@ -218,19 +225,23 @@ Respond with valid JSON matching the required schema.`;
   ): Promise<Result<ClassificationResult, QiError>> {
     return fromAsyncTryCatch(
       async () => {
-        // Build prompt
-        const promptResult = this.buildPrompt(input, context);
-        if (promptResult.tag === 'failure') {
-          throw new Error(`Prompt building failed: ${promptResult.error.message}`);
-        }
-        const prompt = promptResult.value;
+        // Build prompt using QiCore match() - NO .tag access
+        const prompt = match(
+          (prompt: string) => prompt,
+          (error: QiError) => {
+            throw new Error(`Prompt building failed: ${error.message}`);
+          },
+          this.buildPrompt(input, context)
+        );
 
-        // Create JSON schema for Ollama format parameter
-        const jsonSchemaResult = this.createOllamaJsonSchema();
-        if (jsonSchemaResult.tag === 'failure') {
-          throw new Error(`Schema creation failed: ${jsonSchemaResult.error.message}`);
-        }
-        const jsonSchema = jsonSchemaResult.value;
+        // Create JSON schema using QiCore match() - NO .tag access
+        const jsonSchema = match(
+          (schema: object) => schema,
+          (error: QiError) => {
+            throw new Error(`Schema creation failed: ${error.message}`);
+          },
+          this.createOllamaJsonSchema()
+        );
 
         // Call Ollama native API
         const ollamaResponse = await this.callOllamaNativeAPI(prompt, jsonSchema);

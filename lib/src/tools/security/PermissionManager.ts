@@ -5,7 +5,15 @@
  * Implements Claude Code's security patterns with QiCore Result<T> integration.
  */
 
-import { create, failure, type QiError, type Result, success, validationError } from '@qi/base';
+import {
+  create,
+  failure,
+  match,
+  type QiError,
+  type Result,
+  success,
+  validationError,
+} from '@qi/base';
 import { createQiLogger } from '../../utils/QiCoreLogger.js';
 import type { PermissionResult, ToolContext, ToolPermissions } from '../core/interfaces/ITool.js';
 
@@ -199,17 +207,27 @@ export class PermissionManager {
       for (const rule of applicableRules) {
         if (rule.conditions) {
           const conditionResult = await this.evaluateConditions(rule.conditions, context, resource);
-          if (conditionResult.tag === 'failure') {
-            const result: PermissionResult = {
-              allowed: false,
-              reason: `Permission condition failed: ${conditionResult.error.message}`,
-            };
+          const conditionPassed = match(
+            (passed: boolean) => passed,
+            (error: QiError) => {
+              // Log condition failure and deny permission
+              this.logPermissionCheck(
+                toolName,
+                action,
+                resource,
+                context,
+                {
+                  allowed: false,
+                  reason: `Permission condition failed: ${error.message}`,
+                },
+                startTime
+              );
+              return false;
+            },
+            conditionResult
+          );
 
-            await this.logPermissionCheck(toolName, action, resource, context, result, startTime);
-            return success(result);
-          }
-
-          if (!conditionResult.value) {
+          if (!conditionPassed) {
             const result: PermissionResult = {
               allowed: false,
               reason: 'Permission conditions not met',

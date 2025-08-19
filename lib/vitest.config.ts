@@ -1,7 +1,16 @@
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'node:path';
+import tsconfigPaths from 'vite-tsconfig-paths';
+import { resolve } from 'path';
 
 export default defineConfig({
+  plugins: [tsconfigPaths()],
+  resolve: {
+    alias: {
+      '@qi/base': resolve(__dirname, '../../qi-v2-qicore/typescript/dist/base'),
+      '@qi/core': resolve(__dirname, '../../qi-v2-qicore/typescript/dist/core'),
+      '@qi/agent': resolve(__dirname, './src'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
@@ -29,22 +38,5 @@ export default defineConfig({
     },
     testTimeout: 10000,
     hookTimeout: 10000,
-  },
-  resolve: {
-    alias: [
-      { find: '@qi/base', replacement: resolve(__dirname, '../../qi-v2-qicore/typescript/dist/base') },
-      { find: '@qi/core', replacement: resolve(__dirname, '../../qi-v2-qicore/typescript/dist/core') },
-      { find: '@qi/agent/core/interfaces', replacement: resolve(__dirname, './src/core/interfaces.ts') },
-      { find: '@qi/agent/impl/memory-provider', replacement: resolve(__dirname, './src/impl/memory-provider.ts') },
-      { find: '@qi/agent/impl', replacement: resolve(__dirname, './src/impl') },
-      { find: '@qi/agent/core', replacement: resolve(__dirname, './src/core') },
-      { find: '@qi/agent/messaging/types', replacement: resolve(__dirname, './src/messaging/types') },
-      { find: '@qi/agent/messaging/interfaces', replacement: resolve(__dirname, './src/messaging/interfaces') },
-      { find: '@qi/agent/messaging/impl', replacement: resolve(__dirname, './src/messaging/impl') },
-      { find: '@qi/agent/messaging', replacement: resolve(__dirname, './src/messaging') },
-      { find: '@qi/agent', replacement: resolve(__dirname, './src/index.ts') },
-      { find: '@qi/lib', replacement: resolve(__dirname, './src') },
-      { find: '@', replacement: resolve(__dirname, './src') },
-    ],
   },
 });
