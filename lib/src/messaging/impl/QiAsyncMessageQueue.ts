@@ -186,70 +186,121 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
 
   /**
    * Core async iterator method - implements h2A's next() pattern
+   * QiCore Interface Boundary Pattern: Use QiCore internally, adapt to standard interface
    */
   async next(): Promise<IteratorResult<T, any>> {
-    // Check if queue is paused
-    if (this.isPausedState) {
-      return new Promise((resolve) => {
-        const checkPaused = () => {
-          if (!this.isPausedState) {
-            this.next().then(resolve);
-          } else {
-            setTimeout(checkPaused, 100);
-          }
-        };
-        checkPaused();
-      });
-    }
+    const result = await this.nextQiCore();
 
-    // Priority: return from queue if available
-    const nextMessage = this.dequeueNextMessage();
+    // Interface boundary: unwrap QiCore Result<T> to standard interface
     return match(
-      (queuedMessage) => {
-        if (queuedMessage) {
-          this.debug.log(
-            `Dequeuing message ID: ${queuedMessage.message.id}, type: ${queuedMessage.message.type}`
-          );
-          this.updateMessageStatus(queuedMessage, MessageStatus.PROCESSING);
-          // v-0.6.1: Event emission removed - pure message-driven
-
-          return Promise.resolve({
-            done: false,
-            value: queuedMessage.message,
-          });
-        }
-        // Continue to check done/error states
-        return this.handleEmptyQueue();
-      },
+      (iteratorResult) => iteratorResult,
       (error) => {
-        // Log error but continue processing
-        console.error('Dequeue error:', error);
-        return this.handleEmptyQueue();
+        // At interface boundaries, convert QiError to standard exception
+        // This is the ONLY acceptable place to throw in QiCore architecture
+        throw new Error(`Iterator error: ${error.message}`);
       },
-      nextMessage
+      result
     );
   }
 
-  private handleEmptyQueue(): Promise<IteratorResult<T, any>> {
-    // Check if queue is done
-    if (this.state.isDone) {
-      // v-0.6.1: Event emission removed - pure message-driven
-      return Promise.resolve({
-        done: true,
-        value: undefined,
-      });
-    }
+  /**
+   * Internal QiCore implementation - pure functional with Result<T>
+   */
+  private async nextQiCore(): Promise<Result<IteratorResult<T, any>, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        // Check if queue is paused
+        if (this.isPausedState) {
+          return new Promise<IteratorResult<T, any>>((resolve) => {
+            const checkPaused = () => {
+              if (!this.isPausedState) {
+                this.next().then(resolve);
+              } else {
+                setTimeout(checkPaused, 100);
+              }
+            };
+            checkPaused();
+          });
+        }
 
-    // Check for error state
-    if (this.state.hasError) {
-      return Promise.reject(queueError.systemError('QUEUE_ERROR', 'Queue is in error state'));
-    }
+        // Priority: return from queue if available
+        const nextMessage = this.dequeueNextMessage();
+        return match(
+          (queuedMessage) => {
+            if (queuedMessage) {
+              this.debug.log(
+                `Dequeuing message ID: ${queuedMessage.message.id}, type: ${queuedMessage.message.type}`
+              );
+              this.updateMessageStatus(queuedMessage, MessageStatus.PROCESSING);
+              // v-0.6.1: Event emission removed - pure message-driven
 
-    // Wait for new message - core h2A non-blocking pattern
-    return new Promise((resolve, reject) => {
-      this.readResolve = resolve;
-      this.readReject = reject;
-    });
+              return Promise.resolve({
+                done: false,
+                value: queuedMessage.message,
+              });
+            }
+            // Continue to check done/error states
+            return this.handleEmptyQueue();
+          },
+          (error) => {
+            // QiCore error handling - propagate QiError properly
+            throw error;
+          },
+          nextMessage
+        );
+      },
+      (error: unknown) =>
+        queueError.systemError(
+          'ITERATOR_ERROR',
+          `Iterator next() failed: ${error instanceof Error ? error.message : String(error)}`,
+          { operation: 'next' }
+        )
+    );
+  }
+
+  /**
+   * Internal QiCore method for handling empty queue state
+   */
+  private async handleEmptyQueue(): Promise<IteratorResult<T, any>> {
+    const result = await fromAsyncTryCatch(
+      async () => {
+        // Check if queue is done
+        if (this.state.isDone) {
+          // v-0.6.1: Event emission removed - pure message-driven
+          return {
+            done: true,
+            value: undefined,
+          } as IteratorResult<T, any>;
+        }
+
+        // Check for error state
+        if (this.state.hasError) {
+          throw queueError.systemError('QUEUE_ERROR', 'Queue is in error state');
+        }
+
+        // Wait for new message - core h2A non-blocking pattern
+        return new Promise<IteratorResult<T, any>>((resolve, reject) => {
+          this.readResolve = resolve;
+          this.readReject = reject;
+        });
+      },
+      (error: unknown) =>
+        queueError.systemError(
+          'EMPTY_QUEUE_ERROR',
+          `Empty queue handling failed: ${error instanceof Error ? error.message : String(error)}`,
+          { operation: 'handleEmptyQueue' }
+        )
+    );
+
+    // Since this is called internally, propagate QiError as exception for the outer boundary to handle
+    return match(
+      (iteratorResult) => iteratorResult,
+      (error) => {
+        // Internal method - propagate QiError as exception to be caught by boundary
+        throw error;
+      },
+      result
+    );
   }
 
   /**
@@ -490,14 +541,17 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
       const cleanupResult = await fromAsyncTryCatch(
         async () => {
           await this.options.cleanupFn!();
+          return undefined; // Explicit return for TypeScript
         },
-        (_error: unknown) => queueError.cleanupFailed('destroy operation')
+        (error: unknown) =>
+          queueError.cleanupFailed(
+            `destroy operation: ${error instanceof Error ? error.message : String(error)}`
+          )
       );
 
-      // Return cleanup error directly if it occurred
-      return match(
-        (): Result<undefined> => success(undefined), // Success - continue with destroy
-        (error: QiError): Result<undefined> => failure(error),
+      // Handle cleanup result using proper functional composition
+      return flatMap(
+        () => success(undefined), // Success - continue with destroy
         cleanupResult
       );
     }
@@ -520,7 +574,8 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     // Check if message has expired
     if (message.expiresAt && new Date() > message.expiresAt) {
       this.updateStats(message.message, 'expired');
-      return this.dequeueNextMessage(); // Try next message
+      // Use functional composition for recursive call
+      return flatMap((nextResult) => success(nextResult), this.dequeueNextMessage());
     }
 
     return success(message);
