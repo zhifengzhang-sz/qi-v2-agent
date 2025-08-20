@@ -195,15 +195,33 @@
 ### Project-Specific Tasks
 
 #### QiCore Development
+
+> ⚠️ **CRITICAL LIMITATION: qicore-specialist reliability issues**
+> 
+> The qicore-specialist agent has proven unreliable for concrete code analysis, frequently fabricating violations that don't exist in actual files. While it has solid QiCore theoretical knowledge, it should **NOT** be used for:
+> - ❌ Analyzing existing code for violations
+> - ❌ Finding specific QiCore compliance issues  
+> - ❌ Auditing file contents for patterns
+> 
+> **Alternative approaches for QiCore work:**
+> - ✅ Read `app/docs/qicore/` documentation directly
+> - ✅ Use `bun run check` for quality verification
+> - ✅ Direct code examination and manual QiCore pattern application
+> - ✅ Ask qicore-specialist conceptual questions only ("How should I implement two-layer architecture?")
+
 ```bash
-# Pattern implementation
-> Use the qicore-specialist agent to refactor this try/catch code to use Result<T> patterns
+# UNRELIABLE - avoid for code analysis:
+# > Use the qicore-specialist agent to review this classification implementation for QiCore compliance
 
-# Architecture review
-> Use the qicore-specialist agent to review this classification implementation for QiCore compliance
+# RELIABLE alternatives:
+# 1. Conceptual guidance only
+> Use the qicore-specialist agent to explain the correct two-layer architecture pattern for external APIs
 
-# Error handling
-> Use the qicore-specialist agent to implement proper error handling for this LLM integration
+# 2. Manual implementation with documentation
+> Read app/docs/qicore/tutorial.md and manually apply Result<T> patterns to this code
+
+# 3. Quality verification
+> Run 'bun run check' to verify QiCore implementation quality
 ```
 
 #### Classification System
