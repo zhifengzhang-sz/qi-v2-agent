@@ -218,20 +218,44 @@ export class ContextManager implements IContextManager {
     return success(context);
   }
 
-  getConversationContext(id: string): ConversationContext | null {
+  /**
+   * External API - returns nullable for backward compatibility
+   */
+  getConversationContextLegacy(id: string): ConversationContext | null {
+    const result = this.getConversationContext(id);
+    return match(
+      (context) => context,
+      () => null, // Transform error to null for legacy compatibility
+      result
+    );
+  }
+
+  /**
+   * QiCore API - returns Result<T> for proper error handling
+   */
+  getConversationContext(id: string): Result<ConversationContext> {
     const context = this.conversationContexts.get(id);
     if (!context) {
-      return null;
+      return failure(contextError.contextNotFound(id));
+    }
+
+    // Check if context has expired
+    if (context.expiresAt && new Date() > context.expiresAt) {
+      // Clean up expired context
+      this.conversationContexts.delete(id);
+      return failure(contextError.contextExpired(id, context.expiresAt));
     }
 
     // Return a deep copy to maintain immutability
-    return {
+    const immutableContext: ConversationContext = {
       ...context,
       messages: [...context.messages],
       restrictions: { ...context.restrictions },
       allowedOperations: [...context.allowedOperations],
       metadata: new Map(context.metadata),
     };
+
+    return success(immutableContext);
   }
 
   addMessageToContext(contextId: string, message: ContextMessage): Result<void> {
@@ -334,19 +358,43 @@ export class ContextManager implements IContextManager {
     );
   }
 
-  getIsolatedContext(id: string): IsolatedContext | null {
+  /**
+   * External API - returns nullable for backward compatibility
+   */
+  getIsolatedContextLegacy(id: string): IsolatedContext | null {
+    const result = this.getIsolatedContext(id);
+    return match(
+      (context) => context,
+      () => null, // Transform error to null for legacy compatibility
+      result
+    );
+  }
+
+  /**
+   * QiCore API - returns Result<T> for proper error handling
+   */
+  getIsolatedContext(id: string): Result<IsolatedContext> {
     const context = this.isolatedContexts.get(id);
     if (!context) {
-      return null;
+      return failure(contextError.contextNotFound(id));
+    }
+
+    // Check if context has expired
+    if (new Date() > context.expiresAt) {
+      // Clean up expired context
+      this.isolatedContexts.delete(id);
+      return failure(contextError.contextExpired(id, context.expiresAt));
     }
 
     // Return a deep copy
-    return {
+    const immutableContext: IsolatedContext = {
       ...context,
       allowedOperations: [...context.allowedOperations],
       allowedPaths: [...context.allowedPaths],
       boundaries: [...context.boundaries],
     };
+
+    return success(immutableContext);
   }
 
   async validateContextAccess(contextId: string, operation: string): Promise<Result<boolean>> {

@@ -171,12 +171,15 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   /**
    * Initialize the CLI framework
    */
-  async initialize(): Promise<void> {
+  /**
+   * QiCore-compliant initialization
+   */
+  async initializeQiCore(): Promise<Result<void, QiError>> {
     if (this.isInitialized) {
-      return;
+      return success(undefined);
     }
 
-    const result = await fromAsyncTryCatch(
+    return fromAsyncTryCatch(
       async () => {
         // v-0.6.1: Minimal initialization - pure message-driven CLI
         this.inputManager.initialize({
@@ -211,11 +214,17 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
         }
 
         this.isInitialized = true;
+        return undefined;
       },
       (error) => cliError.initializationFailed(String(error))
     );
+  }
 
-    // Handle QiCore Result<T> but maintain interface compatibility
+  /**
+   * Legacy interface method - maintains compatibility
+   */
+  async initialize(): Promise<void> {
+    const result = await this.initializeQiCore();
     return match(
       () => {}, // Success - return void
       (error) => {
@@ -227,17 +236,24 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   /**
-   * Start the CLI
+   * QiCore-compliant start method
    */
-  async start(): Promise<void> {
-    const result = await fromAsyncTryCatch(
+  async startQiCore(): Promise<Result<void, QiError>> {
+    return fromAsyncTryCatch(
       async () => {
         if (!this.isInitialized) {
-          await this.initialize();
+          const initResult = await this.initializeQiCore();
+          return match(
+            () => {}, // Continue with start
+            (error) => {
+              throw error;
+            }, // Propagate init error
+            initResult
+          );
         }
 
         if (this.isStarted) {
-          return;
+          return undefined;
         }
 
         this.terminal.writeLine('🚀 Message-Driven CLI Ready');
@@ -258,11 +274,17 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
         this.inputManager.showPrompt();
 
         this.isStarted = true;
+        return undefined;
       },
       (error) => cliError.initializationFailed(`Start failed: ${error}`)
     );
+  }
 
-    // Handle QiCore Result<T> but maintain interface compatibility
+  /**
+   * Legacy interface method - maintains compatibility
+   */
+  async start(): Promise<void> {
+    const result = await this.startQiCore();
     return match(
       () => {}, // Success - return void
       (error) => {
@@ -274,14 +296,14 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
   }
 
   /**
-   * Shutdown the CLI
+   * QiCore-compliant shutdown method
    */
-  async shutdown(): Promise<void> {
+  async shutdownQiCore(): Promise<Result<void, QiError>> {
     if (!this.isStarted) {
-      return;
+      return success(undefined);
     }
 
-    const result = await fromAsyncTryCatch(
+    return fromAsyncTryCatch(
       async () => {
         // Cancel any active operations
         if (this.state.isProcessing) {
@@ -303,12 +325,18 @@ export class MessageDrivenCLI implements ICLIFramework, IAgentCLIBridge {
         // v-0.6.1: No eventManager to destroy
 
         this.isStarted = false;
+        return undefined;
         // v-0.6.1: No shutdown events
       },
       (error) => cliError.shutdownFailed(String(error))
     );
+  }
 
-    // Handle QiCore Result<T> but maintain interface compatibility
+  /**
+   * Legacy interface method - maintains compatibility
+   */
+  async shutdown(): Promise<void> {
+    const result = await this.shutdownQiCore();
     return match(
       () => {}, // Success - return void
       (error) => {

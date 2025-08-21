@@ -120,16 +120,12 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
       return success(undefined);
     };
 
-    // Register the context
+    // Register the context using QiCore error handling
     const doRegister = (): Result<void> => {
-      try {
-        this.contextRegistry.set(contextId, context);
-        this.violationCounts.set(contextId, 0);
-        console.info(`Security context registered: ${contextId}`);
-        return success(undefined);
-      } catch (error) {
-        return failure(securityError.systemFailure('registration', String(error)));
-      }
+      this.contextRegistry.set(contextId, context);
+      this.violationCounts.set(contextId, 0);
+      console.info(`Security context registered: ${contextId}`);
+      return success(undefined);
     };
 
     // Functional composition chain

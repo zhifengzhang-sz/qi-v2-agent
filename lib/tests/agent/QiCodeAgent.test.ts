@@ -81,7 +81,12 @@ const createMockContextManager = (): any => ({
     messages: [],
     metadata: new Map(),
   })),
-  getConversationContext: vi.fn(() => ({ 
+  getConversationContext: vi.fn(() => success({ 
+    id: 'test-context-id',
+    messages: [],
+    metadata: new Map(),
+  })),
+  getConversationContextLegacy: vi.fn(() => ({ 
     id: 'test-context-id',
     messages: [],
     metadata: new Map(),

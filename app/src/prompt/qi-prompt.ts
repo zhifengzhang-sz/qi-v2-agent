@@ -50,6 +50,7 @@ import {
   match,
   type QiError,
   type Result,
+  success,
   systemError,
   validationError,
 } from '@qi/base';
@@ -486,80 +487,89 @@ class QiPromptApp {
     );
   }
 
-  async start(): Promise<void> {
-    const initResult = await this.initialize();
+  async start(): Promise<Result<void, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        const initResult = await this.initialize();
 
-    // Handle initialization result
-    match(
-      () => {}, // Success - continue with start
-      (error) => {
-        this.logger.error('Failed to initialize application', undefined, {
-          component: 'QiPromptApp',
-          error: error.message,
-          errorContext: error.context,
-        });
-        const initError = systemError('Application initialization failed', {
-          originalError: error.message,
-          errorContext: error.context,
-          step: 'application_start',
-        });
-        throw initError;
+        // Handle initialization result using QiCore functional composition
+        return match(
+          async () => {
+            // Display welcome message with v-0.6.3 features only in debug mode
+            if (this.debugMode) {
+              this.logger.info(
+                '📨 v-0.6.3 Pure Message-Driven Features with QiCore Integration:',
+                undefined,
+                {
+                  component: 'QiPromptApp',
+                  features: [
+                    'h2A-inspired message queue eliminates race conditions',
+                    'Sequential processing prevents duplicate LLM calls',
+                    'Pure message coordination (no EventEmitter)',
+                    'Complete QiCore integration with Result<T> patterns',
+                    'Structured logging with @qi/core/logger',
+                    'Professional error handling with QiError',
+                    'File references: Use @path/to/file to reference files',
+                    'Simple workflows: FILE_REFERENCE workflow for @file + prompt patterns',
+                    'Tool registry: Composable, reusable tools',
+                    'Session persistence: Conversations saved automatically',
+                    'Project awareness: Automatic project context detection',
+                    'Tools managed by workflow system',
+                  ],
+                }
+              );
+            }
+
+            // v-0.6.3: Start QiPrompt Core message processing loop
+            if (!this.qiPromptCore) {
+              throw new Error('QiPrompt Core not initialized');
+            }
+
+            const startResult = await this.qiPromptCore.start();
+            // Use QiCore functional pattern
+            return match(
+              () => {
+                if (this.debugMode) {
+                  this.logger.info('🎯 QiPrompt Core message processing loop started', undefined, {
+                    component: 'QiPromptApp',
+                    step: 'message_processing_started',
+                  });
+                }
+                return undefined;
+              },
+              (error) => {
+                throw new Error(`Failed to start QiPrompt Core: ${error.message}`);
+              },
+              startResult
+            );
+          },
+          (error) => {
+            this.logger.error('Failed to initialize application', undefined, {
+              component: 'QiPromptApp',
+              error: error.message,
+              errorContext: error.context,
+            });
+            throw error; // Propagate QiError
+          },
+          initResult
+        );
       },
-      initResult
-    );
-
-    // Display welcome message with v-0.6.3 features only in debug mode
-    if (this.debugMode) {
-      this.logger.info(
-        '📨 v-0.6.3 Pure Message-Driven Features with QiCore Integration:',
-        undefined,
-        {
-          component: 'QiPromptApp',
-          features: [
-            'h2A-inspired message queue eliminates race conditions',
-            'Sequential processing prevents duplicate LLM calls',
-            'Pure message coordination (no EventEmitter)',
-            'Complete QiCore integration with Result<T> patterns',
-            'Structured logging with @qi/core/logger',
-            'Professional error handling with QiError',
-            'File references: Use @path/to/file to reference files',
-            'Simple workflows: FILE_REFERENCE workflow for @file + prompt patterns',
-            'Tool registry: Composable, reusable tools',
-            'Session persistence: Conversations saved automatically',
-            'Project awareness: Automatic project context detection',
-            'Tools managed by workflow system',
-          ],
-        }
-      );
-    }
-
-    // v-0.6.3: Start QiPrompt Core message processing loop
-    if (!this.qiPromptCore) {
-      throw new Error('QiPrompt Core not initialized');
-    }
-
-    const startResult = await this.qiPromptCore.start();
-    // Use QiCore functional pattern
-    match(
-      () => {
-        if (this.debugMode) {
-          this.logger.info('🎯 QiPrompt Core message processing loop started', undefined, {
-            component: 'QiPromptApp',
-            step: 'message_processing_started',
-          });
-        }
-      },
-      (error) => {
-        throw new Error(`Failed to start QiPrompt Core: ${error.message}`);
-      },
-      startResult
+      (error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return create(
+          'APPLICATION_START_FAILED',
+          `Failed to start QiPromptApp: ${errorMessage}`,
+          'SYSTEM',
+          { originalError: errorMessage, step: 'application_start' }
+        );
+      }
     );
   }
 
   /**
    * Enhanced shutdown with v-0.6.3 message queue cleanup and QiCore logging
    */
-  async shutdown(): Promise<void> {
+  async shutdown(): Promise<Result<void, QiError>> {
     if (this.debugMode) {
       this.logger.info('🛑 Shutting down v-0.6.3 message-driven CLI...', undefined, {
         component: 'QiPromptApp',
@@ -631,15 +641,19 @@ class QiPromptApp {
         )
     );
 
-    // Log any shutdown errors
-    match(
-      () => {}, // Success - no action needed
-      (error) =>
+    // Log any shutdown errors and return the result
+    return match(
+      () => {
+        return success(undefined); // Success case
+      },
+      (error) => {
         this.logger.error('Error during v-0.6.3 shutdown', undefined, {
           component: 'QiPromptApp',
           error: error.message,
           errorContext: error.context,
-        }),
+        });
+        return shutdownResult; // Return the error Result
+      },
       shutdownResult
     );
   }
@@ -983,8 +997,27 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   });
 
-  cli.start().catch((error) => {
-    console.error('CLI failed:', error);
+  // Handle QiCore Result<T> return from start() with two-layer pattern
+  cli.start().then((result) => {
+    match(
+      () => {
+        // Success - application is running
+      },
+      (error) => {
+        // Transform QiError to traditional error for external boundary
+        console.error('CLI failed:', error.message);
+        console.error('Error details:', {
+          code: error.code,
+          category: error.category,
+          context: error.context
+        });
+        process.exit(1);
+      },
+      result
+    );
+  }).catch((error) => {
+    // Fallback for non-QiCore errors
+    console.error('Unexpected CLI error:', error);
     process.exit(1);
   });
 }

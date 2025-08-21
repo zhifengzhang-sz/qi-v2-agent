@@ -284,8 +284,12 @@ export class PromptAppOrchestrator implements IAgent {
                         const finalCancellationCheck = this.checkCancellation();
 
                         return match(
-                          () => {
-                            const enriched = this.enrichResponse(response, startTime, parsed.type);
+                          async () => {
+                            const enriched = await this.enrichResponse(
+                              response,
+                              startTime,
+                              parsed.type
+                            );
                             return match(
                               (finalResponse: AgentResponse) => finalResponse,
                               (error: QiError) => {
@@ -481,29 +485,41 @@ export class PromptAppOrchestrator implements IAgent {
   ): Promise<Result<AgentResponse, QiError>> {
     return fromAsyncTryCatch(
       async () => {
-        let response: AgentResponse;
+        let handlerResult: Result<AgentResponse, QiError>;
 
         switch (parsed.type) {
           case 'command':
-            response = await this.handleCommand(request, parsed.content);
+            handlerResult = await this.handleCommand(request, parsed.content);
             break;
           case 'workflow':
             this.debug.warn(
               `Input "${parsed.content}" classified as workflow - this should not happen for simple prompts!`
             );
-            response = await this.handleWorkflow(request, parsed.content);
+            handlerResult = await this.handleWorkflow(request, parsed.content);
             break;
           case 'prompt':
             this.debug.log(`✅ Input "${parsed.content}" correctly classified as prompt`);
-            response = await this.handlePrompt(request, parsed.content);
+            handlerResult = await this.handlePrompt(request, parsed.content);
             break;
           default:
             throw new Error(`Unknown input type: ${parsed.type}`);
         }
 
-        return response;
+        // Handle the Result<T> from the handler using functional composition
+        return match(
+          (response: AgentResponse) => response,
+          (error: QiError) => {
+            // Propagate the handler error as an exception to be caught by fromAsyncTryCatch
+            throw error;
+          },
+          handlerResult
+        );
       },
       (error: unknown) => {
+        // Handle both direct errors and QiError propagated from handlers
+        if (error && typeof error === 'object' && 'code' in error && 'category' in error) {
+          return error as QiError;
+        }
         const errorMessage = error instanceof Error ? error.message : String(error);
         return createPromptAppError(
           'HANDLER_EXECUTION_ERROR',
@@ -515,37 +531,37 @@ export class PromptAppOrchestrator implements IAgent {
     );
   }
 
-  private enrichResponse(
+  private async enrichResponse(
     response: AgentResponse,
     startTime: number,
     inputType: InputType
-  ): Result<AgentResponse, QiError> {
-    try {
-      const executionTime = Date.now() - startTime;
-      this.totalResponseTime += executionTime;
+  ): Promise<Result<AgentResponse, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        const executionTime = Date.now() - startTime;
+        this.totalResponseTime += executionTime;
 
-      const finalResponse = {
-        ...response,
-        executionTime,
-        metadata: new Map([
-          ...Array.from(response.metadata.entries()),
-          ['inputType', inputType],
-          ['parser', '2-category'],
-          ['orchestrator', 'PromptApp'],
-        ]),
-      };
+        const finalResponse = {
+          ...response,
+          executionTime,
+          metadata: new Map([
+            ...Array.from(response.metadata.entries()),
+            ['inputType', inputType],
+            ['parser', '2-category'],
+            ['orchestrator', 'PromptApp'],
+          ]),
+        };
 
-      return success(finalResponse);
-    } catch (error) {
-      return failure(
+        return finalResponse;
+      },
+      (error: unknown) =>
         createPromptAppError(
           'RESPONSE_ENRICHMENT_ERROR',
           `Failed to enrich response: ${error instanceof Error ? error.message : String(error)}`,
           'SYSTEM',
           { startTime, inputType, originalError: error }
         )
-      );
-    }
+    );
   }
 
   /**
@@ -632,196 +648,245 @@ export class PromptAppOrchestrator implements IAgent {
   private async handleCommand(
     request: AgentRequest,
     commandContent: string
-  ): Promise<AgentResponse> {
-    if (!this.config.enableCommands) {
-      return this.createDisabledResponse('command', 'Command processing is disabled');
-    }
-
-    if (!this.commandHandler) {
-      return this.createErrorResponse('command', 'Command handler not available');
-    }
-
-    // Parse command name and parameters
-    const parts = commandContent.trim().split(/\s+/);
-    const commandName = parts[0];
-    const parameters = new Map<string, unknown>();
-
-    // Simple parameter parsing (can be enhanced later)
-    for (let i = 1; i < parts.length; i++) {
-      parameters.set(`arg${i}`, parts[i]);
-    }
-
-    // Handle PromptApp-specific commands first
-    if (commandName === 'status' || commandName === 's') {
-      return await this.handleStatusCommand();
-    }
-
-    if (commandName === 'maxTokens' || commandName === 'maxtokens' || commandName === 'tokens') {
-      return await this.handleMaxTokensCommand(parts.slice(1));
-    }
-
-    // Fall back to standard command handler for basic CLI commands
-    const commandRequest: CommandRequest = {
-      commandName,
-      parameters,
-      rawInput: request.input,
-      context: request.context.environmentContext,
-    };
-
-    const result = await this.commandHandler.executeCommand(commandRequest);
-
-    return {
-      content: result.content,
-      type: 'command',
-      confidence: 1.0, // Commands are deterministic
-      executionTime: 0, // Will be set by main process method
-      metadata: new Map([
-        ...Array.from(result.metadata.entries()),
-        ['commandName', result.commandName],
-        ['commandStatus', result.status],
-      ]),
-      success: result.success,
-      error: result.error,
-    };
-  }
-
-  private async handleWorkflow(request: AgentRequest, content: string): Promise<AgentResponse> {
-    this.debug.warn(`handleWorkflow called with: "${content}" - WHY IS THIS A WORKFLOW?`);
-
-    if (!this.workflowHandler) {
-      return this.createDisabledResponse('workflow', 'Workflow processing is disabled');
-    }
-
-    // Execute the workflow first; if it yields enhanced content, treat that as a prompt
-    const wf = await this.processWorkflow(content);
-    if (!wf.success) {
-      return this.createErrorResponse('workflow', wf.error);
-    }
-
-    const enhanced = wf.data.output ?? content;
-
-    // Check if this was a passthrough (no actual workflow processing)
-    if (wf.data.output === content || (wf.data as any).metadata?.passthrough) {
-      // This was passthrough - route directly to prompt handler without re-classification
-      return this.handlePrompt(request, enhanced);
-    }
-
-    // Route to prompt handler with the enhanced content, preserving context
-    return this.handlePrompt(request, enhanced);
-  }
-
-  private async handlePrompt(request: AgentRequest, promptContent: string): Promise<AgentResponse> {
-    this.debug.log(`🔍 handlePrompt called with: "${promptContent}"`);
-
-    if (!this.config.enablePrompts) {
-      return this.createDisabledResponse('prompt', 'Prompt processing is disabled');
-    }
-
-    if (!this.promptHandler) {
-      return this.createErrorResponse('prompt', 'Prompt handler not available');
-    }
-
-    try {
-      // Extract prompt options from context if available
-      const promptOptions = this.extractPromptOptions(request.context);
-
-      let result: PromptResponse;
-
-      // Use context-aware prompting if available
-      if (this.contextAwarePromptHandler) {
-        // Get or create conversation context for this session
-        const sessionId = request.context.sessionId;
-        let contextId = this.sessionContextMap.get(sessionId);
-
-        if (!contextId) {
-          // Create new conversation context for this session
-          const contextResult = this.contextManager.createConversationContext('main');
-          const newContextId = match(
-            (context) => context.id,
-            (error) => {
-              throw new Error(`Failed to create conversation context: ${error.message}`);
-            },
-            contextResult
-          );
-          contextId = newContextId;
-          this.sessionContextMap.set(sessionId, contextId);
+  ): Promise<Result<AgentResponse, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        if (!this.config.enableCommands) {
+          return this.createDisabledResponse('command', 'Command processing is disabled');
         }
 
-        // Verify context still exists (cleanup may have removed it)
-        const existingContext = this.contextManager.getConversationContext(contextId);
-        if (!existingContext) {
-          // Context was cleaned up, create a new one
-          const contextResult = this.contextManager.createConversationContext('main');
-          const newContextId = match(
-            (context) => context.id,
-            (error) => {
-              throw new Error(`Failed to create conversation context: ${error.message}`);
-            },
-            contextResult
-          );
-          contextId = newContextId;
-          this.sessionContextMap.set(sessionId, contextId);
+        if (!this.commandHandler) {
+          return this.createErrorResponse('command', 'Command handler not available');
         }
 
-        // Execute with context continuation
-        this.debug.log(
-          `🚀 About to call LLM with contextAwarePromptHandler for: "${promptContent}"`
-        );
-        const startTime = Date.now();
-        result = await this.contextAwarePromptHandler.completeWithContext(
-          promptContent,
-          promptOptions,
-          contextId,
-          true // Include conversation history
-        );
-        const duration = Date.now() - startTime;
-        this.debug.log(`⚡ LLM call completed in ${duration}ms`);
-      } else {
-        // Fallback to basic prompt processing
-        this.debug.log(`🚀 About to call LLM with basic promptHandler for: "${promptContent}"`);
-        const startTime = Date.now();
-        result = await this.promptHandler.complete(promptContent, promptOptions);
-        const duration = Date.now() - startTime;
-        this.debug.log(`⚡ LLM call completed in ${duration}ms`);
+        // Parse command name and parameters
+        const parts = commandContent.trim().split(/\s+/);
+        const commandName = parts[0];
+        const parameters = new Map<string, unknown>();
 
-        // Manually update state manager for fallback
-        this.stateManager.addConversationEntry({
-          type: 'user_input',
-          content: promptContent,
-          metadata: new Map([['inputType', 'prompt']]),
-        });
-
-        if (result.success) {
-          this.stateManager.addConversationEntry({
-            type: 'agent_response',
-            content: result.data,
-            metadata: new Map([['responseType', 'prompt']]),
-          });
+        // Simple parameter parsing (can be enhanced later)
+        for (let i = 1; i < parts.length; i++) {
+          parameters.set(`arg${i}`, parts[i]);
         }
-      }
 
-      if (result.success) {
+        // Handle PromptApp-specific commands first
+        if (commandName === 'status' || commandName === 's') {
+          return await this.handleStatusCommand();
+        }
+
+        if (
+          commandName === 'maxTokens' ||
+          commandName === 'maxtokens' ||
+          commandName === 'tokens'
+        ) {
+          return await this.handleMaxTokensCommand(parts.slice(1));
+        }
+
+        // Fall back to standard command handler for basic CLI commands
+        const commandRequest: CommandRequest = {
+          commandName,
+          parameters,
+          rawInput: request.input,
+          context: request.context.environmentContext,
+        };
+
+        const result = await this.commandHandler.executeCommand(commandRequest);
+
         return {
-          content: result.data,
-          type: 'prompt',
-          confidence: 0.95, // High confidence for successful prompts
+          content: result.content,
+          type: 'command',
+          confidence: 1.0, // Commands are deterministic
           executionTime: 0, // Will be set by main process method
           metadata: new Map([
-            ['promptOptions', JSON.stringify(promptOptions)],
-            ['provider', promptOptions.provider || 'default'],
-            ['contextAware', this.contextAwarePromptHandler ? 'true' : 'false'],
+            ...Array.from(result.metadata.entries()),
+            ['commandName', result.commandName],
+            ['commandStatus', result.status],
           ]),
-          success: true,
+          success: result.success,
+          error: result.error,
         };
-      } else {
-        return this.createErrorResponse('prompt', result.error);
-      }
-    } catch (error) {
-      return this.createErrorResponse(
-        'prompt',
-        `Prompt processing failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+      },
+      (error: unknown) =>
+        createPromptAppError(
+          'COMMAND_EXECUTION_ERROR',
+          `Command execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { commandContent, originalError: error }
+        )
+    );
+  }
+
+  private async handleWorkflow(
+    request: AgentRequest,
+    content: string
+  ): Promise<Result<AgentResponse, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        this.debug.warn(`handleWorkflow called with: "${content}" - WHY IS THIS A WORKFLOW?`);
+
+        if (!this.workflowHandler) {
+          return this.createDisabledResponse('workflow', 'Workflow processing is disabled');
+        }
+
+        // Execute the workflow first; if it yields enhanced content, treat that as a prompt
+        const wf = await this.processWorkflow(content);
+        if (!wf.success) {
+          return this.createErrorResponse('workflow', wf.error);
+        }
+
+        const enhanced = wf.data.output ?? content;
+
+        // Check if this was a passthrough (no actual workflow processing)
+        if (wf.data.output === content || (wf.data as any).metadata?.passthrough) {
+          // This was passthrough - route directly to prompt handler without re-classification
+          const promptResult = await this.handlePrompt(request, enhanced);
+          return match(
+            (response: AgentResponse) => response,
+            (error: QiError) => {
+              throw error;
+            },
+            promptResult
+          );
+        }
+
+        // Route to prompt handler with the enhanced content, preserving context
+        const promptResult = await this.handlePrompt(request, enhanced);
+        return match(
+          (response: AgentResponse) => response,
+          (error: QiError) => {
+            throw error;
+          },
+          promptResult
+        );
+      },
+      (error: unknown) =>
+        createPromptAppError(
+          'WORKFLOW_EXECUTION_ERROR',
+          `Workflow execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { content, originalError: error }
+        )
+    );
+  }
+
+  private async handlePrompt(
+    request: AgentRequest,
+    promptContent: string
+  ): Promise<Result<AgentResponse, QiError>> {
+    return fromAsyncTryCatch(
+      async () => {
+        this.debug.log(`🔍 handlePrompt called with: "${promptContent}"`);
+
+        if (!this.config.enablePrompts) {
+          return this.createDisabledResponse('prompt', 'Prompt processing is disabled');
+        }
+
+        if (!this.promptHandler) {
+          return this.createErrorResponse('prompt', 'Prompt handler not available');
+        }
+        // Extract prompt options from context if available
+        const promptOptions = this.extractPromptOptions(request.context);
+
+        let result: PromptResponse;
+
+        // Use context-aware prompting if available
+        if (this.contextAwarePromptHandler) {
+          // Get or create conversation context for this session
+          const sessionId = request.context.sessionId;
+          let contextId = this.sessionContextMap.get(sessionId);
+
+          if (!contextId) {
+            // Create new conversation context for this session
+            const contextResult = this.contextManager.createConversationContext('main');
+            const newContextId = match(
+              (context) => context.id,
+              (error) => {
+                throw new Error(`Failed to create conversation context: ${error.message}`);
+              },
+              contextResult
+            );
+            contextId = newContextId;
+            this.sessionContextMap.set(sessionId, contextId);
+          }
+
+          // Verify context still exists (cleanup may have removed it)
+          const existingContext = this.contextManager.getConversationContextLegacy(contextId);
+          if (!existingContext) {
+            // Context was cleaned up, create a new one
+            const contextResult = this.contextManager.createConversationContext('main');
+            const newContextId = match(
+              (context) => context.id,
+              (error) => {
+                throw new Error(`Failed to create conversation context: ${error.message}`);
+              },
+              contextResult
+            );
+            contextId = newContextId;
+            this.sessionContextMap.set(sessionId, contextId);
+          }
+
+          // Execute with context continuation
+          this.debug.log(
+            `🚀 About to call LLM with contextAwarePromptHandler for: "${promptContent}"`
+          );
+          const startTime = Date.now();
+          result = await this.contextAwarePromptHandler.completeWithContext(
+            promptContent,
+            promptOptions,
+            contextId,
+            true // Include conversation history
+          );
+          const duration = Date.now() - startTime;
+          this.debug.log(`⚡ LLM call completed in ${duration}ms`);
+        } else {
+          // Fallback to basic prompt processing
+          this.debug.log(`🚀 About to call LLM with basic promptHandler for: "${promptContent}"`);
+          const startTime = Date.now();
+          result = await this.promptHandler.complete(promptContent, promptOptions);
+          const duration = Date.now() - startTime;
+          this.debug.log(`⚡ LLM call completed in ${duration}ms`);
+
+          // Manually update state manager for fallback
+          this.stateManager.addConversationEntry({
+            type: 'user_input',
+            content: promptContent,
+            metadata: new Map([['inputType', 'prompt']]),
+          });
+
+          if (result.success) {
+            this.stateManager.addConversationEntry({
+              type: 'agent_response',
+              content: result.data,
+              metadata: new Map([['responseType', 'prompt']]),
+            });
+          }
+        }
+
+        if (result.success) {
+          return {
+            content: result.data,
+            type: 'prompt',
+            confidence: 0.95, // High confidence for successful prompts
+            executionTime: 0, // Will be set by main process method
+            metadata: new Map([
+              ['promptOptions', JSON.stringify(promptOptions)],
+              ['provider', promptOptions.provider || 'default'],
+              ['contextAware', this.contextAwarePromptHandler ? 'true' : 'false'],
+            ]),
+            success: true,
+          };
+        } else {
+          return this.createErrorResponse('prompt', result.error);
+        }
+      },
+      (error: unknown) =>
+        createPromptAppError(
+          'PROMPT_EXECUTION_ERROR',
+          `Prompt processing failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { promptContent, originalError: error }
+        )
+    );
   }
 
   // Helper methods (same as QiCodeAgent)

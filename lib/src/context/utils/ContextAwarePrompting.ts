@@ -36,7 +36,7 @@ export class ContextAwarePromptHandler {
   ): Promise<PromptResponse> {
     try {
       // Get conversation context
-      const context = this.contextManager.getConversationContext(contextId);
+      const context = this.contextManager.getConversationContextLegacy(contextId);
       if (!context) {
         // Fallback to regular prompt processing
         return await this.baseHandler.complete(prompt, options);
@@ -183,7 +183,7 @@ export class ContextAwarePromptHandler {
    * Get conversation summary for context
    */
   async getConversationSummary(contextId: string, maxMessages: number = 10): Promise<string> {
-    const context = this.contextManager.getConversationContext(contextId);
+    const context = this.contextManager.getConversationContextLegacy(contextId);
     if (!context || context.messages.length === 0) {
       return 'No conversation history available.';
     }
@@ -312,8 +312,8 @@ export class ContextAwarePromptHandler {
     includeMessages: boolean = true
   ): Promise<boolean> {
     try {
-      const fromContext = this.contextManager.getConversationContext(fromContextId);
-      const toContext = this.contextManager.getConversationContext(toContextId);
+      const fromContext = this.contextManager.getConversationContextLegacy(fromContextId);
+      const toContext = this.contextManager.getConversationContextLegacy(toContextId);
 
       if (!fromContext || !toContext) {
         return false;

@@ -27,13 +27,19 @@ export interface IContextManager {
     type: 'main' | 'sub-agent' | 'tool',
     parentId?: string
   ): Result<ConversationContext>;
-  getConversationContext(id: string): ConversationContext | null;
+  // QiCore API - proper error handling with Result<T>
+  getConversationContext(id: string): Result<ConversationContext>;
+  // Legacy API - backward compatibility with nullable return
+  getConversationContextLegacy(id: string): ConversationContext | null;
   addMessageToContext(contextId: string, message: ContextMessage): Result<void>;
   updateConversationContext(contextId: string, updates: Partial<ConversationContext>): Result<void>;
 
   // Isolated Context Management for Sub-Agents
   createIsolatedContext(config: IsolatedContextConfig): Result<IsolatedContext>;
-  getIsolatedContext(id: string): IsolatedContext | null;
+  // QiCore API - proper error handling with Result<T>
+  getIsolatedContext(id: string): Result<IsolatedContext>;
+  // Legacy API - backward compatibility with nullable return
+  getIsolatedContextLegacy(id: string): IsolatedContext | null;
   validateContextAccess(contextId: string, operation: string): Promise<Result<boolean>>;
   terminateContext(contextId: string): void;
 

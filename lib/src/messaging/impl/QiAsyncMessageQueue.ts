@@ -575,7 +575,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     if (message.expiresAt && new Date() > message.expiresAt) {
       this.updateStats(message.message, 'expired');
       // Use functional composition for recursive call
-      return flatMap((nextResult) => success(nextResult), this.dequeueNextMessage());
+      return this.dequeueNextMessage();
     }
 
     return success(message);
