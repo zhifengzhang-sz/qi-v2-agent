@@ -29,6 +29,15 @@ node_modules/
 # Compiled binaries
 app/qi-prompt
 
+# Runtime data files (SQLite databases, etc.)
+**/data/
+lib/data/
+app/data/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
 # Environment files
 .env
 .env.local
