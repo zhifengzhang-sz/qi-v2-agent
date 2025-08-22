@@ -153,25 +153,22 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
     };
 
     const doUnregister = (): Result<void> => {
-      try {
-        this.contextRegistry.delete(contextId);
-        this.violationCounts.delete(contextId);
+      // Map and Array operations are guaranteed not to throw - no try/catch needed
+      this.contextRegistry.delete(contextId);
+      this.violationCounts.delete(contextId);
 
-        // Clean up access log entries older than 1 hour
-        const cutoff = new Date(Date.now() - 3600000);
-        this.accessLog.splice(
-          0,
-          this.accessLog.length,
-          ...this.accessLog.filter(
-            (entry) => entry.contextId !== contextId && entry.timestamp > cutoff
-          )
-        );
+      // Clean up access log entries older than 1 hour
+      const cutoff = new Date(Date.now() - 3600000);
+      this.accessLog.splice(
+        0,
+        this.accessLog.length,
+        ...this.accessLog.filter(
+          (entry) => entry.contextId !== contextId && entry.timestamp > cutoff
+        )
+      );
 
-        console.info(`Security context unregistered: ${contextId}`);
-        return success(undefined);
-      } catch (error) {
-        return failure(securityError.systemFailure('unregistration', String(error)));
-      }
+      console.info(`Security context unregistered: ${contextId}`);
+      return success(undefined);
     };
 
     return flatMap(() => flatMap(() => doUnregister(), checkExists()), validateInput());
@@ -272,27 +269,23 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
     };
 
     const validatePath = (context: IsolatedContext): Result<boolean> => {
-      try {
-        // Normalize path
-        const normalizedPath = this.normalizePath(path);
+      // String operations are guaranteed not to throw - no try/catch needed
+      const normalizedPath = this.normalizePath(path);
 
-        // Check if path is in allowed paths
-        const isAllowed = context.allowedPaths.some((allowedPath) => {
-          const normalizedAllowed = this.normalizePath(allowedPath);
-          return normalizedPath.startsWith(normalizedAllowed);
-        });
+      // Check if path is in allowed paths
+      const isAllowed = context.allowedPaths.some((allowedPath) => {
+        const normalizedAllowed = this.normalizePath(allowedPath);
+        return normalizedPath.startsWith(normalizedAllowed);
+      });
 
-        if (!isAllowed) {
-          this.incrementViolation(contextId);
-          this.logAccess(contextId, `path:${path}`, false, 'Path not in allowed paths');
-          console.warn(`Path restricted for context ${contextId}: ${path}`);
-          return success(false);
-        }
-
-        return success(true);
-      } catch (error) {
-        return failure(securityError.systemFailure('path validation', String(error)));
+      if (!isAllowed) {
+        this.incrementViolation(contextId);
+        this.logAccess(contextId, `path:${path}`, false, 'Path not in allowed paths');
+        console.warn(`Path restricted for context ${contextId}: ${path}`);
+        return success(false);
       }
+
+      return success(true);
     };
 
     return flatMap(validatePath, getContext());
@@ -311,23 +304,19 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
     };
 
     const validateTool = (context: IsolatedContext): Result<boolean> => {
-      try {
-        // Check boundaries for tool restrictions
-        const toolRestricted = context.boundaries.some(
-          (boundary) => boundary.startsWith('tool:') && boundary.includes(tool)
-        );
+      // Array operations are guaranteed not to throw - no try/catch needed
+      const toolRestricted = context.boundaries.some(
+        (boundary) => boundary.startsWith('tool:') && boundary.includes(tool)
+      );
 
-        if (toolRestricted) {
-          this.incrementViolation(contextId);
-          this.logAccess(contextId, `tool:${tool}`, false, 'Tool restricted by boundaries');
-          console.warn(`Tool restricted for context ${contextId}: ${tool}`);
-          return success(false);
-        }
-
-        return success(true);
-      } catch (error) {
-        return failure(securityError.systemFailure('tool validation', String(error)));
+      if (toolRestricted) {
+        this.incrementViolation(contextId);
+        this.logAccess(contextId, `tool:${tool}`, false, 'Tool restricted by boundaries');
+        console.warn(`Tool restricted for context ${contextId}: ${tool}`);
+        return success(false);
       }
+
+      return success(true);
     };
 
     return flatMap(validateTool, getContext());
@@ -346,28 +335,19 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
     };
 
     const validateCommand = (context: IsolatedContext): Result<boolean> => {
-      try {
-        // Check boundaries for command restrictions
-        const commandRestricted = context.boundaries.some(
-          (boundary) => boundary.startsWith('command:') && boundary.includes(command)
-        );
+      // Array operations are guaranteed not to throw - no try/catch needed
+      const commandRestricted = context.boundaries.some(
+        (boundary) => boundary.startsWith('command:') && boundary.includes(command)
+      );
 
-        if (commandRestricted) {
-          this.incrementViolation(contextId);
-          this.logAccess(
-            contextId,
-            `command:${command}`,
-            false,
-            'Command restricted by boundaries'
-          );
-          console.warn(`Command restricted for context ${contextId}: ${command}`);
-          return success(false);
-        }
-
-        return success(true);
-      } catch (error) {
-        return failure(securityError.systemFailure('command validation', String(error)));
+      if (commandRestricted) {
+        this.incrementViolation(contextId);
+        this.logAccess(contextId, `command:${command}`, false, 'Command restricted by boundaries');
+        console.warn(`Command restricted for context ${contextId}: ${command}`);
+        return success(false);
       }
+
+      return success(true);
     };
 
     return flatMap(validateCommand, getContext());
@@ -379,15 +359,12 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
    * @returns Result<number> - Violation count or error if context not found
    */
   getViolationCount(contextId: string): Result<number> {
-    try {
-      const count = this.violationCounts.get(contextId);
-      if (count === undefined && !this.contextRegistry.has(contextId)) {
-        return failure(securityError.contextNotFound(contextId));
-      }
-      return success(count || 0);
-    } catch (error) {
-      return failure(securityError.systemFailure('violation count retrieval', String(error)));
+    // Map operations are guaranteed not to throw - no try/catch needed
+    const count = this.violationCounts.get(contextId);
+    if (count === undefined && !this.contextRegistry.has(contextId)) {
+      return failure(securityError.contextNotFound(contextId));
     }
+    return success(count || 0);
   }
 
   /**
@@ -396,15 +373,12 @@ export class SecurityBoundaryManager implements ISecurityBoundaryManager {
    * @returns Result<readonly ContextAccessAudit[]> - Access log entries or error
    */
   getAccessLog(contextId?: string): Result<readonly ContextAccessAudit[]> {
-    try {
-      if (contextId) {
-        const filteredLog = this.accessLog.filter((entry) => entry.contextId === contextId);
-        return success(filteredLog);
-      }
-      return success([...this.accessLog]);
-    } catch (error) {
-      return failure(securityError.systemFailure('access log retrieval', String(error)));
+    // Array operations are guaranteed not to throw - no try/catch needed
+    if (contextId) {
+      const filteredLog = this.accessLog.filter((entry) => entry.contextId === contextId);
+      return success(filteredLog);
     }
+    return success([...this.accessLog]);
   }
 
   // Private helper methods

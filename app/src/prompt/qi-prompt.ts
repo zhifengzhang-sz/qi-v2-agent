@@ -547,7 +547,7 @@ class QiPromptApp {
             this.logger.error('Failed to initialize application', undefined, {
               component: 'QiPromptApp',
               error: error.message,
-              errorContext: error.context,
+              ...(this.debugMode && { errorContext: error.context }),
             });
             throw error; // Propagate QiError
           },
@@ -650,7 +650,7 @@ class QiPromptApp {
         this.logger.error('Error during v-0.6.3 shutdown', undefined, {
           component: 'QiPromptApp',
           error: error.message,
-          errorContext: error.context,
+          ...(this.debugMode && { errorContext: error.context }),
         });
         return shutdownResult; // Return the error Result
       },
@@ -1005,12 +1005,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       },
       (error) => {
         // Transform QiError to traditional error for external boundary
+        // Hide internal QiCore structure from external consumers
         console.error('CLI failed:', error.message);
-        console.error('Error details:', {
-          code: error.code,
-          category: error.category,
-          context: error.context
-        });
+        if (options.debug) {
+          // Only show internal error structure in debug mode
+          console.error('Debug details:', {
+            code: error.code,
+            category: error.category,
+            context: error.context
+          });
+        }
         process.exit(1);
       },
       result
