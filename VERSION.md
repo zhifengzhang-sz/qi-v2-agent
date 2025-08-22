@@ -20,6 +20,111 @@ This project develops **two specialized AI agents** with distinct capabilities a
 
 ---
 
+## v-0.8.4 - Unified MCP Storage Architecture (COMPLETED)
+
+### 📅 **Release Date**: August 22, 2025
+
+### 🎯 **Overview**
+**Complete MCP Integration & Multi-Provider Support**: Final implementation of unified MCP storage architecture with complete migration from SQLite to MCP memory server for session persistence. This release achieves full multi-provider model support and production-ready QiCore integration with proper two-layer architecture implementation.
+
+### ✨ **Major Features**
+
+#### 🗄️ **Unified MCP Storage Architecture**
+- **Complete SQLite Migration**: Full migration from SQLite to MCP memory server for session persistence ✅
+- **Enhanced Session Management**: Result<T> patterns for `persistSession()`, `loadPersistedSession()`, `listSessions()`, `deleteSession()` ✅
+- **Hybrid Knowledge Access**: Integration with Context7 memory graph and Qdrant RAG systems ✅
+- **Graceful Degradation**: Robust fallback behavior when MCP services unavailable ✅
+
+#### 🔧 **Multi-Provider Model Support**
+- **Extensible Provider System**: Complete `ProviderManager` with `OllamaProvider` and `OpenRouterProvider` implementations ✅
+- **Provider Discovery**: Automatic provider availability detection and selection ✅
+- **Model Configuration**: Flexible model selection without automatic fallback behavior ✅
+- **API Integration**: Full OpenRouter API integration with proper authentication ✅
+
+#### 🔗 **Complete MCP Integration**
+- **MCPServiceManager**: Full MCP service management with stdio transport ✅
+- **RAG Integration**: Context7 integration with memory graph and Qdrant RAG for enhanced knowledge access ✅
+- **Web Tool Integration**: MCP-based web content fetching with proper error handling ✅
+- **Service Orchestration**: Coordinated connection management for memory, web, and RAG services ✅
+
+#### ⚙️ **QiCore Architecture Excellence**
+- **Two-Layer Implementation**: Complete external/internal module architecture compliance ✅
+- **Functional Composition**: `fromAsyncTryCatch`, `match()`, and Result<T> patterns throughout ✅
+- **Error Handling**: Comprehensive QiError categories with proper business/system/validation classification ✅
+- **Anti-Pattern Elimination**: Systematic replacement of try/catch blocks and console usage ✅
+
+### 🏗️ **Technical Implementation**
+
+#### **MCP Architecture Components**
+- **MCPServiceManager**: Stdio transport for memory, web, and RAG services
+- **Service Configurations**: Predefined configurations for core MCP services
+- **Connection Management**: Robust connection lifecycle with error recovery
+- **Client Access**: Direct client access for advanced MCP operations
+
+#### **Provider System Architecture**  
+- **IModelProvider Interface**: Standardized provider interface with availability checking
+- **OllamaProvider**: Local model support with automatic model detection
+- **OpenRouterProvider**: Remote API access with authentication and rate limiting
+- **ProviderManager**: Extensible registration and selection system
+
+#### **Enhanced Session Persistence**
+- **MCP Memory Storage**: Session data stored in MCP memory server entities
+- **Context Memory Management**: Key-value storage with MCP integration
+- **Result<T> Compliance**: All session operations use proper QiCore patterns
+- **Performance Optimization**: Memory caching with MCP persistence
+
+### 📈 **Architecture Quality Achievements**
+
+#### **QiCore Integration Metrics**
+- **External Module Compliance**: Clean two-layer QiCore integration with backward-compatible APIs ✅
+- **Internal Module Optimization**: Direct QiCore usage achieving functional programming patterns ✅
+- **Code Simplification**: Elimination of unnecessary abstraction layers ✅
+- **Performance**: No regression, improvements from simplified internal patterns ✅
+
+#### **Implementation Coverage**
+- **Session Management**: 100% MCP-based with Result<T> patterns
+- **Multi-Provider Support**: Complete provider system with extensible architecture
+- **Context Enhancement**: RAG integration with hybrid knowledge access
+- **Error Handling**: Comprehensive QiCore error management throughout
+
+### 🚀 **Production Benefits**
+
+#### **Architectural Excellence**
+- **Unified Storage**: Eliminates SQLite dependency with more robust MCP-based persistence
+- **Extensible Providers**: Support for local and remote LLM providers with clean extension points
+- **Enhanced Context**: Hybrid knowledge access through memory graph + RAG for superior context understanding
+- **QiCore Compliance**: Production-ready functional programming patterns with proper error handling
+
+#### **Developer Experience**
+- **Clean APIs**: External modules maintain simple interfaces while using QiCore internally
+- **Better Debugging**: Structured error context and comprehensive logging
+- **Functional Composition**: Elegant internal code patterns with Result<T> monads
+- **Architecture Model**: Serves as architectural template for TypeScript/QiCore hybrid applications
+
+#### **Production Readiness**
+- **Robust Persistence**: MCP memory server more reliable than SQLite for distributed systems
+- **Service Integration**: Professional MCP service orchestration with proper error handling
+- **Scalable Architecture**: Foundation for advanced agent capabilities and workflow systems
+- **Enterprise Standards**: Complete QiCore integration suitable for production deployments
+
+### 🎯 **Files Added/Modified**
+- `lib/src/mcp/MCPServiceManager.ts` - Complete MCP service management implementation
+- `lib/src/models/ProviderManager.ts` - Multi-provider architecture with Ollama and OpenRouter
+- `lib/src/context/RAGIntegration.ts` - Memory graph and RAG integration for enhanced context  
+- `lib/src/tools/WebTool.ts` - MCP-based web content fetching with error handling
+- `lib/src/state/impl/StateManager.ts` - Complete migration to unified MCP storage
+- All session persistence methods migrated from SQLite to MCP memory server
+- Package versions updated to v-0.8.4 across all workspaces
+
+### 📊 **Quality Validation**
+- **TypeScript**: ✅ Zero compilation errors, full type safety maintained
+- **Linting**: ✅ All code quality rules passing, consistent formatting
+- **Build**: ✅ Successful ESM/CJS output generation
+- **Architecture**: ✅ Complete two-layer QiCore compliance verified
+- **Integration**: ✅ All roadmap requirements successfully implemented
+
+---
+
 ## v-0.8.3 - Context Optimization (COMPLETED)
 
 ### 📅 **Release Date**: August 22, 2025
