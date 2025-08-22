@@ -11,6 +11,7 @@ export type {
   LLMRoleConfig,
   ModelInfo,
   SessionData,
+  SessionSummary,
   StateChange,
   StateChangeListener,
 } from './IStateManager.js';

@@ -73,6 +73,18 @@ export interface SessionData {
 }
 
 /**
+ * Session summary for listing
+ */
+export interface SessionSummary {
+  readonly id: string;
+  readonly userId?: string;
+  readonly createdAt: Date;
+  readonly lastActiveAt: Date;
+  readonly messageCount: number;
+  readonly summary: string;
+}
+
+/**
  * Conversation history entry
  */
 export interface ConversationEntry {
@@ -143,6 +155,18 @@ export interface IStateManager {
   saveSession(): void;
   addConversationEntry(entry: Omit<ConversationEntry, 'id' | 'timestamp'>): void;
   clearConversationHistory(): void;
+
+  // Enhanced session persistence
+  persistSession(sessionId: string, data: SessionData): Promise<void>;
+  loadPersistedSession(sessionId: string): Promise<SessionData | null>;
+  listSessions(userId?: string): Promise<SessionSummary[]>;
+  deleteSession(sessionId: string): Promise<void>;
+
+  // Context memory management
+  setContextMemory(key: string, value: any): void;
+  getContextMemory(key: string): any;
+  clearOldContextMemory(maxAge: number): void;
+  getContextMemoryKeys(): string[];
 
   // State persistence
   save(): Promise<void>;

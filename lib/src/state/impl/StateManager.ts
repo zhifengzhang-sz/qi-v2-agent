@@ -5,9 +5,11 @@
  * the existing IStateManager interface for compatibility.
  */
 
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fromAsyncTryCatch, match, type QiError, type Result, validationError } from '@qi/base';
 import { ConfigBuilder } from '@qi/core';
+import { Database } from 'sqlite3';
 import { createActor } from 'xstate';
 import { createQiLogger, logError, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
@@ -19,6 +21,7 @@ import type {
   LLMRoleConfig,
   ModelInfo,
   SessionData,
+  SessionSummary,
   StateChange,
   StateChangeListener,
 } from '../abstractions/index.js';
@@ -38,6 +41,8 @@ export class StateManager implements IStateManager {
   private actor: AgentStateActor;
   private listeners: Set<StateChangeListener> = new Set();
   private logger: SimpleLogger;
+  private database: Database | null = null;
+  private contextMemory: Map<string, any> = new Map();
 
   constructor() {
     // Initialize QiCore logger
@@ -63,6 +68,9 @@ export class StateManager implements IStateManager {
 
     // Start the actor
     this.actor.start();
+
+    // Initialize enhanced session database
+    this.initializeSessionDatabase();
   }
 
   // ==========================================================================
@@ -589,6 +597,210 @@ export class StateManager implements IStateManager {
   }
 
   // ==========================================================================
+  // Enhanced session persistence
+  // ==========================================================================
+
+  async persistSession(sessionId: string, data: SessionData): Promise<void> {
+    if (!this.database) {
+      throw new Error('Session database not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      const stmt = this.database!.prepare(`
+        INSERT OR REPLACE INTO sessions 
+        (id, user_id, start_time, last_activity, message_count, session_data, summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const summary = this.generateSessionSummary(data);
+
+      stmt.run(
+        sessionId,
+        data.userId || null,
+        data.createdAt.toISOString(),
+        data.lastActiveAt.toISOString(),
+        data.conversationHistory.length,
+        JSON.stringify(data),
+        summary,
+        (err: Error | null) => {
+          if (err) {
+            this.logger.error(`Failed to persist session ${sessionId}:`, err.message);
+            reject(err);
+          } else {
+            this.logger.info(`Session ${sessionId} persisted successfully`);
+            resolve();
+          }
+        }
+      );
+
+      stmt.finalize();
+    });
+  }
+
+  async loadPersistedSession(sessionId: string): Promise<SessionData | null> {
+    if (!this.database) {
+      throw new Error('Session database not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.database!.get(
+        'SELECT session_data FROM sessions WHERE id = ?',
+        [sessionId],
+        (err: Error | null, row: any) => {
+          if (err) {
+            this.logger.error(`Failed to load session ${sessionId}:`, err.message);
+            reject(err);
+          } else if (row) {
+            try {
+              const sessionData: SessionData = JSON.parse(row.session_data);
+              this.logger.info(`Session ${sessionId} loaded successfully`);
+              resolve(sessionData);
+            } catch (parseError) {
+              this.logger.error(`Failed to parse session data for ${sessionId}:`, parseError);
+              reject(parseError);
+            }
+          } else {
+            resolve(null);
+          }
+        }
+      );
+    });
+  }
+
+  async listSessions(userId?: string): Promise<SessionSummary[]> {
+    if (!this.database) {
+      throw new Error('Session database not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      const query = userId
+        ? 'SELECT id, user_id, start_time, last_activity, message_count, summary FROM sessions WHERE user_id = ? ORDER BY last_activity DESC'
+        : 'SELECT id, user_id, start_time, last_activity, message_count, summary FROM sessions ORDER BY last_activity DESC';
+
+      const params = userId ? [userId] : [];
+
+      this.database!.all(query, params, (err: Error | null, rows: any[]) => {
+        if (err) {
+          this.logger.error('Failed to list sessions:', err.message);
+          reject(err);
+        } else {
+          const summaries: SessionSummary[] = rows.map((row) => ({
+            id: row.id,
+            userId: row.user_id,
+            createdAt: new Date(row.start_time),
+            lastActiveAt: new Date(row.last_activity),
+            messageCount: row.message_count,
+            summary:
+              row.summary || `Session started ${new Date(row.start_time).toLocaleDateString()}`,
+          }));
+          resolve(summaries);
+        }
+      });
+    });
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    if (!this.database) {
+      throw new Error('Session database not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      this.database!.run('DELETE FROM sessions WHERE id = ?', [sessionId], (err: Error | null) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  // ==========================================================================
+  // Context memory management
+  // ==========================================================================
+
+  setContextMemory(key: string, value: any): void {
+    this.contextMemory.set(key, value);
+
+    // Also persist to database
+    if (this.database) {
+      const stmt = this.database.prepare(`
+        INSERT OR REPLACE INTO context_memory (key, value, accessed_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `);
+
+      stmt.run(key, JSON.stringify(value), (err: Error | null) => {
+        if (err) {
+          this.logger.error(`Failed to persist context memory key ${key}:`, err.message);
+        }
+      });
+
+      stmt.finalize();
+    }
+  }
+
+  getContextMemory(key: string): any {
+    const memoryValue = this.contextMemory.get(key);
+    if (memoryValue !== undefined) {
+      return memoryValue;
+    }
+
+    // Try to load from database if not in memory
+    if (this.database) {
+      this.database.get(
+        'SELECT value FROM context_memory WHERE key = ?',
+        [key],
+        (err: Error | null, row: any) => {
+          if (!err && row) {
+            try {
+              const value = JSON.parse(row.value);
+              this.contextMemory.set(key, value);
+
+              // Update access time
+              this.database!.run(
+                'UPDATE context_memory SET accessed_at = CURRENT_TIMESTAMP WHERE key = ?',
+                [key]
+              );
+            } catch (parseError) {
+              this.logger.error(`Failed to parse context memory value for ${key}:`, parseError);
+            }
+          }
+        }
+      );
+    }
+
+    return undefined;
+  }
+
+  clearOldContextMemory(maxAge: number): void {
+    // Clear from memory map
+    const cutoffTime = Date.now() - maxAge;
+    for (const [key, value] of this.contextMemory.entries()) {
+      // Simple heuristic: remove if not accessed recently
+      // In practice, you'd track access times
+      this.contextMemory.delete(key);
+    }
+
+    // Clear from database
+    if (this.database) {
+      const cutoffDate = new Date(cutoffTime).toISOString();
+      this.database.run(
+        'DELETE FROM context_memory WHERE accessed_at < ?',
+        [cutoffDate],
+        (err: Error | null) => {
+          if (err) {
+            console.error('Failed to clear old context memory:', err.message);
+          }
+        }
+      );
+    }
+  }
+
+  getContextMemoryKeys(): string[] {
+    return Array.from(this.contextMemory.keys());
+  }
+
+  // ==========================================================================
   // Private helper methods
   // ==========================================================================
 
@@ -676,6 +888,17 @@ export class StateManager implements IStateManager {
   stop(): void {
     this.actor.stop();
     this.listeners.clear();
+
+    // Close database connection
+    if (this.database) {
+      this.database.close((err) => {
+        if (err) {
+          this.logger.error('Error closing session database:', err.message);
+        } else {
+          this.logger.info('Session database closed');
+        }
+      });
+    }
   }
 
   // ==========================================================================
@@ -697,5 +920,112 @@ export class StateManager implements IStateManager {
     } catch (error) {
       this.logger.error('Failed to initialize persistence:', error);
     }
+  }
+
+  private initializeSessionDatabase(): void {
+    try {
+      // Create data directory if it doesn't exist
+      const dataDir = './data';
+      if (!existsSync(dataDir)) {
+        mkdirSync(dataDir, { recursive: true });
+      }
+      const dbPath = join(dataDir, 'sessions.db');
+
+      // Create database connection
+      this.database = new Database(dbPath, (err) => {
+        if (err) {
+          this.logger.error('Failed to open session database:', err.message);
+          return;
+        }
+
+        this.logger.info(`Session database connected: ${dbPath}`);
+
+        // Initialize database schema
+        this.initializeDatabaseSchema();
+      });
+    } catch (error) {
+      this.logger.error('Failed to initialize session database:', error);
+    }
+  }
+
+  private initializeDatabaseSchema(): void {
+    if (!this.database) return;
+
+    try {
+      // Execute schema statements in sequence to ensure proper order
+      const tableStatements = [
+        `CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          start_time DATETIME NOT NULL,
+          last_activity DATETIME NOT NULL,
+          message_count INTEGER DEFAULT 0,
+          session_data TEXT NOT NULL,
+          summary TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS context_memory (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE TABLE IF NOT EXISTS conversation_entries (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          timestamp DATETIME NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('user_input', 'agent_response', 'system_message')),
+          content TEXT NOT NULL,
+          metadata TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`,
+      ];
+
+      const indexStatements = [
+        `CREATE INDEX IF NOT EXISTS idx_sessions_last_activity ON sessions(last_activity)`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time)`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_context_memory_accessed ON context_memory(accessed_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_conversation_session_id ON conversation_entries(session_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_conversation_timestamp ON conversation_entries(timestamp)`,
+      ];
+
+      // Execute table creation statements first
+      this.database.serialize(() => {
+        for (const statement of tableStatements) {
+          this.database!.run(statement, (err) => {
+            if (err) {
+              this.logger.error('Failed to execute table statement:', err.message);
+            }
+          });
+        }
+
+        // Then execute index creation statements
+        for (const statement of indexStatements) {
+          this.database!.run(statement, (err) => {
+            if (err) {
+              this.logger.error('Failed to execute index statement:', err.message);
+            }
+          });
+        }
+      });
+
+      this.logger.info('Session database schema initialized');
+    } catch (error) {
+      this.logger.error('Failed to initialize database schema:', error);
+    }
+  }
+
+  private generateSessionSummary(data: SessionData): string {
+    const messageCount = data.conversationHistory.length;
+    if (messageCount === 0) {
+      return `Session started ${data.createdAt.toLocaleDateString()}`;
+    }
+
+    const lastMessage = data.conversationHistory[messageCount - 1];
+    const duration = data.lastActiveAt.getTime() - data.createdAt.getTime();
+    const durationMinutes = Math.round(duration / 60000);
+
+    return `${messageCount} messages over ${durationMinutes}m - "${lastMessage.content.substring(0, 50)}${lastMessage.content.length > 50 ? '...' : ''}"`;
   }
 }

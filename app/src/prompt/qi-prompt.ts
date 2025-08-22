@@ -346,6 +346,9 @@ class QiPromptApp {
           });
         }
 
+        // Enhanced Session Persistence: Try to load existing session or create new one
+        await this.initializeSessionPersistence();
+
         // v-0.6.3: Create orchestrator directly with message queue (bypass factory)
         this.orchestrator = new (
           await import('@qi/agent/agent/PromptAppOrchestrator')
@@ -579,6 +582,9 @@ class QiPromptApp {
 
     const shutdownResult = await fromAsyncTryCatch(
       async () => {
+        // Enhanced Session Persistence: Save current session before shutdown
+        await this.saveCurrentSession();
+
         // v-0.6.3: Shutdown QiPrompt Core first (stops message processing)
         if (this.qiPromptCore) {
           const shutdownResult = await this.qiPromptCore.shutdown();
@@ -764,6 +770,165 @@ class QiPromptApp {
         }
       }
     );
+  }
+
+  // ==========================================================================
+  // Enhanced Session Persistence Methods
+  // ==========================================================================
+
+  /**
+   * Initialize session persistence - try to load existing session or create new one
+   */
+  private async initializeSessionPersistence(): Promise<void> {
+    try {
+      if (!this.currentSession) {
+        this.logger.warn('No current session to persist', undefined, {
+          component: 'QiPromptApp',
+          step: 'session_persistence_init_warning',
+        });
+        return;
+      }
+
+      // Try to load existing session data
+      const existingSession = await this.stateManager.loadPersistedSession(this.currentSession);
+
+      if (existingSession) {
+        // Restore session data
+        this.logger.info('📂 Session restored from previous run', undefined, {
+          component: 'QiPromptApp',
+          step: 'session_restored',
+          sessionId: this.currentSession,
+          messageCount: existingSession.conversationHistory.length,
+        });
+
+        // Restore conversation history to current session
+        for (const entry of existingSession.conversationHistory) {
+          this.stateManager.addConversationEntry({
+            type: entry.type,
+            content: entry.content,
+            metadata: entry.metadata,
+          });
+        }
+
+        // Set context memory for quick access
+        this.stateManager.setContextMemory('last_session_id', this.currentSession);
+        this.stateManager.setContextMemory('session_start_time', new Date().toISOString());
+      } else {
+        this.logger.info('🆕 Starting new session', undefined, {
+          component: 'QiPromptApp',
+          step: 'new_session_started',
+          sessionId: this.currentSession,
+        });
+
+        // Set context memory for new session
+        this.stateManager.setContextMemory('last_session_id', this.currentSession);
+        this.stateManager.setContextMemory('session_start_time', new Date().toISOString());
+      }
+
+      // Setup auto-save every 30 seconds
+      this.setupAutoSave();
+    } catch (error) {
+      this.logger.error('Failed to initialize session persistence', undefined, {
+        component: 'QiPromptApp',
+        step: 'session_persistence_init_error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Save current session data
+   */
+  private async saveCurrentSession(): Promise<void> {
+    try {
+      if (!this.currentSession) {
+        return;
+      }
+
+      const currentSessionData = this.stateManager.getCurrentSession();
+      await this.stateManager.persistSession(this.currentSession, currentSessionData);
+
+      if (this.debugMode) {
+        this.logger.info('💾 Session saved', undefined, {
+          component: 'QiPromptApp',
+          step: 'session_saved',
+          sessionId: this.currentSession,
+          messageCount: currentSessionData.conversationHistory.length,
+        });
+      }
+    } catch (error) {
+      this.logger.error('Failed to save session', undefined, {
+        component: 'QiPromptApp',
+        step: 'session_save_error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Setup automatic session saving
+   */
+  private setupAutoSave(): void {
+    // Auto-save every 30 seconds
+    setInterval(async () => {
+      await this.saveCurrentSession();
+    }, 30000);
+
+    // Also save on process exit
+    process.on('SIGINT', async () => {
+      this.logger.info('🛑 Received SIGINT, saving session...', undefined, {
+        component: 'QiPromptApp',
+        step: 'sigint_session_save',
+      });
+      await this.saveCurrentSession();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', async () => {
+      this.logger.info('🛑 Received SIGTERM, saving session...', undefined, {
+        component: 'QiPromptApp',
+        step: 'sigterm_session_save',
+      });
+      await this.saveCurrentSession();
+      process.exit(0);
+    });
+  }
+
+  /**
+   * List previous sessions
+   */
+  async listPreviousSessions(): Promise<void> {
+    try {
+      const sessions = await this.stateManager.listSessions();
+
+      if (sessions.length === 0) {
+        console.log('📭 No previous sessions found');
+        return;
+      }
+
+      console.log('\n📚 Previous Sessions:');
+      console.log('────────────────────');
+
+      for (const session of sessions.slice(0, 10)) {
+        // Show last 10 sessions
+        const lastActive = session.lastActiveAt.toLocaleDateString();
+        const messageCount = session.messageCount;
+        const summary =
+          session.summary.length > 60 ? session.summary.substring(0, 60) + '...' : session.summary;
+
+        console.log(
+          `${session.id.substring(0, 8)}... | ${lastActive} | ${messageCount} msgs | ${summary}`
+        );
+      }
+
+      console.log('────────────────────\n');
+    } catch (error) {
+      this.logger.error('Failed to list sessions', undefined, {
+        component: 'QiPromptApp',
+        step: 'session_list_error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   // v-0.6.1: Input handling delegated to CLI framework
@@ -998,32 +1163,35 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 
   // Handle QiCore Result<T> return from start() with two-layer pattern
-  cli.start().then((result) => {
-    match(
-      () => {
-        // Success - application is running
-      },
-      (error) => {
-        // Transform QiError to traditional error for external boundary
-        // Hide internal QiCore structure from external consumers
-        console.error('CLI failed:', error.message);
-        if (options.debug) {
-          // Only show internal error structure in debug mode
-          console.error('Debug details:', {
-            code: error.code,
-            category: error.category,
-            context: error.context
-          });
-        }
-        process.exit(1);
-      },
-      result
-    );
-  }).catch((error) => {
-    // Fallback for non-QiCore errors
-    console.error('Unexpected CLI error:', error);
-    process.exit(1);
-  });
+  cli
+    .start()
+    .then((result) => {
+      match(
+        () => {
+          // Success - application is running
+        },
+        (error) => {
+          // Transform QiError to traditional error for external boundary
+          // Hide internal QiCore structure from external consumers
+          console.error('CLI failed:', error.message);
+          if (options.debug) {
+            // Only show internal error structure in debug mode
+            console.error('Debug details:', {
+              code: error.code,
+              category: error.category,
+              context: error.context,
+            });
+          }
+          process.exit(1);
+        },
+        result
+      );
+    })
+    .catch((error) => {
+      // Fallback for non-QiCore errors
+      console.error('Unexpected CLI error:', error);
+      process.exit(1);
+    });
 }
 
 export { QiPromptApp };

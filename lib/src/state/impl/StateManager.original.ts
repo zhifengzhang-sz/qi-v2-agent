@@ -19,6 +19,7 @@ import type {
   LLMRoleConfig,
   ModelInfo,
   SessionData,
+  SessionSummary,
   StateChange,
   StateChangeListener,
 } from '../abstractions/index.js';
@@ -672,5 +673,50 @@ export class StateManager implements IStateManager {
       newValue: null,
       timestamp: new Date(),
     });
+  }
+
+  // Enhanced session persistence methods (stub implementations)
+  async persistSession(sessionId: string, data: SessionData): Promise<void> {
+    // Stub implementation - this original StateManager doesn't support persistence
+    console.warn('persistSession called on original StateManager - no-op');
+  }
+
+  async loadPersistedSession(sessionId: string): Promise<SessionData | null> {
+    // Stub implementation
+    console.warn('loadPersistedSession called on original StateManager - returning null');
+    return null;
+  }
+
+  async listSessions(userId?: string): Promise<SessionSummary[]> {
+    // Stub implementation
+    console.warn('listSessions called on original StateManager - returning empty array');
+    return [];
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    // Stub implementation
+    console.warn('deleteSession called on original StateManager - no-op');
+  }
+
+  setContextMemory(key: string, value: any): void {
+    // Stub implementation
+    console.warn('setContextMemory called on original StateManager - no-op');
+  }
+
+  getContextMemory(key: string): any {
+    // Stub implementation
+    console.warn('getContextMemory called on original StateManager - returning undefined');
+    return undefined;
+  }
+
+  clearOldContextMemory(maxAge: number): void {
+    // Stub implementation
+    console.warn('clearOldContextMemory called on original StateManager - no-op');
+  }
+
+  getContextMemoryKeys(): string[] {
+    // Stub implementation
+    console.warn('getContextMemoryKeys called on original StateManager - returning empty array');
+    return [];
   }
 }
