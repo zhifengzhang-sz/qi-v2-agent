@@ -42,3 +42,4 @@ export function createPromptHandler(): DefaultPromptHandler {
   const manager = new QiCorePromptManager();
   return new DefaultPromptHandler(manager);
 }
+

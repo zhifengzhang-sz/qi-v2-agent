@@ -64,7 +64,8 @@ export {
   TopicSchema,
 } from './schemas/ClassificationSchemas.js';
 
-// LLM Integration - removed, use prompt module instead
+// Model Provider System
+export * from './models/index.js';
 
 // Prompt Processing
 export * from './prompt/index.js';
