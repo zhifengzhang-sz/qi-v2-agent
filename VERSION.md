@@ -1,22 +1,21 @@
 # Qi V2 Agent - Version History
 
-## 🤖 Dual-Agent Architecture
+## 🤖 Extensible Agent Framework
 
-This project develops **two specialized AI agents** with distinct capabilities and milestones:
+This project provides an **extensible agent framework** for building specialized AI agents with distinct capabilities:
 
 ### **qi-prompt** - Advanced Prompt Application
 - **Focus**: Context management and simple workflows
 - **Strength**: Professional context optimization with RAG integration  
 - **Design Philosophy**: Simple, well-defined patterns (no fancy complexity)
-- **Current Status**: v-0.8.0 working implementation ✅
-- **Milestone**: v-0.8.x complete (qi-prompt enhanced with upgraded modules)
+- **Current Status**: v-0.8.4 production-ready ✅
+- **Architecture**: Complete QiCore integration with unified MCP storage
 
-### **qi-code** - Full Coding Agent  
-- **Focus**: Complete workflow orchestration and tool ecosystem
-- **Strength**: Advanced agent capabilities with MCP server integration
-- **Design Philosophy**: Full pattern library with intelligent selection
-- **Current Status**: Under development 🚧
-- **Milestone**: v-0.10.x Advanced Agent Capabilities
+### **Future Agents** - Extensible Capabilities  
+- **qi-code**: Complete workflow orchestration and tool ecosystem (planned v-0.10.x)
+- **qi-analyze**: Data analysis and visualization agent (future)
+- **qi-deploy**: DevOps and deployment automation agent (future)
+- **Custom Agents**: Framework supports unlimited specialized agent implementations
 
 ---
 
@@ -659,13 +658,14 @@ Complete implementation of QiCore-integrated tool layer with advanced security f
 - **Knowledge Evolution**: Automated learning pipelines
 - **Self-Optimization**: Continuous performance improvement
 - **Memory Consolidation**: Long-term knowledge synthesis
-- **Cross-Agent Learning**: Knowledge sharing between qi-prompt and qi-code
+- **Cross-Agent Learning**: Knowledge sharing between multiple agent implementations
 
-### v1.0.x - Production Dual-Agent System (PLANNED)
+### v1.0.x - Production Multi-Agent System (PLANNED)
 **Target**: Enterprise-ready deployment
 - **qi-prompt**: Mature context management and simple workflows
-- **qi-code**: Full agent capabilities with advanced workflows
-- **Unified Experience**: Seamless integration between both agents
+- **qi-code**: Full agent capabilities with advanced workflows  
+- **Additional Agents**: Data analysis, DevOps automation, and custom implementations
+- **Unified Experience**: Seamless integration between all agent types
 - **Enterprise Features**: Monitoring, security, and compliance
 
 ---
