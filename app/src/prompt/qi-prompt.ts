@@ -40,6 +40,8 @@ import { RAGIntegration } from '@qi/agent/context/RAGIntegration';
 import { MCPServiceManager } from '@qi/agent/mcp/MCPServiceManager';
 import { QiAsyncMessageQueue } from '@qi/agent/messaging/impl/QiAsyncMessageQueue';
 import type { QiMessage } from '@qi/agent/messaging/types/MessageTypes';
+// v-0.8.x: Multi-Provider Model Support
+import { ProviderManager } from '@qi/agent/models/ProviderManager';
 import { createPromptHandler } from '@qi/agent/prompt';
 import { createStateManager } from '@qi/agent/state';
 import { WebTool } from '@qi/agent/tools/WebTool';
@@ -62,6 +64,8 @@ import {
 import { createModelCommand } from './commands/ModelCommand.js';
 import { createProviderCommand } from './commands/ProviderCommand.js';
 import { createStatusCommand } from './commands/StatusCommand.js';
+// v-0.8.x: Custom prompt handler using ProviderManager
+import { ProviderManagerPromptHandler } from './ProviderManagerPromptHandler.js';
 // v-0.6.1: Import new QiPrompt Core and message queue
 import { QiPromptCLI } from './QiPromptCLI.js';
 
@@ -160,6 +164,8 @@ class QiPromptApp {
   private serviceManager: MCPServiceManager;
   private ragIntegration: RAGIntegration;
   private webTool: WebTool;
+  // v-0.8.x: Multi-Provider Model Support
+  private providerManager: ProviderManager;
 
   constructor(
     options: {
@@ -198,7 +204,11 @@ class QiPromptApp {
     const appContext = createDefaultAppContext();
     this.contextManager = new ContextManager(appContext);
 
-    this.promptHandler = createPromptHandler();
+    // v-0.8.x: Initialize Multi-Provider Model Support FIRST
+    this.providerManager = new ProviderManager();
+
+    // v-0.8.x: Use ProviderManager-based prompt handler for automatic fallback
+    this.promptHandler = new ProviderManagerPromptHandler(this.providerManager);
     this.commandHandler = createCommandHandler({
       enableBuiltInCommands: true,
     });
@@ -964,6 +974,48 @@ class QiPromptApp {
           return {
             success: false,
             message: `❌ Knowledge search error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          };
+        }
+      }
+    );
+
+    // v-0.8.x: Provider status command
+    this.commandHandler.registerCommand(
+      {
+        name: 'providers',
+        description: 'Show available LLM providers and their status',
+        category: 'models',
+      },
+      async () => {
+        try {
+          const availableProviderResult = await this.providerManager.getAvailableProvider();
+
+          return match(
+            (provider) => {
+              let info = `🤖 LLM Provider Status:\n`;
+              info += `  Active Provider: ${provider.name} (${provider.type})\n`;
+              info += `  Status: ✅ Available\n\n`;
+
+              info += `🔄 Provider Priority:\n`;
+              info += `  1. Ollama (local) - ${provider.name === 'ollama' ? '✅ Active' : '❌ Unavailable'}\n`;
+              info += `  2. OpenRouter (remote) - ${provider.name === 'openrouter' ? '✅ Active' : provider.name === 'ollama' ? '⏩ Fallback ready' : '❌ Unavailable'}\n\n`;
+
+              info += `💡 Automatic fallback: Ollama → OpenRouter when needed`;
+
+              return { success: true, message: info };
+            },
+            (error) => {
+              return {
+                success: false,
+                message: `❌ No providers available: ${error.message}\n\n💡 Check:\n  • Ollama running (http://localhost:11434)\n  • OPENROUTER_API_KEY environment variable set`,
+              };
+            },
+            availableProviderResult
+          );
+        } catch (error) {
+          return {
+            success: false,
+            message: `❌ Provider check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           };
         }
       }
