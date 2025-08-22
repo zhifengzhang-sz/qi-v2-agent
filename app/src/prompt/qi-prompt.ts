@@ -35,10 +35,14 @@ import { createCommandHandler } from '@qi/agent/command';
 import { createDefaultAppContext } from '@qi/agent/context';
 // Use standard context manager instead of tool-based one
 import { ContextManager } from '@qi/agent/context/impl/ContextManager';
+import { RAGIntegration } from '@qi/agent/context/RAGIntegration';
+// v-0.8.x: MCP Integration imports
+import { MCPServiceManager } from '@qi/agent/mcp/MCPServiceManager';
 import { QiAsyncMessageQueue } from '@qi/agent/messaging/impl/QiAsyncMessageQueue';
 import type { QiMessage } from '@qi/agent/messaging/types/MessageTypes';
 import { createPromptHandler } from '@qi/agent/prompt';
 import { createStateManager } from '@qi/agent/state';
+import { WebTool } from '@qi/agent/tools/WebTool';
 // Debug logging utility
 import { initializeDebugLogging } from '@qi/agent/utils/DebugLogger';
 // Import new two-layer workflow architecture (v0.5.x refactored)
@@ -152,6 +156,10 @@ class QiPromptApp {
   private configHelper!: AppConfigHelper;
   private promptConfigPath?: string;
   private promptSchemaPath?: string;
+  // v-0.8.x: MCP Integration components
+  private serviceManager: MCPServiceManager;
+  private ragIntegration: RAGIntegration;
+  private webTool: WebTool;
 
   constructor(
     options: {
@@ -194,6 +202,11 @@ class QiPromptApp {
     this.commandHandler = createCommandHandler({
       enableBuiltInCommands: true,
     });
+
+    // v-0.8.x: Initialize MCP components
+    this.serviceManager = new MCPServiceManager();
+    this.ragIntegration = new RAGIntegration(this.serviceManager);
+    this.webTool = new WebTool(this.serviceManager);
 
     // Register app-specific commands
     this.registerAppCommands();
@@ -348,6 +361,9 @@ class QiPromptApp {
 
         // Enhanced Session Persistence: Try to load existing session or create new one
         await this.initializeSessionPersistence();
+
+        // v-0.8.x: Initialize MCP services
+        await this.initializeMCPServices();
 
         // v-0.6.3: Create orchestrator directly with message queue (bypass factory)
         this.orchestrator = new (
@@ -570,6 +586,88 @@ class QiPromptApp {
   }
 
   /**
+   * v-0.8.x: Initialize MCP services for RAG and web capabilities
+   */
+  private async initializeMCPServices(): Promise<void> {
+    if (this.debugMode) {
+      this.logger.info('🔌 Initializing MCP services...', undefined, {
+        component: 'QiPromptApp',
+        step: 'mcp_services_init',
+      });
+    }
+
+    // Define MCP services to connect to
+    const servicesToConnect = [
+      {
+        name: 'memory',
+        command: ['npx', '@modelcontextprotocol/server-memory'],
+        autoConnect: true,
+      },
+      {
+        name: 'fetch',
+        command: ['npx', '@modelcontextprotocol/server-fetch'],
+        autoConnect: true,
+      },
+      {
+        name: 'brave-search',
+        command: ['npx', '@modelcontextprotocol/server-brave-search'],
+        autoConnect: false, // Optional service
+      },
+    ];
+
+    // Connect to MCP services
+    for (const service of servicesToConnect) {
+      if (service.autoConnect) {
+        try {
+          const result = await this.serviceManager.connectToService(service);
+          match(
+            () => {
+              if (this.debugMode) {
+                this.logger.info(`✅ Connected to MCP service: ${service.name}`, undefined, {
+                  component: 'QiPromptApp',
+                  step: 'mcp_service_connected',
+                  serviceName: service.name,
+                });
+              }
+            },
+            (error) => {
+              this.logger.warn(
+                `⚠️ Failed to connect to ${service.name}: ${error.message}`,
+                undefined,
+                {
+                  component: 'QiPromptApp',
+                  step: 'mcp_service_connection_failed',
+                  serviceName: service.name,
+                  error: error.message,
+                }
+              );
+            },
+            result
+          );
+        } catch (error) {
+          this.logger.warn(`⚠️ Error connecting to ${service.name}`, undefined, {
+            component: 'QiPromptApp',
+            step: 'mcp_service_connection_error',
+            serviceName: service.name,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    if (this.debugMode) {
+      const connectedServices = this.serviceManager.getConnectedServices();
+      this.logger.info('🔌 MCP services initialization complete', undefined, {
+        component: 'QiPromptApp',
+        step: 'mcp_services_init_complete',
+        connectedServices,
+        ragAvailable: this.ragIntegration.isAvailable(),
+        webFetchAvailable: this.webTool.isWebFetchAvailable(),
+      });
+    }
+  }
+
+  /**
    * Enhanced shutdown with v-0.6.3 message queue cleanup and QiCore logging
    */
   async shutdown(): Promise<Result<void, QiError>> {
@@ -619,6 +717,15 @@ class QiPromptApp {
           this.logger.info('✅ Context manager shut down', undefined, {
             component: 'QiPromptApp',
             step: 'context_manager_shutdown',
+          });
+        }
+
+        // v-0.8.x: Shutdown MCP services
+        if (this.serviceManager) {
+          await this.serviceManager.shutdown();
+          this.logger.info('✅ MCP services shut down', undefined, {
+            component: 'QiPromptApp',
+            step: 'mcp_services_shutdown',
           });
         }
 
@@ -767,6 +874,97 @@ class QiPromptApp {
             `  Session: ${this.currentSession || 'None'}\n` +
             `  Context managed by workflow system`;
           return { success: true, message: info };
+        }
+      }
+    );
+
+    // v-0.8.x: MCP-related commands
+    this.commandHandler.registerCommand(
+      {
+        name: 'mcp',
+        description: 'Show MCP service status and capabilities',
+        category: 'services',
+      },
+      async () => {
+        const connectedServices = this.serviceManager.getConnectedServices();
+        const ragAvailable = this.ragIntegration.isAvailable();
+        const webFetchAvailable = this.webTool.isWebFetchAvailable();
+
+        let info = `🔌 MCP Services Status:\n`;
+        info += `  Connected Services: ${connectedServices.length > 0 ? connectedServices.join(', ') : 'None'}\n`;
+        info += `  RAG Available: ${ragAvailable ? '✅' : '❌'}\n`;
+        info += `  Web Fetch Available: ${webFetchAvailable ? '✅' : '❌'}\n`;
+
+        if (connectedServices.length > 0) {
+          info += `\n🧠 Enhanced Capabilities:\n`;
+          if (ragAvailable) {
+            info += `  • Knowledge storage and retrieval\n`;
+          }
+          if (webFetchAvailable) {
+            info += `  • Real-time web content fetching\n`;
+          }
+        } else {
+          info += `\n💡 No MCP services connected. Enhanced features unavailable.`;
+        }
+
+        return { success: true, message: info };
+      }
+    );
+
+    this.commandHandler.registerCommand(
+      {
+        name: 'knowledge',
+        description: 'Search stored knowledge using RAG',
+        category: 'context',
+      },
+      async (args: string[]) => {
+        if (!this.ragIntegration.isAvailable()) {
+          return {
+            success: false,
+            message: '❌ RAG service not available. Knowledge search unavailable.',
+          };
+        }
+
+        const query = args.join(' ');
+        if (!query) {
+          return {
+            success: false,
+            message: '❌ Please provide a search query. Usage: /knowledge <query>',
+          };
+        }
+
+        try {
+          const searchResult = await this.ragIntegration.searchRelevantContext(query, 5);
+          return match(
+            (documents) => {
+              if (documents.length === 0) {
+                return {
+                  success: true,
+                  message: `🔍 No relevant knowledge found for: "${query}"`,
+                };
+              }
+
+              let response = `🧠 Knowledge Search Results for "${query}":\n\n`;
+              documents.forEach((doc, index) => {
+                const content = doc.content;
+                response += `${index + 1}. ${content.substring(0, 200)}${content.length > 200 ? '...' : ''}\n\n`;
+              });
+
+              return { success: true, message: response };
+            },
+            (error) => {
+              return {
+                success: false,
+                message: `❌ Knowledge search failed: ${error.message}`,
+              };
+            },
+            searchResult
+          );
+        } catch (error) {
+          return {
+            success: false,
+            message: `❌ Knowledge search error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          };
         }
       }
     );

@@ -564,115 +564,119 @@ export class QiPrompt {
 
 ### Implementation Plan
 
-#### Step 4.1: Basic MCP Client
+#### Step 4.1: MCP Service Manager (Use SDK Directly)
+**IMPORTANT**: Do NOT create MCP client wrapper classes. Use the SDK's `Client` class directly.
+
 ```typescript
-// lib/src/mcp/MCPClient.ts
+// lib/src/mcp/MCPServiceManager.ts
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { spawn, ChildProcess } from 'child_process';
+import type { Result, QiError } from '@qi/base';
+import { success, failure, create } from '@qi/base';
 
-export class MCPClient {
-  private connections: Map<string, MCPConnection> = new Map();
-  private processes: Map<string, ChildProcess> = new Map();
-  
-  async connectToService(config: MCPServiceConfig): Promise<void> {
-    // Start service process
-    const process = spawn(config.command[0], config.command.slice(1), {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, ...config.environment }
-    });
-    
-    this.processes.set(config.name, process);
-    
-    // Create transport
-    const transport = new StdioClientTransport(
-      process.stdout!,
-      process.stdin!
-    );
-    
-    // Create client
-    const client = new Client({
-      name: 'qi-v2-agent',
-      version: '1.0.0'
-    }, {
-      capabilities: { resources: {}, tools: {} }
-    });
-    
-    await client.connect(transport);
-    
-    this.connections.set(config.name, {
-      client,
-      transport,
-      config,
-      status: 'connected'
-    });
-  }
-  
-  async callTool(serviceName: string, toolName: string, params: any): Promise<any> {
-    const connection = this.connections.get(serviceName);
-    if (!connection) {
-      throw new Error(`Service ${serviceName} not connected`);
-    }
-    
-    try {
-      const result = await connection.client.callTool(toolName, params);
-      return result;
-    } catch (error) {
-      console.error(`MCP tool call failed: ${serviceName}.${toolName}`, error);
-      throw error;
-    }
-  }
-  
-  async listTools(serviceName: string): Promise<any[]> {
-    const connection = this.connections.get(serviceName);
-    if (!connection) return [];
-    
-    try {
-      const tools = await connection.client.listTools();
-      return tools.tools || [];
-    } catch (error) {
-      console.error(`Failed to list tools for ${serviceName}`, error);
-      return [];
-    }
-  }
-  
-  async shutdown(): Promise<void> {
-    // Close connections and kill processes
-    for (const [name, connection] of this.connections) {
-      try {
-        await connection.transport.close();
-      } catch (error) {
-        console.error(`Error closing connection to ${name}`, error);
-      }
-    }
-    
-    for (const [name, process] of this.processes) {
-      try {
-        process.kill();
-      } catch (error) {
-        console.error(`Error killing process for ${name}`, error);
-      }
-    }
-    
-    this.connections.clear();
-    this.processes.clear();
-  }
-}
-
-interface MCPConnection {
-  client: Client;
-  transport: StdioClientTransport;
-  config: MCPServiceConfig;
-  status: 'connected' | 'disconnected' | 'error';
-}
-
-interface MCPServiceConfig {
+export interface MCPServiceConfig {
   name: string;
   command: string[];
   environment?: Record<string, string>;
   autoConnect?: boolean;
 }
+
+export interface MCPServiceConnection {
+  client: Client;  // Use SDK Client directly - NO WRAPPER
+  transport: StdioClientTransport;
+  config: MCPServiceConfig;
+  status: 'connected' | 'disconnected' | 'error';
+}
+
+/**
+ * Simple service manager - NO CLIENT WRAPPER
+ * Just manages connections and exposes SDK Client instances
+ */
+export class MCPServiceManager {
+  private connections: Map<string, MCPServiceConnection> = new Map();
+
+  /**
+   * Connect to MCP service using SDK Client directly
+   */
+  async connectToService(config: MCPServiceConfig): Promise<Result<void, QiError>> {
+    try {
+      // Create transport using SDK (handles process internally)
+      const transport = new StdioClientTransport({
+        command: config.command[0],
+        args: config.command.slice(1),
+        env: config.environment,
+      });
+
+      // Create client using SDK
+      const client = new Client(
+        {
+          name: 'qi-v2-agent',
+          version: '0.8.3',
+        },
+        {
+          capabilities: {
+            tools: {},
+            resources: {},
+          },
+        },
+      );
+
+      // Connect using SDK
+      await client.connect(transport);
+
+      // Store connection
+      this.connections.set(config.name, {
+        client,
+        transport,
+        config,
+        status: 'connected',
+      });
+
+      return success(undefined);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return failure(
+        create('MCP_CONNECTION_FAILED', `Failed to connect to ${config.name}: ${errorMessage}`, 'SYSTEM'),
+      );
+    }
+  }
+
+  /**
+   * Get SDK Client for direct use - NO WRAPPER METHODS
+   */
+  getClient(serviceName: string): Client | null {
+    const connection = this.connections.get(serviceName);
+    return connection?.status === 'connected' ? connection.client : null;
+  }
+
+  isConnected(serviceName: string): boolean {
+    return this.connections.get(serviceName)?.status === 'connected' || false;
+  }
+
+  getConnectedServices(): string[] {
+    return Array.from(this.connections.entries())
+      .filter(([_, conn]) => conn.status === 'connected')
+      .map(([name]) => name);
+  }
+
+  async shutdown(): Promise<void> {
+    for (const [name, connection] of this.connections) {
+      try {
+        await connection.transport.close();
+      } catch (error) {
+        console.error(`Error closing connection to ${name}:`, error);
+      }
+    }
+    this.connections.clear();
+  }
+}
 ```
+
+**Key Changes from Failed Approach:**
+- ❌ No `MCPClient` wrapper class
+- ✅ Use SDK `Client` class directly via `getClient()`
+- ✅ Use `StdioClientTransport` correctly (handles process internally)
+- ✅ Service manager only manages connections, doesn't wrap SDK functionality
 
 #### Step 4.2: Predefined Service Configurations
 ```typescript
@@ -707,39 +711,96 @@ export const CORE_MCP_SERVICES: MCPServiceConfig[] = [
 ];
 ```
 
-#### Step 4.3: RAG Integration
+#### Step 4.3: RAG Integration (Use SDK Client Directly)
 ```typescript
 // lib/src/context/RAGIntegration.ts
+import type { MCPServiceManager } from '../mcp/MCPServiceManager.js';
+import type { Result, QiError } from '@qi/base';
+import { success, failure, create } from '@qi/base';
+
 export class RAGIntegration {
-  constructor(private mcpClient: MCPClient) {}
+  constructor(private serviceManager: MCPServiceManager) {}  // No wrapper client!
   
-  async addDocument(content: string, metadata: any = {}): Promise<void> {
+  async addDocument(content: string, metadata: any = {}): Promise<Result<void, QiError>> {
+    // Check if memory service is available
+    if (!this.serviceManager.isConnected('memory')) {
+      return failure(create('RAG_SERVICE_UNAVAILABLE', 'Memory service not available', 'SYSTEM'));
+    }
+
     try {
-      await this.mcpClient.callTool('chroma', 'add_documents', {
-        collection_name: 'qi_agent_knowledge',
-        documents: [content],
-        metadatas: [metadata],
-        ids: [this.generateId()]
+      // Get SDK client directly - NO WRAPPER
+      const client = this.serviceManager.getClient('memory');
+      if (!client) {
+        return failure(create('RAG_SERVICE_UNAVAILABLE', 'Memory client not available', 'SYSTEM'));
+      }
+      
+      // Use SDK client directly
+      await client.callTool({
+        name: 'create_entities',
+        arguments: {
+          entities: [{
+            name: this.generateId(),
+            entityType: 'knowledge',
+            observations: [content],
+          }],
+        },
       });
+      
+      return success(undefined);
     } catch (error) {
-      console.error('Failed to add document to RAG', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return failure(create('RAG_STORAGE_ERROR', `Error storing document: ${errorMessage}`, 'SYSTEM'));
     }
   }
   
-  async searchRelevantContext(query: string, maxResults: number = 3): Promise<string[]> {
+  async searchRelevantContext(query: string, maxResults: number = 3): Promise<Result<string[], QiError>> {
+    if (!this.serviceManager.isConnected('memory')) {
+      return success([]); // Graceful degradation
+    }
+
     try {
-      const result = await this.mcpClient.callTool('chroma', 'query_collection', {
-        collection_name: 'qi_agent_knowledge',
-        query_texts: [query],
-        n_results: maxResults,
-        include: ['documents', 'metadatas']
+      // Get SDK client directly - NO WRAPPER
+      const client = this.serviceManager.getClient('memory');
+      if (!client) {
+        return success([]); // Graceful degradation
+      }
+      
+      // Use SDK client directly
+      const result = await client.callTool({
+        name: 'search_nodes',
+        arguments: { query },
       });
       
-      return result.documents?.[0] || [];
+      // Process MCP SDK response format (content array with text)
+      const documents: string[] = [];
+      if (result.content && Array.isArray(result.content)) {
+        for (const contentItem of result.content) {
+          if (contentItem.type === 'text' && contentItem.text) {
+            try {
+              const searchData = JSON.parse(contentItem.text);
+              if (searchData.entities) {
+                for (const entity of searchData.entities.slice(0, maxResults)) {
+                  if (entity.observations?.[0]) {
+                    documents.push(entity.observations[0]);
+                  }
+                }
+              }
+            } catch {
+              documents.push(contentItem.text);
+            }
+          }
+        }
+      }
+      
+      return success(documents);
     } catch (error) {
-      console.error('Failed to search RAG', error);
-      return [];
+      console.warn('RAG search error:', error);
+      return success([]); // Graceful degradation
     }
+  }
+  
+  isAvailable(): boolean {
+    return this.serviceManager.isConnected('memory');
   }
   
   private generateId(): string {
@@ -748,99 +809,156 @@ export class RAGIntegration {
 }
 ```
 
-#### Step 4.4: Web Content Integration
+#### Step 4.4: Web Content Integration (Use SDK Client Directly)
 ```typescript
 // lib/src/tools/WebTool.ts
+import type { MCPServiceManager } from '../mcp/MCPServiceManager.js';
+import type { Result, QiError } from '@qi/base';
+import { success, failure, create } from '@qi/base';
+
 export class WebTool {
-  constructor(private mcpClient: MCPClient) {}
+  constructor(private serviceManager: MCPServiceManager) {}  // No wrapper client!
   
-  async fetchWebContent(url: string): Promise<string> {
+  async fetchWebContent(url: string): Promise<Result<string, QiError>> {
+    if (!this.serviceManager.isConnected('fetch')) {
+      return failure(create('WEB_SERVICE_UNAVAILABLE', 'Fetch service not available', 'SYSTEM'));
+    }
+
     try {
-      const result = await this.mcpClient.callTool('web', 'fetch_content', {
-        url,
-        follow_redirects: true,
-        timeout: 30000
+      // Get SDK client directly - NO WRAPPER
+      const client = this.serviceManager.getClient('fetch');
+      if (!client) {
+        return failure(create('WEB_SERVICE_UNAVAILABLE', 'Fetch client not available', 'SYSTEM'));
+      }
+      
+      // Use SDK client directly
+      const result = await client.callTool({
+        name: 'fetch_url',
+        arguments: {
+          url,
+          follow_redirects: true,
+          timeout: 30000
+        },
       });
       
-      return result.content || '';
+      // Process MCP SDK response format
+      let content = '';
+      if (result.content && Array.isArray(result.content)) {
+        for (const contentItem of result.content) {
+          if (contentItem.type === 'text' && contentItem.text) {
+            content = contentItem.text;
+            break;
+          }
+        }
+      }
+      
+      return success(content);
     } catch (error) {
-      console.error(`Failed to fetch web content from ${url}`, error);
-      return '';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return failure(create('WEB_FETCH_ERROR', `Error fetching ${url}: ${errorMessage}`, 'SYSTEM'));
     }
   }
   
-  async searchWeb(query: string): Promise<any[]> {
-    // This would depend on what web search MCP service is available
-    try {
-      const result = await this.mcpClient.callTool('web', 'search', {
-        query,
-        num_results: 5
-      });
-      
-      return result.results || [];
-    } catch (error) {
-      console.error(`Web search failed for: ${query}`, error);
-      return [];
-    }
+  isWebFetchAvailable(): boolean {
+    return this.serviceManager.isConnected('fetch');
   }
 }
 ```
 
-#### Step 4.5: Integration with qi-prompt
+#### Step 4.5: Integration with qi-prompt (Use Service Manager)
 ```typescript
 // app/src/prompt/qi-prompt.ts
+import { MCPServiceManager, RAGIntegration, WebTool } from '@qi/agent/mcp';
+
 export class QiPrompt {
-  private mcpClient: MCPClient;
+  private serviceManager: MCPServiceManager;  // No wrapper client!
   private ragIntegration: RAGIntegration;
   private webTool: WebTool;
+  
+  constructor() {
+    // Use service manager, not wrapper client
+    this.serviceManager = new MCPServiceManager();
+    this.ragIntegration = new RAGIntegration(this.serviceManager);
+    this.webTool = new WebTool(this.serviceManager);
+  }
   
   async initialize(): Promise<void> {
     // ... existing initialization
     
-    // Initialize MCP services
-    this.mcpClient = new MCPClient();
+    // Connect to MCP services using service manager
+    const servicesToConnect = [
+      { name: 'memory', command: ['npx', '@modelcontextprotocol/server-memory'], autoConnect: true },
+      { name: 'fetch', command: ['npx', '@modelcontextprotocol/server-fetch'], autoConnect: true },
+    ];
     
-    // Connect to core services
-    for (const service of CORE_MCP_SERVICES) {
+    for (const service of servicesToConnect) {
       if (service.autoConnect) {
         try {
-          await this.mcpClient.connectToService(service);
-          console.log(`Connected to MCP service: ${service.name}`);
+          const result = await this.serviceManager.connectToService(service);
+          if (result.tag === 'success') {
+            console.log(`✅ Connected to MCP service: ${service.name}`);
+          } else {
+            console.warn(`⚠️ Failed to connect to ${service.name}: ${result.error.message}`);
+          }
         } catch (error) {
-          console.warn(`Failed to connect to ${service.name}:`, error.message);
+          console.warn(`⚠️ Error connecting to ${service.name}:`, error);
         }
       }
     }
-    
-    this.ragIntegration = new RAGIntegration(this.mcpClient);
-    this.webTool = new WebTool(this.mcpClient);
   }
   
   async handleMessage(message: string): Promise<string> {
-    // Check if we need web content
+    // Build context using proper QiCore functional patterns
+    const contextResult = await this.buildContextForMessage(message);
+    
+    return match(
+      context => this.generateResponse(context.enhancedMessage),
+      error => {
+        this.logger?.warn('Context building failed', { error: error.message });
+        return this.generateResponse(message); // Graceful degradation
+      },
+      contextResult
+    );
+  }
+
+  private async buildContextForMessage(message: string): Promise<Result<{enhancedMessage: string}, QiError>> {
+    const contexts: string[] = [];
+    
+    // Web context - use match, not manual tag checking
     if (this.needsWebContent(message)) {
-      const webContent = await this.fetchRelevantWebContent(message);
-      message = `Context from web: ${webContent}\n\nUser question: ${message}`;
+      const webResult = await this.webTool.fetchWebContent(message);
+      match(
+        content => contexts.push(`Web: ${content}`),
+        error => this.logger?.warn('Web fetch failed', { error: error.message }),
+        webResult
+      );
     }
     
-    // Search RAG for relevant context
-    const ragContext = await this.ragIntegration.searchRelevantContext(message);
-    if (ragContext.length > 0) {
-      message = `Relevant knowledge: ${ragContext.join('\n')}\n\nUser question: ${message}`;
-    }
+    // RAG context - use match, not manual tag checking
+    const ragResult = await this.ragIntegration.searchRelevantContext(message);
+    match(
+      documents => {
+        if (documents.length > 0) {
+          contexts.push(`Knowledge: ${documents.join('\n')}`);
+        }
+      },
+      error => this.logger?.warn('RAG search failed', { error: error.message }),
+      ragResult
+    );
     
-    const response = await this.generateResponse(message);
+    // Build enhanced message (pure transformation)
+    const enhancedMessage = contexts.length > 0 
+      ? `${contexts.join('\n\n')}\n\nUser: ${message}`
+      : message;
+      
+    return success({ enhancedMessage });
+  }
+  
+  async shutdown(): Promise<void> {
+    // ... existing shutdown code ...
     
-    // Store important information in RAG for future use
-    if (this.isWorthStoring(response)) {
-      await this.ragIntegration.addDocument(response, {
-        type: 'conversation',
-        timestamp: new Date().toISOString(),
-        query: message
-      });
-    }
-    
-    return response;
+    // Shutdown MCP services
+    await this.serviceManager.shutdown();
   }
   
   private needsWebContent(message: string): boolean {

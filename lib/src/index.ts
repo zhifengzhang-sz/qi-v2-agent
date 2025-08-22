@@ -50,6 +50,9 @@ export {
   SecurityRestrictions,
 } from './context/index.js';
 
+// MCP Integration System
+export * from './mcp/index.js';
+
 // Model Provider System
 export * from './models/index.js';
 // Prompt Processing
