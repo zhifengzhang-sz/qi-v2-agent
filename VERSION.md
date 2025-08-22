@@ -164,7 +164,7 @@ getContextMemoryKeys(): string[];
 
 ---
 
-## v0.8.1 - QiCore Two-Layer Architecture Implementation (IN PROGRESS)
+## v-0.8.1 - QiCore Two-Layer Architecture Implementation (IN PROGRESS)
 
 ### 📅 **Release Date**: August 2025
 
@@ -341,7 +341,7 @@ return Result.failure(QiError.createValidationError(
 
 ---
 
-## v0.8.0 - qi-prompt First Working Implementation (COMPLETED)
+## v-0.8.0 - qi-prompt First Working Implementation (COMPLETED)
 
 ### 📅 **Release Date**: August 2025
 
@@ -418,7 +418,7 @@ return Result.failure(QiError.createValidationError(
 
 ---
 
-## v0.7.0 - Tool Layer Implementation (COMPLETED)
+## v-0.7.0 - Tool Layer Implementation (COMPLETED)
 
 ### 📅 **Release Date**: August 2025
 
@@ -883,7 +883,7 @@ Preview implementation of v-0.8.x agent functionality with toolbox architecture.
 
 ---
 
-## v0.3.2 - Classifier Performance Study Framework
+## v-0.3.2 - Classifier Performance Study Framework
 
 **Release Date**: August 3, 2025
 
@@ -906,7 +906,7 @@ Preview implementation of v-0.8.x agent functionality with toolbox architecture.
 
 ---
 
-## v0.3.1 - Study Directory Cleanup & QiCore Compliance
+## v-0.3.1 - Study Directory Cleanup & QiCore Compliance
 
 **Release Date**: August 2, 2025
 
@@ -917,7 +917,7 @@ Preview implementation of v-0.8.x agent functionality with toolbox architecture.
 
 ---
 
-## v0.3.0 - CLI + Agent with Command, Prompt & Context Continuation
+## v-0.3.0 - CLI + Agent with Command, Prompt & Context Continuation
 
 **Release Date**: July 31, 2025
 
