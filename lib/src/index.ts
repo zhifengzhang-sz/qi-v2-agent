@@ -49,6 +49,11 @@ export {
   SecurityBoundaryManager,
   SecurityRestrictions,
 } from './context/index.js';
+
+// Model Provider System
+export * from './models/index.js';
+// Prompt Processing
+export * from './prompt/index.js';
 // Classification Schemas
 export {
   ClassificationSchemas,
@@ -63,12 +68,6 @@ export {
   type TopicResult,
   TopicSchema,
 } from './schemas/ClassificationSchemas.js';
-
-// Model Provider System
-export * from './models/index.js';
-
-// Prompt Processing
-export * from './prompt/index.js';
 
 // State Management
 export {

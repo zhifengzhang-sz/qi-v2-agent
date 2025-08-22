@@ -3,7 +3,7 @@
  * Following implementation guide Step 2.5: Integration with qi-prompt
  */
 
-import { fromAsyncTryCatch, type QiError, type Result, Ok, Err, businessError } from '@qi/base';
+import { businessError, Err, fromAsyncTryCatch, Ok, type QiError, type Result } from '@qi/base';
 
 export interface ModelRequest {
   prompt: string;
@@ -21,7 +21,7 @@ export interface ModelResponse {
 export interface IModelProvider {
   readonly name: string;
   readonly type: 'local' | 'remote';
-  
+
   isAvailable(): Promise<boolean>;
   invoke(request: ModelRequest): Promise<ModelResponse>;
 }
@@ -32,9 +32,9 @@ export interface IModelProvider {
 export class OllamaProvider implements IModelProvider {
   readonly name = 'ollama';
   readonly type = 'local' as const;
-  
+
   constructor(private baseUrl: string = 'http://localhost:11434') {}
-  
+
   async isAvailable(): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`);
@@ -43,7 +43,7 @@ export class OllamaProvider implements IModelProvider {
       return false;
     }
   }
-  
+
   async invoke(request: ModelRequest): Promise<ModelResponse> {
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: 'POST',
@@ -54,24 +54,24 @@ export class OllamaProvider implements IModelProvider {
         stream: false,
         options: {
           temperature: request.temperature || 0.7,
-          num_predict: request.maxTokens || 2048
-        }
-      })
+          num_predict: request.maxTokens || 2048,
+        },
+      }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Ollama request failed: ${response.statusText}`);
     }
-    
+
     const data: any = await response.json();
-    
+
     return {
       content: data.response || '',
       provider: this.name,
-      model: 'llama3.2:3b'
+      model: 'llama3.2:3b',
     };
   }
-  
+
   private buildPrompt(request: ModelRequest): string {
     if (request.system) {
       return `System: ${request.system}\n\nUser: ${request.prompt}`;
@@ -86,57 +86,57 @@ export class OllamaProvider implements IModelProvider {
 export class OpenRouterProvider implements IModelProvider {
   readonly name = 'openrouter';
   readonly type = 'remote' as const;
-  
+
   constructor(private apiKey: string) {}
-  
+
   async isAvailable(): Promise<boolean> {
     return !!this.apiKey;
   }
-  
+
   async invoke(request: ModelRequest): Promise<ModelResponse> {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://qi-v2-agent.dev',
-        'X-Title': 'qi-v2-agent'
+        'X-Title': 'qi-v2-agent',
       },
       body: JSON.stringify({
         model: 'anthropic/claude-3.5-haiku',
         messages: this.buildMessages(request),
         temperature: request.temperature || 0.7,
-        max_tokens: request.maxTokens || 2048
-      })
+        max_tokens: request.maxTokens || 2048,
+      }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`OpenRouter request failed: ${response.statusText}`);
     }
-    
+
     const data: any = await response.json();
     const choice = data.choices?.[0];
-    
+
     if (!choice) {
       throw new Error('No response choices returned from OpenRouter');
     }
-    
+
     return {
       content: choice.message?.content || '',
       provider: this.name,
-      model: 'anthropic/claude-3.5-haiku'
+      model: 'anthropic/claude-3.5-haiku',
     };
   }
-  
+
   private buildMessages(request: ModelRequest) {
     const messages = [];
-    
+
     if (request.system) {
       messages.push({ role: 'system', content: request.system });
     }
-    
+
     messages.push({ role: 'user', content: request.prompt });
-    
+
     return messages;
   }
 }
@@ -147,30 +147,30 @@ export class OpenRouterProvider implements IModelProvider {
 export class ProviderManager {
   private providers: Map<string, IModelProvider> = new Map();
   private preferences: string[] = ['ollama', 'openrouter'];
-  
+
   constructor() {
     this.registerProvider(new OllamaProvider());
-    
+
     const openrouterKey = process.env.OPENROUTER_API_KEY;
     if (openrouterKey) {
       this.registerProvider(new OpenRouterProvider(openrouterKey));
     }
   }
-  
+
   registerProvider(provider: IModelProvider): void {
     this.providers.set(provider.name, provider);
   }
-  
+
   async getAvailableProvider(): Promise<Result<IModelProvider, QiError>> {
     return fromAsyncTryCatch(
       async () => {
         for (const providerName of this.preferences) {
           const provider = this.providers.get(providerName);
-          if (provider && await provider.isAvailable()) {
+          if (provider && (await provider.isAvailable())) {
             return provider;
           }
         }
-        
+
         throw new Error('No available model providers');
       },
       (error: unknown) =>
@@ -180,14 +180,14 @@ export class ProviderManager {
         )
     );
   }
-  
+
   async invoke(request: ModelRequest): Promise<Result<ModelResponse, QiError>> {
     const providerResult = await this.getAvailableProvider();
-    
+
     if (providerResult.tag === 'failure') {
       return providerResult;
     }
-    
+
     return fromAsyncTryCatch(
       async () => {
         return await providerResult.value.invoke(request);
@@ -199,7 +199,7 @@ export class ProviderManager {
         )
     );
   }
-  
+
   getSystemPrompt(): string {
     return `You are a helpful AI assistant. You provide clear, accurate, and concise responses.`;
   }
