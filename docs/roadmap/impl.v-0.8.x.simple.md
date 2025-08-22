@@ -1,84 +1,19 @@
-# qi-v2-agent v0.8.x Simple Implementation Guide
+# qi-v2-agent v0.8.x Implementation Guide
 
-**Document Version**: 1.0  
-**Date**: 2025-01-17  
-**Status**: Implementation Ready  
-**Philosophy**: Practical value over architectural complexity
+## Overview
 
-## Executive Summary
+Implementation guide for the remaining v0.8.x enhancements:
 
-This guide provides a **simple, practical approach** to enhancing qi-v2-agent v0.8.x. Instead of building 8 complex modules, we focus on **4 core enhancements** that deliver immediate value while maintaining the existing architecture.
+1. **Session Persistence** - Add conversation memory across restarts
+2. **Multi-Provider Support** - Enable Ollama, OpenRouter, and extensible provider system  
+3. **Context Optimization** - Intelligent context pruning for token limits
+4. **MCP Integration** - Connect RAG, Web, and Memory services
 
-### Key Principles
-- **Enhance existing files** rather than creating parallel systems
-- **Multi-provider support** (Ollama, OpenRouter, etc.) not just Ollama
-- **Incremental improvement** without breaking qi-prompt functionality
-- **2-3 week timeline** with concrete deliverables
-
-## Core Enhancements Overview
-
-### Enhancement 1: Session Persistence (State Management)
-**Goal**: Remember conversations and context across qi-prompt restarts
-**Files**: Extend existing `lib/src/state/StateManager.ts`
-**Timeline**: 3-4 days
-
-### Enhancement 2: Multi-Provider Model Support
-**Goal**: Seamlessly work with Ollama, OpenRouter, and other providers
-**Files**: Enhance existing prompt system in `app/src/prompt/`
-**Timeline**: 4-5 days
-
-### Enhancement 3: Context Optimization
-**Goal**: Handle large contexts without hitting token limits
-**Files**: Extend existing `lib/src/context/ContextManager.ts`
-**Timeline**: 2-3 days
-
-### Enhancement 4: Essential MCP Integration
-**Goal**: Connect to key MCP services (RAG, Web, Memory)
-**Files**: Add MCP capabilities to existing tool system
-**Timeline**: 5-6 days
-
-## BREAKING CHANGE: Unified MCP Storage Architecture (v-0.8.5)
-
-**Document Updated**: 2025-01-17 - Post v-0.8.4 Architectural Improvement
-
-### Architectural Decision: Single Storage System
-
-**OLD Architecture (v-0.8.4 and earlier):**
-- StateManager uses SQLite for sessions/context memory
-- RAG Integration uses MCP memory server for knowledge storage
-- **Problem**: Two storage systems, native SQLite bindings prevent binary compilation
-
-**NEW Architecture (v-0.8.5+):**
-- StateManager uses MCP memory server for ALL persistence
-- RAG Integration uses MCP memory server for knowledge storage  
-- **Result**: Single unified storage system, no native dependencies
-
-### Benefits of Unified Architecture
-- ✅ **Eliminates SQLite native binding issues** → Binary compilation works
-- ✅ **Unified storage architecture** → All persistent data in one system
-- ✅ **No scattered data** → Sessions and knowledge in same MCP memory server
-- ✅ **Cleaner dependencies** → No SQLite, no native bindings
-- ✅ **Consistent patterns** → All storage through MCP protocol
-- ✅ **Predictable behavior** → Either MCP works or persistence doesn't (no fallback confusion)
-
-### Dependencies
-- **MCP memory server MUST be running** for session persistence to work
-- **Clean failure mode** when MCP unavailable (session persistence simply disabled)
-- **No fallback logic** → Avoids data scattered across multiple systems
-
-## Enhancement 1: Session Persistence (MCP-Based)
-
-### Current State
-- `lib/src/state/StateManager.ts` - Uses SQLite (REMOVED in v-0.8.5)
-- `lib/src/state/StatePersistence.ts` - Session persistence foundation
-- Sessions stored via MCP memory server (NEW in v-0.8.5)
+## Enhancement 1: Session Persistence
 
 ### Implementation Plan
 
-#### Step 1.1: Remove SQLite Dependencies
-**BREAKING CHANGE**: All SQLite code removed from StateManager
-
-#### Step 1.2: Extend IStateManager Interface
+#### Step 1.1: Extend IStateManager Interface
 ```typescript
 // lib/src/state/abstractions/IStateManager.ts
 export interface IStateManager {
@@ -113,7 +48,7 @@ export interface SessionSummary {
 }
 ```
 
-#### Step 1.3: Implement MCP-Based StateManager (v-0.8.5)
+#### Step 1.2: Implement Session Methods in StateManager
 ```typescript
 // lib/src/state/StateManager.ts
 import type { MCPServiceManager } from '../mcp/MCPServiceManager.js';
@@ -123,19 +58,18 @@ import { success, failure, fromAsyncTryCatch } from '@qi/base';
 export class StateManager implements IStateManager {
   private sessionStorage: Map<string, SessionData> = new Map();
   private contextMemory: Map<string, any> = new Map();
-  private serviceManager: MCPServiceManager; // NEW: MCP dependency
+  private serviceManager: MCPServiceManager;
   
   constructor(config: StateManagerConfig, serviceManager: MCPServiceManager) {
     // ... existing constructor
-    this.serviceManager = serviceManager; // Store MCP service manager
-    // REMOVED: No more SQLite initialization
+    this.serviceManager = serviceManager;
   }
   
   async persistSession(sessionId: string, data: SessionData): Promise<void> {
     // Store in memory cache
     this.sessionStorage.set(sessionId, data);
     
-    // Persist to MCP memory server (REPLACED SQLite)
+    // Persist to MCP memory server
     await this.saveSessionToMCP(sessionId, data);
   }
   
@@ -145,7 +79,7 @@ export class StateManager implements IStateManager {
       return this.sessionStorage.get(sessionId)!;
     }
     
-    // Load from MCP memory server (REPLACED SQLite)
+    // Load from MCP memory server
     const session = await this.loadSessionFromMCP(sessionId);
     if (session) {
       this.sessionStorage.set(sessionId, session);
@@ -153,7 +87,7 @@ export class StateManager implements IStateManager {
     return session;
   }
   
-  // NEW: MCP-based storage methods
+  // MCP-based storage methods
   private async saveSessionToMCP(sessionId: string, data: SessionData): Promise<Result<void, QiError>> {
     if (!this.serviceManager.isConnected('memory')) {
       return failure(create('MCP_UNAVAILABLE', 'Memory service not connected', 'SYSTEM'));
@@ -212,17 +146,7 @@ export class StateManager implements IStateManager {
 }
 ```
 
-#### Step 1.4: Remove SQLite Dependencies
-**BREAKING CHANGES in v-0.8.5:**
-- ❌ Remove `import { Database } from 'sqlite3'`
-- ❌ Remove `initializeSessionDatabase()` method
-- ❌ Remove `initializeDatabaseSchema()` method  
-- ❌ Remove all SQLite table creation code
-- ❌ Remove database connection management
-- ✅ Add `MCPServiceManager` dependency to constructor
-- ✅ Replace all database operations with MCP memory server calls
-
-#### Step 1.4: Integration with qi-prompt
+#### Step 1.3: Integration with qi-prompt
 ```typescript
 // app/src/prompt/qi-prompt.ts
 // Add session management to existing qi-prompt functionality
@@ -254,19 +178,8 @@ class QiPrompt {
 }
 ```
 
-### Verification Criteria
-- [ ] Sessions persist across qi-prompt restarts
-- [ ] Can load previous conversation history
-- [ ] Session data includes messages and context
-- [ ] Database queries complete in <100ms
-- [ ] Memory usage stays reasonable (<50MB for session data)
 
 ## Enhancement 2: Multi-Provider Model Support
-
-### Current State
-- Prompt system primarily designed for single provider
-- Limited flexibility in model selection
-- Hard-coded provider assumptions
 
 ### Implementation Plan
 
@@ -410,26 +323,31 @@ export class OpenRouterProvider implements IModelProvider {
 // lib/src/models/ProviderManager.ts
 export class ProviderManager {
   private providers: Map<string, IModelProvider> = new Map();
-  private preferences: string[] = ['ollama', 'openrouter'];
+  private defaultProvider: string = 'ollama';
   
   registerProvider(provider: IModelProvider): void {
     this.providers.set(provider.name, provider);
   }
   
-  async getAvailableProvider(): Promise<IModelProvider | null> {
-    for (const providerName of this.preferences) {
-      const provider = this.providers.get(providerName);
-      if (provider && await provider.isAvailable()) {
-        return provider;
-      }
+  setDefaultProvider(providerName: string): void {
+    this.defaultProvider = providerName;
+  }
+  
+  async getProvider(providerName?: string): Promise<IModelProvider | null> {
+    const targetProvider = providerName || this.defaultProvider;
+    const provider = this.providers.get(targetProvider);
+    
+    if (provider && await provider.isAvailable()) {
+      return provider;
     }
+    
     return null;
   }
   
-  async invoke(request: ModelRequest): Promise<ModelResponse> {
-    const provider = await this.getAvailableProvider();
+  async invoke(request: ModelRequest, providerName?: string): Promise<ModelResponse> {
+    const provider = await this.getProvider(providerName);
     if (!provider) {
-      throw new Error('No available model providers');
+      throw new Error(`Provider not available: ${providerName || this.defaultProvider}`);
     }
     
     return provider.invoke(request);
@@ -440,7 +358,6 @@ export class ProviderManager {
 #### Step 2.5: Integration with qi-prompt
 ```typescript
 // app/src/prompt/qi-prompt.ts
-// Enhance existing qi-prompt to use ProviderManager
 export class QiPrompt {
   private providerManager: ProviderManager;
   
@@ -456,32 +373,20 @@ export class QiPrompt {
     }
   }
   
-  async generateResponse(prompt: string): Promise<string> {
+  async generateResponse(prompt: string, providerName?: string): Promise<string> {
     const response = await this.providerManager.invoke({
       prompt,
       system: this.getSystemPrompt(),
       temperature: 0.7,
       maxTokens: 4000
-    });
+    }, providerName);
     
     return response.content;
   }
 }
 ```
 
-### Verification Criteria
-- [ ] Works with Ollama when available
-- [ ] Falls back to OpenRouter when Ollama unavailable
-- [ ] Same prompt produces consistent results across providers
-- [ ] Provider switching is automatic and transparent
-- [ ] Easy to add new providers
-
 ## Enhancement 3: Context Optimization
-
-### Current State
-- Context can grow very large during conversations
-- No automatic pruning or optimization
-- Risk of hitting token limits
 
 ### Implementation Plan
 
@@ -632,24 +537,12 @@ export class QiPrompt {
 }
 ```
 
-### Verification Criteria
-- [ ] Large contexts get pruned to fit token limits
-- [ ] Important content (code, errors, Q&A) is preserved
-- [ ] Optimization completes in <500ms for 32k context
-- [ ] Pruned context maintains conversation coherence
-- [ ] Token counting is reasonably accurate
 
 ## Enhancement 4: Essential MCP Integration
 
-### Current State
-- No MCP (Model Context Protocol) integration
-- Missing RAG capabilities
-- No external service connections
-
 ### Implementation Plan
 
-#### Step 4.1: MCP Service Manager (Use SDK Directly)
-**IMPORTANT**: Do NOT create MCP client wrapper classes. Use the SDK's `Client` class directly.
+#### Step 4.1: MCP Service Manager
 
 ```typescript
 // lib/src/mcp/MCPServiceManager.ts
@@ -666,32 +559,27 @@ export interface MCPServiceConfig {
 }
 
 export interface MCPServiceConnection {
-  client: Client;  // Use SDK Client directly - NO WRAPPER
+  client: Client;
   transport: StdioClientTransport;
   config: MCPServiceConfig;
   status: 'connected' | 'disconnected' | 'error';
 }
-
-/**
- * Simple service manager - NO CLIENT WRAPPER
- * Just manages connections and exposes SDK Client instances
- */
 export class MCPServiceManager {
   private connections: Map<string, MCPServiceConnection> = new Map();
 
   /**
-   * Connect to MCP service using SDK Client directly
+   * Connect to MCP service
    */
   async connectToService(config: MCPServiceConfig): Promise<Result<void, QiError>> {
     try {
-      // Create transport using SDK (handles process internally)
+      // Create transport
       const transport = new StdioClientTransport({
         command: config.command[0],
         args: config.command.slice(1),
         env: config.environment,
       });
 
-      // Create client using SDK
+      // Create client
       const client = new Client(
         {
           name: 'qi-v2-agent',
@@ -705,7 +593,7 @@ export class MCPServiceManager {
         },
       );
 
-      // Connect using SDK
+      // Connect
       await client.connect(transport);
 
       // Store connection
@@ -726,7 +614,7 @@ export class MCPServiceManager {
   }
 
   /**
-   * Get SDK Client for direct use - NO WRAPPER METHODS
+   * Get Client for direct use
    */
   getClient(serviceName: string): Client | null {
     const connection = this.connections.get(serviceName);
@@ -756,11 +644,6 @@ export class MCPServiceManager {
 }
 ```
 
-**Key Changes from Failed Approach:**
-- ❌ No `MCPClient` wrapper class
-- ✅ Use SDK `Client` class directly via `getClient()`
-- ✅ Use `StdioClientTransport` correctly (handles process internally)
-- ✅ Service manager only manages connections, doesn't wrap SDK functionality
 
 #### Step 4.2: Predefined Service Configurations
 ```typescript
@@ -795,7 +678,7 @@ export const CORE_MCP_SERVICES: MCPServiceConfig[] = [
 ];
 ```
 
-#### Step 4.3: RAG Integration (Use SDK Client Directly)
+#### Step 4.3: RAG Integration
 ```typescript
 // lib/src/context/RAGIntegration.ts
 import type { MCPServiceManager } from '../mcp/MCPServiceManager.js';
@@ -803,7 +686,7 @@ import type { Result, QiError } from '@qi/base';
 import { success, failure, create } from '@qi/base';
 
 export class RAGIntegration {
-  constructor(private serviceManager: MCPServiceManager) {}  // No wrapper client!
+  constructor(private serviceManager: MCPServiceManager) {}
   
   async addDocument(content: string, metadata: any = {}): Promise<Result<void, QiError>> {
     // Check if memory service is available
@@ -812,13 +695,13 @@ export class RAGIntegration {
     }
 
     try {
-      // Get SDK client directly - NO WRAPPER
+      // Get client
       const client = this.serviceManager.getClient('memory');
       if (!client) {
         return failure(create('RAG_SERVICE_UNAVAILABLE', 'Memory client not available', 'SYSTEM'));
       }
       
-      // Use SDK client directly
+      // Use client
       await client.callTool({
         name: 'create_entities',
         arguments: {
@@ -843,19 +726,19 @@ export class RAGIntegration {
     }
 
     try {
-      // Get SDK client directly - NO WRAPPER
+      // Get client
       const client = this.serviceManager.getClient('memory');
       if (!client) {
         return success([]); // Graceful degradation
       }
       
-      // Use SDK client directly
+      // Use client
       const result = await client.callTool({
         name: 'search_nodes',
         arguments: { query },
       });
       
-      // Process MCP SDK response format (content array with text)
+      // Process response format
       const documents: string[] = [];
       if (result.content && Array.isArray(result.content)) {
         for (const contentItem of result.content) {
@@ -893,7 +776,7 @@ export class RAGIntegration {
 }
 ```
 
-#### Step 4.4: Web Content Integration (Use SDK Client Directly)
+#### Step 4.4: Web Content Integration
 ```typescript
 // lib/src/tools/WebTool.ts
 import type { MCPServiceManager } from '../mcp/MCPServiceManager.js';
@@ -901,7 +784,7 @@ import type { Result, QiError } from '@qi/base';
 import { success, failure, create } from '@qi/base';
 
 export class WebTool {
-  constructor(private serviceManager: MCPServiceManager) {}  // No wrapper client!
+  constructor(private serviceManager: MCPServiceManager) {}
   
   async fetchWebContent(url: string): Promise<Result<string, QiError>> {
     if (!this.serviceManager.isConnected('fetch')) {
@@ -909,13 +792,13 @@ export class WebTool {
     }
 
     try {
-      // Get SDK client directly - NO WRAPPER
+      // Get client
       const client = this.serviceManager.getClient('fetch');
       if (!client) {
         return failure(create('WEB_SERVICE_UNAVAILABLE', 'Fetch client not available', 'SYSTEM'));
       }
       
-      // Use SDK client directly
+      // Use client
       const result = await client.callTool({
         name: 'fetch_url',
         arguments: {
@@ -925,7 +808,7 @@ export class WebTool {
         },
       });
       
-      // Process MCP SDK response format
+      // Process response format
       let content = '';
       if (result.content && Array.isArray(result.content)) {
         for (const contentItem of result.content) {
@@ -949,18 +832,17 @@ export class WebTool {
 }
 ```
 
-#### Step 4.5: Integration with qi-prompt (Use Service Manager)
+#### Step 4.5: Integration with qi-prompt
 ```typescript
 // app/src/prompt/qi-prompt.ts
 import { MCPServiceManager, RAGIntegration, WebTool } from '@qi/agent/mcp';
 
 export class QiPrompt {
-  private serviceManager: MCPServiceManager;  // No wrapper client!
+  private serviceManager: MCPServiceManager;
   private ragIntegration: RAGIntegration;
   private webTool: WebTool;
   
   constructor() {
-    // Use service manager, not wrapper client
     this.serviceManager = new MCPServiceManager();
     this.ragIntegration = new RAGIntegration(this.serviceManager);
     this.webTool = new WebTool(this.serviceManager);
@@ -969,7 +851,7 @@ export class QiPrompt {
   async initialize(): Promise<void> {
     // ... existing initialization
     
-    // Connect to MCP services using service manager
+    // Connect to MCP services
     const servicesToConnect = [
       { name: 'memory', command: ['npx', '@modelcontextprotocol/server-memory'], autoConnect: true },
       { name: 'fetch', command: ['npx', '@modelcontextprotocol/server-fetch'], autoConnect: true },
@@ -1008,7 +890,7 @@ export class QiPrompt {
   private async buildContextForMessage(message: string): Promise<Result<{enhancedMessage: string}, QiError>> {
     const contexts: string[] = [];
     
-    // Web context - use match, not manual tag checking
+    // Web context
     if (this.needsWebContent(message)) {
       const webResult = await this.webTool.fetchWebContent(message);
       match(
@@ -1018,7 +900,7 @@ export class QiPrompt {
       );
     }
     
-    // RAG context - use match, not manual tag checking
+    // RAG context
     const ragResult = await this.ragIntegration.searchRelevantContext(message);
     match(
       documents => {
@@ -1030,7 +912,7 @@ export class QiPrompt {
       ragResult
     );
     
-    // Build enhanced message (pure transformation)
+    // Build enhanced message
     const enhancedMessage = contexts.length > 0 
       ? `${contexts.join('\n\n')}\n\nUser: ${message}`
       : message;
@@ -1060,206 +942,3 @@ export class QiPrompt {
 }
 ```
 
-### Verification Criteria
-- [ ] MCP services start automatically with qi-prompt
-- [ ] RAG queries work and return relevant results
-- [ ] Web fetching works through MCP
-- [ ] Services failures don't crash qi-prompt
-- [ ] Knowledge gets stored and retrieved properly
-
-## Implementation Timeline
-
-### Week 1: Core Infrastructure
-- **Days 1-2**: Enhancement 1 (Session Persistence) - Database and basic persistence
-- **Days 3-4**: Enhancement 2 (Multi-Provider) - Ollama and OpenRouter providers
-- **Day 5**: Integration testing and bug fixes
-
-### Week 2: Optimization and MCP
-- **Days 1-2**: Enhancement 3 (Context Optimization) - Token management and pruning
-- **Days 3-5**: Enhancement 4 (MCP Integration) - RAG and web services
-
-### Week 3: Integration and Testing
-- **Days 1-2**: Full system integration with qi-prompt
-- **Days 3-4**: Testing, bug fixes, and performance optimization
-- **Day 5**: Documentation and deployment
-
-## Testing Strategy
-
-### Unit Tests
-```typescript
-// lib/src/state/__tests__/StateManager.test.ts
-describe('StateManager Session Persistence', () => {
-  it('should persist and load sessions', async () => {
-    const manager = new StateManager(testConfig);
-    const sessionData = createTestSessionData();
-    
-    await manager.persistSession('test-123', sessionData);
-    const loaded = await manager.loadSession('test-123');
-    
-    expect(loaded).toEqual(sessionData);
-  });
-});
-
-// lib/src/models/__tests__/ProviderManager.test.ts
-describe('ProviderManager', () => {
-  it('should fallback to available providers', async () => {
-    const manager = new ProviderManager();
-    manager.registerProvider(new MockOllamaProvider(false)); // unavailable
-    manager.registerProvider(new MockOpenRouterProvider(true)); // available
-    
-    const response = await manager.invoke({ prompt: 'test' });
-    expect(response.provider).toBe('openrouter');
-  });
-});
-```
-
-### Integration Tests
-```typescript
-// integration/__tests__/qi-prompt.integration.test.ts
-describe('QiPrompt Integration', () => {
-  it('should work with multiple providers', async () => {
-    const qiPrompt = new QiPrompt();
-    await qiPrompt.initialize();
-    
-    const response = await qiPrompt.handleMessage('Hello');
-    expect(response).toBeTruthy();
-    expect(response.length).toBeGreaterThan(0);
-  });
-  
-  it('should persist conversations', async () => {
-    const qiPrompt1 = new QiPrompt();
-    await qiPrompt1.initialize();
-    await qiPrompt1.handleMessage('Remember: my name is Alice');
-    await qiPrompt1.shutdown();
-    
-    const qiPrompt2 = new QiPrompt();
-    await qiPrompt2.initialize();
-    const response = await qiPrompt2.handleMessage('What is my name?');
-    
-    expect(response.toLowerCase()).toContain('alice');
-  });
-});
-```
-
-## Success Metrics
-
-### Performance Targets
-- **Session loading**: <200ms
-- **Provider switching**: <5 seconds  
-- **Context optimization**: <500ms for 32k context
-- **MCP tool calls**: <2 seconds average
-- **Memory usage**: <200MB total
-
-### Functionality Targets
-- ✅ **Multi-provider support**: Works with Ollama and OpenRouter
-- ✅ **Session persistence**: Conversations survive restarts
-- ✅ **Context optimization**: Handles large contexts gracefully
-- ✅ **RAG integration**: Stores and retrieves relevant knowledge
-- ✅ **Web integration**: Can fetch external content when needed
-
-### Quality Targets
-- **Unit test coverage**: >85%
-- **Integration test coverage**: >70%
-- **No regressions**: Existing qi-prompt functionality preserved
-- **Error handling**: Graceful degradation when services unavailable
-
-## File Structure
-
-```
-qi-v2-agent/
-├── lib/src/
-│   ├── state/
-│   │   ├── StateManager.ts (enhanced)
-│   │   ├── abstractions/IStateManager.ts (extended)
-│   │   └── sql/sessions_schema.sql (new)
-│   ├── models/
-│   │   ├── ProviderManager.ts (new)
-│   │   ├── abstractions/IModelProvider.ts (new)
-│   │   └── providers/
-│   │       ├── OllamaProvider.ts (new)
-│   │       └── OpenRouterProvider.ts (new)
-│   ├── context/
-│   │   ├── ContextManager.ts (enhanced)
-│   │   ├── ContextOptimizer.ts (new)
-│   │   ├── RAGIntegration.ts (new)
-│   │   └── abstractions/IContextManager.ts (extended)
-│   ├── mcp/
-│   │   ├── MCPClient.ts (new)
-│   │   └── services/ServiceConfigs.ts (new)
-│   └── tools/
-│       └── WebTool.ts (new)
-└── app/src/prompt/
-    └── qi-prompt.ts (enhanced)
-```
-
-## Dependencies
-
-### New Dependencies
-```json
-{
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "sqlite3": "^5.1.6"
-  },
-  "devDependencies": {
-    "@types/sqlite3": "^3.1.9"
-  }
-}
-```
-
-### MCP Services Installation
-```bash
-# Install core MCP servers
-npm install -g @chroma-core/chroma-mcp
-npm install -g @modelcontextprotocol/servers
-
-# Setup ChromaDB for RAG
-pip install chromadb==0.4.22
-```
-
-## Configuration
-
-### Environment Variables
-```bash
-# Model providers
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-
-# MCP services
-CHROMA_HOST=localhost
-CHROMA_PORT=8000
-MCP_SERVICES_AUTO_START=true
-
-# Session storage
-SESSION_DB_PATH=./data/sessions.db
-CONTEXT_MAX_TOKENS=16000
-```
-
-### Config File
-```typescript
-// config/enhanced.config.ts
-export const ENHANCED_CONFIG = {
-  session: {
-    dbPath: './data/sessions.db',
-    maxSessions: 100,
-    pruneAfterDays: 30
-  },
-  providers: {
-    preferred: ['ollama', 'openrouter'],
-    ollama: { baseUrl: 'http://localhost:11434' },
-    openrouter: { baseUrl: 'https://openrouter.ai/api/v1' }
-  },
-  context: {
-    maxTokens: 16000,
-    optimizationThreshold: 0.8
-  },
-  mcp: {
-    autoStart: true,
-    services: ['chroma', 'web'],
-    timeout: 30000
-  }
-};
-```
-
----
-
-This implementation guide provides concrete, actionable steps to enhance qi-v2-agent v0.8.x with essential capabilities while maintaining simplicity and avoiding over-engineering.
