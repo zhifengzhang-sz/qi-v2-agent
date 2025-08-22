@@ -26,6 +26,7 @@ import type {
   IsolatedContextConfig,
   SecurityRestrictions,
 } from '../abstractions/index.js';
+import { ContextOptimizer } from './ContextOptimizer.js';
 import { SecurityBoundaryManager } from './SecurityBoundaryManager.js';
 
 /**
@@ -113,6 +114,7 @@ export class ContextManager implements IContextManager {
   private conversationContexts = new Map<string, ConversationContext>();
   private isolatedContexts = new Map<string, IsolatedContext>();
   private securityBoundaries: SecurityBoundaryManager;
+  private contextOptimizer: ContextOptimizer;
   private cleanupInterval?: NodeJS.Timeout;
   private accessAuditLog: ContextAccessAudit[] = [];
 
@@ -127,6 +129,7 @@ export class ContextManager implements IContextManager {
   constructor(initialAppContext: AppContext) {
     this.applicationContext = { ...initialAppContext };
     this.securityBoundaries = new SecurityBoundaryManager();
+    this.contextOptimizer = new ContextOptimizer();
   }
 
   async initialize(): Promise<Result<void>> {
@@ -598,6 +601,24 @@ export class ContextManager implements IContextManager {
     }
 
     return hierarchy;
+  }
+
+  // Context Optimization (Enhancement 3)
+
+  async optimizeContext(context: string, maxTokens: number): Promise<Result<string>> {
+    return this.contextOptimizer.optimizeContext(context, maxTokens);
+  }
+
+  calculateTokenCount(text: string): number {
+    return this.contextOptimizer.calculateTokenCount(text);
+  }
+
+  scoreRelevance(text: string, query: string): number {
+    return this.contextOptimizer.scoreRelevance(text, query);
+  }
+
+  async pruneOldContext(context: string, maxAge: number): Promise<Result<string>> {
+    return this.contextOptimizer.pruneOldContext(context, maxAge);
   }
 
   // Utility Methods

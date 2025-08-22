@@ -57,6 +57,12 @@ export interface IContextManager {
   getChildContexts(parentId: string): readonly ConversationContext[];
   getContextHierarchy(contextId: string): readonly string[];
 
+  // Context Optimization (Enhancement 3)
+  optimizeContext(context: string, maxTokens: number): Promise<Result<string>>;
+  calculateTokenCount(text: string): number;
+  scoreRelevance(text: string, query: string): number;
+  pruneOldContext(context: string, maxAge: number): Promise<Result<string>>;
+
   // Utility Methods
   generateContextId(): string;
   isContextActive(contextId: string): boolean;

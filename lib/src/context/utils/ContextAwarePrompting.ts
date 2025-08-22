@@ -22,7 +22,7 @@ export class ContextAwarePromptHandler {
     private baseHandler: IPromptHandler,
     private contextManager: IContextManager
   ) {
-    this.langChainHandler = new LangChainPromptHandler(baseHandler);
+    this.langChainHandler = new LangChainPromptHandler(baseHandler, contextManager);
   }
 
   /**

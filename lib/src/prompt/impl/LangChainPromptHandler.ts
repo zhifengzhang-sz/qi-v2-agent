@@ -7,7 +7,8 @@
 
 import { AIMessage, type BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
-import type { ContextMessage, ConversationContext } from '../../context/index.js';
+import { match } from '@qi/base';
+import type { ContextMessage, ConversationContext, IContextManager } from '../../context/index.js';
 import { isDebugEnabled } from '../../utils/DebugLogger.js';
 import {
   createQiLogger,
@@ -27,11 +28,13 @@ import type {
  */
 export class LangChainPromptHandler implements IPromptHandler {
   private baseHandler: IPromptHandler;
+  private contextManager: IContextManager;
   private templates: Map<string, ChatPromptTemplate> = new Map();
   private logger: SimpleLogger;
 
-  constructor(baseHandler: IPromptHandler) {
+  constructor(baseHandler: IPromptHandler, contextManager: IContextManager) {
     this.baseHandler = baseHandler;
+    this.contextManager = contextManager;
     this.logger = createQiLogger({
       level: 'info',
       name: 'LangChainPromptHandler',
@@ -91,7 +94,52 @@ export class LangChainPromptHandler implements IPromptHandler {
 
       // Convert structured messages back to string for current LLM interface
       // TODO: Future improvement - update multi-llm-ts to accept Message objects directly
-      const formattedPrompt = this.messagesToString(messages);
+      let formattedPrompt = this.messagesToString(messages);
+
+      // Enhancement 3: Context Optimization - prevent hitting token limits
+      const maxTokensForProvider = this.getMaxTokensForProvider(options);
+      const currentTokenCount = this.contextManager.calculateTokenCount(formattedPrompt);
+
+      if (currentTokenCount > maxTokensForProvider * 0.8) {
+        if (isDebugEnabled()) {
+          this.logger.debug('🔧 Context optimization triggered', undefined, {
+            component: 'LangChainPromptHandler',
+            method: 'completeWithContext',
+            originalTokens: currentTokenCount,
+            maxTokens: maxTokensForProvider,
+            threshold: maxTokensForProvider * 0.8,
+          });
+        }
+
+        const optimizationResult = await this.contextManager.optimizeContext(
+          formattedPrompt,
+          maxTokensForProvider
+        );
+
+        match(
+          (optimizedPrompt) => {
+            formattedPrompt = optimizedPrompt;
+            if (isDebugEnabled()) {
+              this.logger.debug('✅ Context optimization successful', undefined, {
+                component: 'LangChainPromptHandler',
+                method: 'completeWithContext',
+                originalTokens: currentTokenCount,
+                optimizedTokens: this.contextManager.calculateTokenCount(optimizedPrompt),
+                reduction:
+                  currentTokenCount - this.contextManager.calculateTokenCount(optimizedPrompt),
+              });
+            }
+          },
+          (error) => {
+            this.logger.warn('⚠️ Context optimization failed, using original prompt', undefined, {
+              component: 'LangChainPromptHandler',
+              method: 'completeWithContext',
+              error: error.message,
+            });
+          },
+          optimizationResult
+        );
+      }
 
       if (isDebugEnabled()) {
         this.logger.debug('📝 Final formatted prompt being sent to LLM', undefined, {
@@ -345,6 +393,48 @@ export class LangChainPromptHandler implements IPromptHandler {
   }
 
   /**
+   * Get maximum token limit for current provider
+   */
+  private getMaxTokensForProvider(options: PromptOptions): number {
+    // Check if provider info is available in options
+    const providerName = (options as any).provider || (options as any).model;
+
+    // Default token limits based on common providers
+    if (typeof providerName === 'string') {
+      const provider = providerName.toLowerCase();
+
+      // Ollama local models - conservative limits
+      if (
+        provider.includes('ollama') ||
+        provider.includes('llama') ||
+        provider.includes('mistral')
+      ) {
+        return 8000;
+      }
+
+      // OpenRouter models - higher limits
+      if (
+        provider.includes('openrouter') ||
+        provider.includes('anthropic') ||
+        provider.includes('claude')
+      ) {
+        return 32000;
+      }
+
+      // GPT models
+      if (provider.includes('gpt-4')) {
+        return 32000;
+      }
+      if (provider.includes('gpt-3.5')) {
+        return 16000;
+      }
+    }
+
+    // Default conservative limit
+    return 16000;
+  }
+
+  /**
    * Extract additional template variables from options
    */
   private extractAdditionalVariables(options: PromptOptions): Record<string, any> {
@@ -365,7 +455,11 @@ export class LangChainPromptHandler implements IPromptHandler {
 
 /**
  * Factory function to create LangChain-enhanced prompt handler
+ * @deprecated Use constructor directly with contextManager parameter
  */
-export function createLangChainPromptHandler(baseHandler: IPromptHandler): LangChainPromptHandler {
-  return new LangChainPromptHandler(baseHandler);
+export function createLangChainPromptHandler(
+  baseHandler: IPromptHandler,
+  contextManager: IContextManager
+): LangChainPromptHandler {
+  return new LangChainPromptHandler(baseHandler, contextManager);
 }
