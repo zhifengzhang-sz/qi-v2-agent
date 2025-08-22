@@ -207,8 +207,11 @@ class QiPromptApp {
     // v-0.8.x: Initialize Multi-Provider Model Support FIRST
     this.providerManager = new ProviderManager();
 
-    // v-0.8.x: Use ProviderManager-based prompt handler for automatic fallback
-    this.promptHandler = new ProviderManagerPromptHandler(this.providerManager);
+    // v-0.8.x: Use ProviderManager-based prompt handler with context optimization
+    this.promptHandler = new ProviderManagerPromptHandler(
+      this.providerManager,
+      this.contextManager
+    );
     this.commandHandler = createCommandHandler({
       enableBuiltInCommands: true,
     });

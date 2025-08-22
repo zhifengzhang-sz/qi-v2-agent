@@ -3,6 +3,7 @@
  * Implements IPromptHandler interface but uses ProviderManager internally
  */
 
+import type { ContextManager } from '@qi/agent/context/impl/ContextManager';
 // biome-ignore lint/style/useImportType: ProviderManager is used as constructor, not just type
 import { type ModelRequest, ProviderManager } from '@qi/agent/models/ProviderManager';
 import type { IPromptHandler, PromptOptions, PromptResponse, ProviderInfo } from '@qi/agent/prompt';
@@ -10,10 +11,12 @@ import { match } from '@qi/base';
 
 export class ProviderManagerPromptHandler implements IPromptHandler {
   private providerManager: ProviderManager;
+  private contextManager?: ContextManager;
   private initialized = false;
 
-  constructor(providerManager: ProviderManager) {
+  constructor(providerManager: ProviderManager, contextManager?: ContextManager) {
     this.providerManager = providerManager;
+    this.contextManager = contextManager;
   }
 
   /**
@@ -33,7 +36,7 @@ export class ProviderManagerPromptHandler implements IPromptHandler {
   }
 
   /**
-   * Execute a prompt using ProviderManager with automatic fallback
+   * Execute a prompt using ProviderManager with automatic fallback and context optimization
    */
   async complete(prompt: string, options: PromptOptions = {}): Promise<PromptResponse> {
     if (!this.initialized) {
@@ -41,8 +44,27 @@ export class ProviderManagerPromptHandler implements IPromptHandler {
     }
 
     try {
+      // Enhancement 3: Context Optimization - optimize prompt if ContextManager available
+      let optimizedPrompt = prompt;
+      if (this.contextManager && prompt.length > 1000) {
+        // Only optimize larger prompts
+        const maxTokens = this.getMaxTokensForProvider(options.provider);
+        const optimizationResult = await this.contextManager.optimizeContext(prompt, maxTokens);
+
+        // Use optimized context if successful, fallback to original if failed
+        match(
+          (optimized) => {
+            optimizedPrompt = optimized;
+          },
+          (error) => {
+            console.warn(`Context optimization failed: ${error.message}, using original prompt`);
+          },
+          optimizationResult
+        );
+      }
+
       const modelRequest: ModelRequest = {
-        prompt,
+        prompt: optimizedPrompt,
         system: options.model
           ? `Using model: ${options.model}`
           : this.providerManager.getSystemPrompt(),
@@ -109,6 +131,26 @@ export class ProviderManagerPromptHandler implements IPromptHandler {
       );
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Get maximum token limits based on provider (Enhancement 3: Context Optimization)
+   */
+  private getMaxTokensForProvider(provider?: string): number {
+    // Use provider preference from ProviderManager if not specified
+    if (!provider) {
+      // Try to detect current provider - simplified approach
+      return 16000; // Conservative default
+    }
+
+    switch (provider.toLowerCase()) {
+      case 'ollama':
+        return 8000; // Conservative for local models
+      case 'openrouter':
+        return 32000; // Varies by model, use conservative estimate
+      default:
+        return 16000; // Safe default
     }
   }
 }
