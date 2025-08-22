@@ -35,7 +35,7 @@
 ---
 
 ## v-0.8.2 - Enhanced Session Persistence
-**Date**: 2025-01-22
+**Date**: 2025-08-22
 
 ### Enhancement 1: Session Persistence Implementation
 

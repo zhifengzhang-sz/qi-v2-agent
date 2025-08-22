@@ -76,7 +76,7 @@ This project develops **two specialized AI agents** with distinct capabilities a
 
 ## v-0.8.2 - Enhanced Session Persistence (COMPLETED)
 
-### 📅 **Release Date**: January 22, 2025
+### 📅 **Release Date**: August 22, 2025
 
 ### 🎯 **Overview**
 **Enhanced Session Persistence Implementation**: Complete session persistence functionality with SQLite backend, auto-save capabilities, and context memory management. This release enables conversations to persist across qi-prompt restarts while maintaining the existing architecture and providing a foundation for advanced workflow management.
