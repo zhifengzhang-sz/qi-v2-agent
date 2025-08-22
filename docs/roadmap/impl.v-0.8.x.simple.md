@@ -37,16 +37,48 @@ This guide provides a **simple, practical approach** to enhancing qi-v2-agent v0
 **Files**: Add MCP capabilities to existing tool system
 **Timeline**: 5-6 days
 
-## Enhancement 1: Session Persistence
+## BREAKING CHANGE: Unified MCP Storage Architecture (v-0.8.5)
+
+**Document Updated**: 2025-01-17 - Post v-0.8.4 Architectural Improvement
+
+### Architectural Decision: Single Storage System
+
+**OLD Architecture (v-0.8.4 and earlier):**
+- StateManager uses SQLite for sessions/context memory
+- RAG Integration uses MCP memory server for knowledge storage
+- **Problem**: Two storage systems, native SQLite bindings prevent binary compilation
+
+**NEW Architecture (v-0.8.5+):**
+- StateManager uses MCP memory server for ALL persistence
+- RAG Integration uses MCP memory server for knowledge storage  
+- **Result**: Single unified storage system, no native dependencies
+
+### Benefits of Unified Architecture
+- ✅ **Eliminates SQLite native binding issues** → Binary compilation works
+- ✅ **Unified storage architecture** → All persistent data in one system
+- ✅ **No scattered data** → Sessions and knowledge in same MCP memory server
+- ✅ **Cleaner dependencies** → No SQLite, no native bindings
+- ✅ **Consistent patterns** → All storage through MCP protocol
+- ✅ **Predictable behavior** → Either MCP works or persistence doesn't (no fallback confusion)
+
+### Dependencies
+- **MCP memory server MUST be running** for session persistence to work
+- **Clean failure mode** when MCP unavailable (session persistence simply disabled)
+- **No fallback logic** → Avoids data scattered across multiple systems
+
+## Enhancement 1: Session Persistence (MCP-Based)
 
 ### Current State
-- `lib/src/state/StateManager.ts` - Basic state management
+- `lib/src/state/StateManager.ts` - Uses SQLite (REMOVED in v-0.8.5)
 - `lib/src/state/StatePersistence.ts` - Session persistence foundation
-- Sessions don't persist across qi-prompt restarts
+- Sessions stored via MCP memory server (NEW in v-0.8.5)
 
 ### Implementation Plan
 
-#### Step 1.1: Extend IStateManager Interface
+#### Step 1.1: Remove SQLite Dependencies
+**BREAKING CHANGE**: All SQLite code removed from StateManager
+
+#### Step 1.2: Extend IStateManager Interface
 ```typescript
 // lib/src/state/abstractions/IStateManager.ts
 export interface IStateManager {
@@ -81,62 +113,114 @@ export interface SessionSummary {
 }
 ```
 
-#### Step 1.2: Implement Enhanced StateManager
+#### Step 1.3: Implement MCP-Based StateManager (v-0.8.5)
 ```typescript
 // lib/src/state/StateManager.ts
+import type { MCPServiceManager } from '../mcp/MCPServiceManager.js';
+import type { Result, QiError } from '@qi/base';
+import { success, failure, fromAsyncTryCatch } from '@qi/base';
+
 export class StateManager implements IStateManager {
   private sessionStorage: Map<string, SessionData> = new Map();
   private contextMemory: Map<string, any> = new Map();
-  private dbPath: string;
+  private serviceManager: MCPServiceManager; // NEW: MCP dependency
   
-  constructor(config: StateManagerConfig) {
+  constructor(config: StateManagerConfig, serviceManager: MCPServiceManager) {
     // ... existing constructor
-    this.dbPath = config.sessionDbPath || './data/sessions.db';
-    this.initializeSessionDb();
+    this.serviceManager = serviceManager; // Store MCP service manager
+    // REMOVED: No more SQLite initialization
   }
   
   async persistSession(sessionId: string, data: SessionData): Promise<void> {
-    // Store in memory
+    // Store in memory cache
     this.sessionStorage.set(sessionId, data);
     
-    // Persist to SQLite
-    await this.saveSessionToDb(sessionId, data);
+    // Persist to MCP memory server (REPLACED SQLite)
+    await this.saveSessionToMCP(sessionId, data);
   }
   
-  async loadSession(sessionId: string): Promise<SessionData | null> {
-    // Check memory first
+  async loadPersistedSession(sessionId: string): Promise<SessionData | null> {
+    // Check memory cache first
     if (this.sessionStorage.has(sessionId)) {
       return this.sessionStorage.get(sessionId)!;
     }
     
-    // Load from database
-    const session = await this.loadSessionFromDb(sessionId);
+    // Load from MCP memory server (REPLACED SQLite)
+    const session = await this.loadSessionFromMCP(sessionId);
     if (session) {
       this.sessionStorage.set(sessionId, session);
     }
     return session;
   }
   
-  // ... implement other methods
+  // NEW: MCP-based storage methods
+  private async saveSessionToMCP(sessionId: string, data: SessionData): Promise<Result<void, QiError>> {
+    if (!this.serviceManager.isConnected('memory')) {
+      return failure(create('MCP_UNAVAILABLE', 'Memory service not connected', 'SYSTEM'));
+    }
+
+    const client = this.serviceManager.getClient('memory');
+    if (!client) {
+      return failure(create('MCP_CLIENT_UNAVAILABLE', 'Memory client not available', 'SYSTEM'));
+    }
+
+    try {
+      await client.callTool({
+        name: 'create_entities',
+        arguments: {
+          entities: [{
+            name: `session_${sessionId}`,
+            entityType: 'session',
+            observations: [JSON.stringify(data)]
+          }]
+        }
+      });
+      return success(undefined);
+    } catch (error) {
+      return failure(create('SESSION_SAVE_FAILED', `Failed to save session: ${error}`, 'SYSTEM'));
+    }
+  }
+  
+  private async loadSessionFromMCP(sessionId: string): Promise<SessionData | null> {
+    if (!this.serviceManager.isConnected('memory')) {
+      return null; // Graceful degradation
+    }
+
+    const client = this.serviceManager.getClient('memory');
+    if (!client) {
+      return null;
+    }
+
+    try {
+      const result = await client.callTool({
+        name: 'search_nodes',
+        arguments: { query: `session_${sessionId}` }
+      });
+      
+      if (result.content?.[0]?.text) {
+        const searchData = JSON.parse(result.content[0].text);
+        if (searchData.entities?.[0]?.observations?.[0]) {
+          return JSON.parse(searchData.entities[0].observations[0]);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to load session from MCP:', error);
+      return null;
+    }
+  }
 }
 ```
 
-#### Step 1.3: Database Schema
-```sql
--- lib/src/state/sql/sessions_schema.sql
-CREATE TABLE IF NOT EXISTS sessions (
-  id TEXT PRIMARY KEY,
-  start_time DATETIME NOT NULL,
-  last_activity DATETIME NOT NULL,
-  message_count INTEGER DEFAULT 0,
-  session_data TEXT NOT NULL,
-  summary TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_sessions_last_activity ON sessions(last_activity);
-CREATE INDEX idx_sessions_start_time ON sessions(start_time);
-```
+#### Step 1.4: Remove SQLite Dependencies
+**BREAKING CHANGES in v-0.8.5:**
+- ❌ Remove `import { Database } from 'sqlite3'`
+- ❌ Remove `initializeSessionDatabase()` method
+- ❌ Remove `initializeDatabaseSchema()` method  
+- ❌ Remove all SQLite table creation code
+- ❌ Remove database connection management
+- ✅ Add `MCPServiceManager` dependency to constructor
+- ✅ Replace all database operations with MCP memory server calls
 
 #### Step 1.4: Integration with qi-prompt
 ```typescript

@@ -5,7 +5,8 @@
  * Provides passive data store - no automatic notifications.
  */
 
-// No qicore imports - agent layer should not see them
+// QiCore imports - Essential for proper error handling patterns
+import type { QiError, Result } from '@qi/base';
 
 /**
  * Application configuration
@@ -156,21 +157,22 @@ export interface IStateManager {
   addConversationEntry(entry: Omit<ConversationEntry, 'id' | 'timestamp'>): void;
   clearConversationHistory(): void;
 
-  // Enhanced session persistence
-  persistSession(sessionId: string, data: SessionData): Promise<void>;
-  loadPersistedSession(sessionId: string): Promise<SessionData | null>;
-  listSessions(userId?: string): Promise<SessionSummary[]>;
-  deleteSession(sessionId: string): Promise<void>;
+  // Enhanced session persistence - QiCore Result<T> patterns
+  persistSession(sessionId: string, data: SessionData): Promise<Result<void, QiError>>;
+  loadPersistedSession(sessionId: string): Promise<Result<SessionData | null, QiError>>;
+  listSessions(userId?: string): Promise<Result<SessionSummary[], QiError>>;
+  deleteSession(sessionId: string): Promise<Result<void, QiError>>;
 
-  // Context memory management
-  setContextMemory(key: string, value: any): void;
-  getContextMemory(key: string): any;
-  clearOldContextMemory(maxAge: number): void;
+  // Context memory management - QiCore Result<T> patterns for async operations
+  setContextMemory(key: string, value: any): Result<void, QiError>; // Synchronous but can fail
+  getContextMemory(key: string): any; // Synchronous access to local cache
+  loadContextMemoryFromMCP(key: string): Promise<Result<any, QiError>>; // Async MCP loading
+  clearOldContextMemory(maxAge: number): Result<void, QiError>;
   getContextMemoryKeys(): string[];
 
-  // State persistence
-  save(): Promise<void>;
-  load(): Promise<void>;
+  // State persistence - QiCore Result<T> patterns
+  save(): Promise<Result<void, QiError>>;
+  load(): Promise<Result<void, QiError>>;
 
   // Optional: State change notifications (for components that need updates)
   subscribe(listener: StateChangeListener): () => void;

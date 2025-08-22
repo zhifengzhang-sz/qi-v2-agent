@@ -39,7 +39,10 @@ export class QiCoreStateManager {
   private stateManager: StateManager;
 
   constructor() {
-    this.stateManager = new StateManager();
+    // Create MCP service manager for unified storage
+    const { MCPServiceManager } = require('../mcp/MCPServiceManager.js');
+    const serviceManager = new MCPServiceManager();
+    this.stateManager = new StateManager(serviceManager);
   }
 
   // ==========================================================================
@@ -59,7 +62,8 @@ export class QiCoreStateManager {
    * External API: Promise<void> (traditional)
    */
   async saveState(): Promise<void> {
-    return this.stateManager.save();
+    const result = await this.stateManager.save();
+    return this.transformResultToPromise(result);
   }
 
   /**
@@ -67,7 +71,8 @@ export class QiCoreStateManager {
    * External API: Promise<void> (traditional)
    */
   async loadState(): Promise<void> {
-    return this.stateManager.load();
+    const result = await this.stateManager.load();
+    return this.transformResultToPromise(result);
   }
 
   // ==========================================================================
@@ -171,11 +176,13 @@ export class QiCoreStateManager {
 }
 
 /**
- * Create a state manager with default configuration
- * Legacy API: Returns original StateManager for backward compatibility
+ * Create a state manager with MCP service manager
  */
 export function createStateManager(): StateManager {
-  return new StateManager();
+  // Create MCP service manager for unified storage
+  const { MCPServiceManager } = require('../mcp/MCPServiceManager.js');
+  const serviceManager = new MCPServiceManager();
+  return new StateManager(serviceManager);
 }
 
 /**

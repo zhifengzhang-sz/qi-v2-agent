@@ -163,15 +163,19 @@ qi-prompt will be enhanced with upgraded modules while maintaining functionality
 
 ### **Usage Examples**
 ```bash
-# Binary usage with configuration
-./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json
+# Binary usage with full configuration (recommended)
+./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path .env
 
-# Framework selection
-./app/qi-prompt --framework ink --config-path ./config.yaml
+# Framework selection with configuration
+./app/qi-prompt --framework hybrid --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path .env
+
+# Development mode
+bun run qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path .env --debug
 
 # File reference usage
 @package.json what dependencies?
 @src/file.ts explain this code
+@config/llm-providers.yaml check this configuration
 ```
 
 ## Enhancement Roadmap (v-0.8.x)
@@ -201,10 +205,10 @@ cd app && bun run qi-prompt
 ### **Production Binary**
 ```bash
 # Compile binary
-bun run compile
+bun run build
 
-# Run with configuration
-./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/schema.json
+# Run with full configuration
+./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path .env
 ```
 
 ### **Key Commands**
