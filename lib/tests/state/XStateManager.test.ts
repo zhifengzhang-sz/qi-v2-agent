@@ -265,12 +265,14 @@ describe('XState v5 StateManager', () => {
       expect(typeof stateManager.load).toBe('function');
     });
 
-    it('should save state without throwing', async () => {
-      await expect(stateManager.save()).resolves.not.toThrow();
+    it('should save state successfully', async () => {
+      const result = await stateManager.save();
+      expect(result).toBeDefined();
     });
 
-    it('should load state without throwing', async () => {
-      await expect(stateManager.load()).resolves.not.toThrow();
+    it('should load state successfully', async () => {
+      const result = await stateManager.load();
+      expect(result).toBeDefined();
     });
   });
 

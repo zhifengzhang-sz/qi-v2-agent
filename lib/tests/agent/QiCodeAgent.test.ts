@@ -158,7 +158,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
   describe('Two-Layer Architecture', () => {
     it('should maintain clean public interface', async () => {
       // Setup mock classification
-      vi.mocked(mockClassifier.classify).mockResolvedValue({
+      mockClassifier.classify.mockResolvedValue({
         type: 'prompt',
         confidence: 0.9,
         method: 'mock-method',
@@ -194,7 +194,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
 
     it('should handle errors gracefully in public interface', async () => {
       // Mock classifier to fail
-      vi.mocked(mockClassifier.classify).mockRejectedValue(
+      mockClassifier.classify.mockRejectedValue(
         new Error('Classification failed')
       );
 
@@ -236,7 +236,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
         metadata: new Map(),
       };
 
-      vi.mocked(mockClassifier.classify).mockResolvedValue(mockClassificationResult);
+      mockClassifier.classify.mockResolvedValue(mockClassificationResult);
 
       // The internal implementation should handle Result<T> properly
       const response = await agent.process(validRequest);
@@ -248,7 +248,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
 
     it('should handle QiError categorization', async () => {
       // Test different error categories are handled properly
-      vi.mocked(mockClassifier.classify).mockRejectedValue(
+      mockClassifier.classify.mockRejectedValue(
         validationError('Invalid input format')
       );
 
@@ -289,7 +289,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
 
     it('should handle invalid state commands gracefully', async () => {
       // Mock command handler to fail for invalid command
-      vi.mocked(mockCommandHandler.executeCommand).mockResolvedValue({
+      mockCommandHandler.executeCommand.mockResolvedValue({
         commandName: 'invalid-command',
         success: false,
         content: 'Unknown command',
@@ -299,7 +299,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
       });
 
       // Mock classifier for invalid command (should return command type)
-      vi.mocked(mockClassifier.classify).mockResolvedValue({
+      mockClassifier.classify.mockResolvedValue({
         type: 'command',
         confidence: 0.9,
         method: 'mock-method',
@@ -339,7 +339,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
         mockCommandHandler = createMockCommandHandler();
         mockPromptHandler = createMockPromptHandler();
         
-        vi.mocked(mockClassifier.classify).mockResolvedValue({
+        mockClassifier.classify.mockResolvedValue({
           type: testCase.type,
           confidence: 0.8,
           method: 'mock-method',
@@ -374,7 +374,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
     });
 
     it('should handle unknown classification types', async () => {
-      vi.mocked(mockClassifier.classify).mockResolvedValue({
+      mockClassifier.classify.mockResolvedValue({
         type: 'unknown' as any,
         confidence: 0.5,
         method: 'mock-method',
@@ -400,7 +400,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
 
   describe('Workflow Handling (Disabled)', () => {
     it('should return disabled response for workflows when disabled', async () => {
-      vi.mocked(mockClassifier.classify).mockResolvedValue({
+      mockClassifier.classify.mockResolvedValue({
         type: 'workflow',
         confidence: 0.9,
         method: 'mock-method',
@@ -426,7 +426,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
 
   describe('Performance and Metrics', () => {
     it('should track execution time', async () => {
-      vi.mocked(mockClassifier.classify).mockResolvedValue({
+      mockClassifier.classify.mockResolvedValue({
         type: 'prompt',
         confidence: 0.8,
         method: 'mock-method',
@@ -451,7 +451,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
     });
 
     it('should include proper metadata', async () => {
-      vi.mocked(mockClassifier.classify).mockResolvedValue({
+      mockClassifier.classify.mockResolvedValue({
         type: 'prompt',
         confidence: 0.85,
         method: 'mock-method',
@@ -490,7 +490,7 @@ describe('QiCodeAgent QiCore Compliance', () => {
       ];
 
       for (const test of errorTests) {
-        vi.mocked(mockClassifier.classify).mockRejectedValue(test.error);
+        mockClassifier.classify.mockRejectedValue(test.error);
 
         const request: AgentRequest = {
           input: 'Test input',

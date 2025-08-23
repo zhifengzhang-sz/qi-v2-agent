@@ -12,6 +12,12 @@
     "build": "bun build.ts compile",
     "validate": "bun build.ts build",
     "test": "bun run --cwd lib test && bun run --cwd app test",
+    "test:lib:unit": "bun run --cwd lib test --coverage",
+    "test:app:unit": "bun run --cwd app test --coverage", 
+    "test:infrastructure": "bun run --cwd lib test tests/cli tests/mcp tests/utils --coverage",
+    "test:coverage:report": "bun run test:lib:unit && bun run test:app:unit",
+    "test:watch": "bun run --cwd lib test --watch",
+    "test:watch:app": "bun run --cwd app test --watch",
     "typecheck": "bun run --cwd lib type-check && bun --cwd app tsc --noEmit",
     "lint": "bun run --cwd lib lint && bun run --cwd app lint",
     "format": "bun run --cwd lib format && bun run --cwd app format",
@@ -21,7 +27,8 @@
     "config:show": "bun --cwd app src/main.ts config --show ../config/qi-config.yaml",
     "config:validate": "bun --cwd app src/main.ts config --validate ../config/qi-config.yaml",
     "check": "bun run typecheck && bun run lint && bun run test",
-    "check:lib": "bun run --cwd lib type-check && bun run --cwd lib lint && bun run --cwd lib test"
+    "check:lib": "bun run --cwd lib type-check && bun run --cwd lib lint && bun run --cwd lib test",
+    "check:coverage": "bun run typecheck && bun run lint && bun run test:coverage:report"
   },
   "devDependencies": {
     "@types/node": "^24.2.1",

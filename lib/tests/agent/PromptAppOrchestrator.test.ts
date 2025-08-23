@@ -192,7 +192,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
   describe('Clean Interface Layer', () => {
     it('should maintain clean public interface for commands', async () => {
       // Mock successful command execution
-      vi.mocked(mockCommandHandler.executeCommand).mockResolvedValue({
+      mockCommandHandler.executeCommand.mockResolvedValue({
         commandName: 'test',
         success: true,
         content: 'Command executed successfully',
@@ -225,7 +225,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
 
     it('should maintain clean public interface for prompts', async () => {
       // Mock successful prompt execution
-      vi.mocked(mockPromptHandler.complete).mockResolvedValue({
+      mockPromptHandler.complete.mockResolvedValue({
         success: true,
         data: 'This is the AI response',
       } as PromptResponse);
@@ -257,7 +257,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
   describe('Error Handling with QiCore Patterns', () => {
     it('should handle command handler errors gracefully', async () => {
       // Mock command handler failure
-      vi.mocked(mockCommandHandler.executeCommand).mockRejectedValue(
+      mockCommandHandler.executeCommand.mockRejectedValue(
         new Error('Command handler failed')
       );
 
@@ -279,7 +279,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
 
     it('should handle prompt handler errors gracefully', async () => {
       // Mock prompt handler failure
-      vi.mocked(mockPromptHandler.complete).mockResolvedValue({
+      mockPromptHandler.complete.mockResolvedValue({
         success: false,
         error: 'LLM service unavailable',
       } as PromptResponse);
@@ -406,7 +406,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
   describe('Cancellation Support', () => {
     it('should support request cancellation', async () => {
       // Mock a long-running prompt handler
-      vi.mocked(mockPromptHandler.complete).mockImplementation(
+      mockPromptHandler.complete.mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve({ success: true, data: 'Response' }), 1000))
       );
 
@@ -439,7 +439,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
   describe('Streaming Support', () => {
     it('should provide streaming interface', async () => {
       // Mock successful prompt execution for streaming
-      vi.mocked(mockPromptHandler.complete).mockResolvedValue({
+      mockPromptHandler.complete.mockResolvedValue({
         success: true,
         data: 'Streamed response',
       } as PromptResponse);
@@ -476,7 +476,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
 
     it('should handle streaming errors gracefully', async () => {
       // Mock prompt handler failure for streaming
-      vi.mocked(mockPromptHandler.complete).mockRejectedValue(
+      mockPromptHandler.complete.mockRejectedValue(
         new Error('Streaming failed')
       );
 
@@ -549,7 +549,7 @@ describe('PromptAppOrchestrator QiCore Compliance', () => {
   describe('Status and Metrics', () => {
     it('should track processing metrics', async () => {
       // Mock successful prompt
-      vi.mocked(mockPromptHandler.complete).mockResolvedValue({
+      mockPromptHandler.complete.mockResolvedValue({
         success: true,
         data: 'Response',
       } as PromptResponse);

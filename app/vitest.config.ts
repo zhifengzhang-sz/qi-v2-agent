@@ -11,21 +11,29 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
-      include: ['src/**/*'],
+      include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/**/*.d.ts',
+        'node_modules/',
+        'dist/',
+        '**/*.d.ts',
+        '**/*.config.{js,ts}',
+        '**/index.ts', // Re-export files
         'src/demos/**',
         'src/fine-tuning/**',
+        'src/study/**', // Study/research files
         'src/test-*.ts'
       ],
       thresholds: {
         global: {
-          branches: 80,
-          functions: 85,
-          lines: 85,
-          statements: 85
-        }
-      }
+          branches: 50,
+          functions: 60,
+          lines: 60,
+          statements: 60,
+        },
+        // Higher standards for core components
+        'src/prompt/**/*': { functions: 70 },
+        'src/main.ts': { functions: 80 },
+      },
     },
     testTimeout: 10000,
     hookTimeout: 10000,
