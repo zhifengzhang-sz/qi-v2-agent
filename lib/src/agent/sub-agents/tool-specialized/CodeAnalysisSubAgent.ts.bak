@@ -1,0 +1,722 @@
+/**
+ * Code Analysis Sub-Agent
+ *
+ * Specializes in code analysis operations using Read, Grep, and Glob tools.
+ * Handles tasks like code review, pattern detection, dependency analysis.
+ * Uses QiCore Result<T, QiError> patterns for consistent error handling.
+ */
+
+import type { Result } from '@qi/base';
+import { failure, match, success } from '@qi/base';
+import type { QiError } from '@qi/core';
+import { BaseSubAgent } from '../core/BaseSubAgent.js';
+import type {
+  SubAgentCapability,
+  SubAgentConfig,
+  SubAgentProgress,
+  SubAgentResult,
+  SubAgentTask,
+} from '../core/types.js';
+
+/**
+ * Code analysis specific task types
+ */
+export type CodeAnalysisTaskType =
+  | 'code_review'
+  | 'pattern_detection'
+  | 'dependency_analysis'
+  | 'security_scan'
+  | 'code_metrics'
+  | 'function_analysis'
+  | 'import_analysis'
+  | 'complexity_analysis'
+  | 'documentation_analysis';
+
+/**
+ * Code analysis task context
+ */
+export interface CodeAnalysisTaskContext {
+  filePath?: string;
+  directoryPath?: string;
+  filePattern?: string;
+  languageType?: string;
+  analysisType?: 'structure' | 'quality' | 'security' | 'performance' | 'maintainability';
+  includeTests?: boolean;
+  excludePatterns?: string[];
+  maxDepth?: number;
+  frameworks?: string[];
+  customPatterns?: string[];
+}
+
+/**
+ * Code Analysis Sub-Agent
+ * Handles comprehensive code analysis with language-aware processing
+ */
+export class CodeAnalysisSubAgent extends BaseSubAgent {
+  public readonly name = 'Code Analysis Agent';
+  public readonly version = '1.0.0';
+  protected requiredTools = ['Read', 'Grep', 'Glob'];
+
+  /**
+   * Define capabilities for code analysis operations
+   */
+  public get capabilities(): SubAgentCapability[] {
+    return [
+      {
+        type: 'code_review',
+        description: 'Comprehensive code review and quality assessment',
+        confidence: 0.85,
+        domains: ['code', 'review', 'quality'],
+        workflowPatterns: ['sequential', 'hierarchical'],
+        requiredTools: ['Read', 'Grep', 'Glob'],
+        estimatedDuration: 3000,
+      },
+      {
+        type: 'pattern_detection',
+        description: 'Detect code patterns, anti-patterns, and best practices',
+        confidence: 0.9,
+        domains: ['code', 'patterns', 'analysis'],
+        workflowPatterns: ['parallel'],
+        requiredTools: ['Grep', 'Read'],
+        estimatedDuration: 2000,
+      },
+      {
+        type: 'dependency_analysis',
+        description: 'Analyze imports, dependencies, and module structure',
+        confidence: 0.85,
+        domains: ['code', 'dependencies', 'structure'],
+        workflowPatterns: ['hierarchical'],
+        requiredTools: ['Grep', 'Glob', 'Read'],
+        estimatedDuration: 2500,
+      },
+      {
+        type: 'security_scan',
+        description: 'Scan code for security vulnerabilities and issues',
+        confidence: 0.8,
+        domains: ['code', 'security', 'vulnerabilities'],
+        workflowPatterns: ['parallel'],
+        requiredTools: ['Grep', 'Read'],
+        estimatedDuration: 3500,
+      },
+      {
+        type: 'code_metrics',
+        description: 'Calculate code complexity and quality metrics',
+        confidence: 0.75,
+        domains: ['code', 'metrics', 'complexity'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Read', 'Grep', 'Glob'],
+        estimatedDuration: 4000,
+      },
+      {
+        type: 'function_analysis',
+        description: 'Analyze function structure, parameters, and usage',
+        confidence: 0.85,
+        domains: ['code', 'functions', 'structure'],
+        workflowPatterns: ['parallel'],
+        requiredTools: ['Grep', 'Read'],
+        estimatedDuration: 1800,
+      },
+      {
+        type: 'import_analysis',
+        description: 'Analyze import statements and module dependencies',
+        confidence: 0.9,
+        domains: ['code', 'imports', 'modules'],
+        workflowPatterns: ['hierarchical'],
+        requiredTools: ['Grep', 'Glob'],
+        estimatedDuration: 1500,
+      },
+    ];
+  }
+
+  /**
+   * Check if this agent can handle the given task
+   */
+  async canHandle(task: SubAgentTask): Promise<Result<boolean, QiError>> {
+    try {
+      // Check if task type matches our capabilities
+      const isCodeAnalysisTask = this.capabilities.some(cap => cap.type === task.type);
+      if (!isCodeAnalysisTask) {
+        return success(false);
+      }
+
+      // Validate required tools are available
+      const capability = this.capabilities.find(cap => cap.type === task.type);
+      if (!capability) {
+        return success(false);
+      }
+
+      const toolCheckResult = await this.validateToolAccess(capability.requiredTools);
+      return match(
+        () => success(true),
+        () => success(false),
+        toolCheckResult
+      );
+    } catch (error) {
+      return failure(
+        this.createError('CODE_ANALYSIS_CAN_HANDLE_ERROR', 'Error checking task compatibility', {
+          taskId: task.id,
+          taskType: task.type,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Execute code analysis task
+   */
+  async *execute(task: SubAgentTask): AsyncGenerator<SubAgentProgress, SubAgentResult> {
+    const startTime = Date.now();
+    this.emit('taskStarted', { taskId: task.id, agentId: this.id });
+
+    try {
+      // Initialize execution context
+      yield {
+        taskId: task.id,
+        agentId: this.id,
+        status: 'running',
+        progress: 0.1,
+        message: `Starting ${task.type} analysis`,
+        timestamp: new Date(),
+        details: { phase: 'initialization', analysis: task.type },
+      };
+
+      // Route to specific analysis handler
+      const result = await this.routeCodeAnalysis(task);
+      
+      const executionTime = Date.now() - startTime;
+      
+      return match(
+        (data) => {
+          this.emit('taskCompleted', { taskId: task.id, agentId: this.id, executionTime });
+          return {
+            taskId: task.id,
+            agentId: this.id,
+            status: 'completed' as const,
+            result: { success: true, data },
+            executionTime,
+            timestamp: new Date(),
+          };
+        },
+        (error) => {
+          this.emit('taskFailed', { taskId: task.id, agentId: this.id, error, executionTime });
+          return {
+            taskId: task.id,
+            agentId: this.id,
+            status: 'failed' as const,
+            result: { success: false, error },
+            executionTime,
+            timestamp: new Date(),
+          };
+        },
+        result
+      );
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const qiError = this.createError(
+        'CODE_ANALYSIS_EXECUTION_ERROR',
+        'Code analysis execution failed',
+        {
+          taskId: task.id,
+          taskType: task.type,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+
+      this.emit('taskFailed', { taskId: task.id, agentId: this.id, error: qiError, executionTime });
+      return {
+        taskId: task.id,
+        agentId: this.id,
+        status: 'failed',
+        result: { success: false, error: qiError },
+        executionTime,
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * Route to appropriate code analysis handler
+   */
+  private async routeCodeAnalysis(task: SubAgentTask): Promise<Result<unknown, QiError>> {
+    const context = task.context as CodeAnalysisTaskContext;
+
+    switch (task.type) {
+      case 'code_review':
+        return this.handleCodeReview(task, context);
+      case 'pattern_detection':
+        return this.handlePatternDetection(task, context);
+      case 'dependency_analysis':
+        return this.handleDependencyAnalysis(task, context);
+      case 'security_scan':
+        return this.handleSecurityScan(task, context);
+      case 'code_metrics':
+        return this.handleCodeMetrics(task, context);
+      case 'function_analysis':
+        return this.handleFunctionAnalysis(task, context);
+      case 'import_analysis':
+        return this.handleImportAnalysis(task, context);
+      default:
+        return failure(
+          this.createError('CODE_ANALYSIS_UNSUPPORTED_OPERATION', 'Unsupported analysis operation', {
+            taskType: task.type,
+            supportedTypes: this.capabilities.map(cap => cap.type),
+          })
+        );
+    }
+  }
+
+  /**
+   * Handle comprehensive code review
+   */
+  private async handleCodeReview(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const reviewResults = {
+        codeQuality: await this.analyzeCodeQuality(context),
+        securityIssues: await this.findSecurityIssues(context),
+        performanceIssues: await this.findPerformanceIssues(context),
+        maintainabilityScore: await this.calculateMaintainabilityScore(context),
+        testCoverage: await this.analyzeTestCoverage(context),
+        documentation: await this.analyzeDocumentation(context),
+      };
+
+      return success({
+        operation: 'code_review',
+        analysisPath: context.filePath || context.directoryPath,
+        languageType: context.languageType,
+        reviewResults,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('CODE_REVIEW_FAILED', 'Code review analysis failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle pattern detection analysis
+   */
+  private async handlePatternDetection(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const patterns = await this.detectCodePatterns(context);
+      const antiPatterns = await this.detectAntiPatterns(context);
+      const designPatterns = await this.detectDesignPatterns(context);
+
+      return success({
+        operation: 'pattern_detection',
+        analysisPath: context.filePath || context.directoryPath,
+        patterns: {
+          good: patterns,
+          antiPatterns,
+          designPatterns,
+        },
+        patternCount: patterns.length + antiPatterns.length + designPatterns.length,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('PATTERN_DETECTION_FAILED', 'Pattern detection analysis failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle dependency analysis
+   */
+  private async handleDependencyAnalysis(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const dependencies = await this.analyzeDependencies(context);
+      const imports = await this.analyzeImports(context);
+      const moduleStructure = await this.analyzeModuleStructure(context);
+      const circularDeps = await this.detectCircularDependencies(context);
+
+      return success({
+        operation: 'dependency_analysis',
+        analysisPath: context.filePath || context.directoryPath,
+        dependencies,
+        imports,
+        moduleStructure,
+        circularDependencies: circularDeps,
+        dependencyCount: dependencies.length,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('DEPENDENCY_ANALYSIS_FAILED', 'Dependency analysis failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle security scan
+   */
+  private async handleSecurityScan(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const vulnerabilities = await this.scanForVulnerabilities(context);
+      const sensitiveData = await this.detectSensitiveDataExposure(context);
+      const injectionRisks = await this.detectInjectionRisks(context);
+      const authIssues = await this.detectAuthenticationIssues(context);
+
+      const securityScore = this.calculateSecurityScore({
+        vulnerabilities,
+        sensitiveData,
+        injectionRisks,
+        authIssues,
+      });
+
+      return success({
+        operation: 'security_scan',
+        analysisPath: context.filePath || context.directoryPath,
+        securityFindings: {
+          vulnerabilities,
+          sensitiveDataExposure: sensitiveData,
+          injectionRisks,
+          authenticationIssues: authIssues,
+        },
+        securityScore,
+        riskLevel: this.calculateRiskLevel(securityScore),
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('SECURITY_SCAN_FAILED', 'Security scan failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle code metrics calculation
+   */
+  private async handleCodeMetrics(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const metrics = {
+        linesOfCode: await this.countLinesOfCode(context),
+        cyclomaticComplexity: await this.calculateCyclomaticComplexity(context),
+        functionCount: await this.countFunctions(context),
+        classCount: await this.countClasses(context),
+        duplicateCode: await this.detectDuplicateCode(context),
+        technicalDebt: await this.calculateTechnicalDebt(context),
+      };
+
+      return success({
+        operation: 'code_metrics',
+        analysisPath: context.filePath || context.directoryPath,
+        metrics,
+        overallScore: this.calculateOverallScore(metrics),
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('CODE_METRICS_FAILED', 'Code metrics calculation failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle function analysis
+   */
+  private async handleFunctionAnalysis(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const functions = await this.analyzeFunctions(context);
+      const functionMetrics = await this.calculateFunctionMetrics(functions);
+
+      return success({
+        operation: 'function_analysis',
+        analysisPath: context.filePath || context.directoryPath,
+        functions,
+        functionMetrics,
+        functionCount: functions.length,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('FUNCTION_ANALYSIS_FAILED', 'Function analysis failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle import analysis
+   */
+  private async handleImportAnalysis(
+    task: SubAgentTask,
+    context: CodeAnalysisTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const imports = await this.extractImports(context);
+      const importMetrics = this.calculateImportMetrics(imports);
+
+      return success({
+        operation: 'import_analysis',
+        analysisPath: context.filePath || context.directoryPath,
+        imports,
+        importMetrics,
+        importCount: imports.length,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('IMPORT_ANALYSIS_FAILED', 'Import analysis failed', {
+          taskId: task.id,
+          analysisPath: context.filePath || context.directoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  // Helper methods for code analysis
+  private async analyzeCodeQuality(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>> {
+    // Placeholder implementation
+    return { score: 0.8, issues: [], recommendations: [] };
+  }
+
+  private async findSecurityIssues(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async findPerformanceIssues(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async calculateMaintainabilityScore(context: CodeAnalysisTaskContext): Promise<number> {
+    // Placeholder implementation
+    return 0.75;
+  }
+
+  private async analyzeTestCoverage(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>> {
+    // Placeholder implementation
+    return { coverage: 0.6, testFiles: [], missingTests: [] };
+  }
+
+  private async analyzeDocumentation(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>> {
+    // Placeholder implementation
+    return { score: 0.7, missingDocs: [], quality: 'good' };
+  }
+
+  private async detectCodePatterns(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async detectAntiPatterns(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async detectDesignPatterns(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async analyzeDependencies(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async analyzeImports(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async analyzeModuleStructure(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>> {
+    // Placeholder implementation
+    return { modules: [], structure: 'flat' };
+  }
+
+  private async detectCircularDependencies(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async scanForVulnerabilities(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async detectSensitiveDataExposure(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async detectInjectionRisks(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async detectAuthenticationIssues(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private calculateSecurityScore(findings: Record<string, unknown[]>): number {
+    // Placeholder implementation
+    return 0.8;
+  }
+
+  private calculateRiskLevel(score: number): string {
+    if (score >= 0.8) return 'low';
+    if (score >= 0.6) return 'medium';
+    return 'high';
+  }
+
+  private async countLinesOfCode(context: CodeAnalysisTaskContext): Promise<number> {
+    // Placeholder implementation
+    return 1000;
+  }
+
+  private async calculateCyclomaticComplexity(context: CodeAnalysisTaskContext): Promise<number> {
+    // Placeholder implementation
+    return 15;
+  }
+
+  private async countFunctions(context: CodeAnalysisTaskContext): Promise<number> {
+    // Placeholder implementation
+    return 50;
+  }
+
+  private async countClasses(context: CodeAnalysisTaskContext): Promise<number> {
+    // Placeholder implementation
+    return 10;
+  }
+
+  private async detectDuplicateCode(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async calculateTechnicalDebt(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>> {
+    // Placeholder implementation
+    return { debt: 'medium', issues: [], estimatedTime: '2 days' };
+  }
+
+  private calculateOverallScore(metrics: Record<string, unknown>): number {
+    // Placeholder implementation
+    return 0.75;
+  }
+
+  private async analyzeFunctions(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private async calculateFunctionMetrics(functions: Record<string, unknown>[]): Promise<Record<string, unknown>> {
+    // Placeholder implementation
+    return { averageComplexity: 3, longestFunction: 50, shortestFunction: 5 };
+  }
+
+  private async extractImports(context: CodeAnalysisTaskContext): Promise<Record<string, unknown>[]> {
+    // Placeholder implementation
+    return [];
+  }
+
+  private calculateImportMetrics(imports: Record<string, unknown>[]): Record<string, unknown> {
+    // Placeholder implementation
+    return { totalImports: imports.length, externalDeps: 10, internalDeps: 5 };
+  }
+
+  /**
+   * Get specialized insights for code analysis operations
+   */
+  async getSpecializedInsights(): Promise<Result<Record<string, unknown>, QiError>> {
+    try {
+      const analysisStats = await this.gatherAnalysisStats();
+      
+      return success({
+        analysisPerformance: analysisStats,
+        commonIssues: this.getCommonIssues(),
+        analysisHistory: this.getRecentAnalyses(),
+        improvementSuggestions: this.getImprovementSuggestions(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('CODE_ANALYSIS_INSIGHTS_ERROR', 'Failed to gather specialized insights', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  // Helper methods for insights
+  private async gatherAnalysisStats(): Promise<Record<string, unknown>> {
+    return {
+      recentAnalyses: this.metrics.completedTasks,
+      averageAnalysisTime: this.metrics.averageExecutionTime,
+      analysisSuccessRate: this.metrics.successRate,
+      mostAnalyzedLanguages: ['typescript', 'javascript', 'python'],
+    };
+  }
+
+  private getCommonIssues(): string[] {
+    return [
+      'Missing error handling',
+      'Overly complex functions',
+      'Insufficient test coverage',
+      'Security vulnerabilities',
+      'Code duplication',
+    ];
+  }
+
+  private getRecentAnalyses(): Record<string, unknown>[] {
+    return [];
+  }
+
+  private getImprovementSuggestions(): string[] {
+    const suggestions: string[] = [];
+    
+    if (this.metrics.averageExecutionTime > 10000) {
+      suggestions.push('Consider analyzing smaller code chunks for faster results');
+    }
+    
+    if (this.metrics.successRate < 0.8) {
+      suggestions.push('Review analysis patterns and tool configurations');
+    }
+    
+    return suggestions;
+  }
+}

@@ -1,0 +1,874 @@
+/**
+ * Git Operations Sub-Agent
+ *
+ * Specializes in Git operations using Bash tool for version control tasks.
+ * Handles tasks like repository management, commit operations, and Git analysis.
+ * Uses QiCore Result<T, QiError> patterns for consistent error handling.
+ */
+
+import type { Result } from '@qi/base';
+import { failure, match, success } from '@qi/base';
+import type { QiError } from '@qi/core';
+import { BaseSubAgent } from '../core/BaseSubAgent.js';
+import type {
+  SubAgentCapability,
+  SubAgentConfig,
+  SubAgentProgress,
+  SubAgentResult,
+  SubAgentTask,
+} from '../core/types.js';
+
+/**
+ * Git operations specific task types
+ */
+export type GitTaskType =
+  | 'git_status'
+  | 'git_commit'
+  | 'git_branch'
+  | 'git_merge'
+  | 'git_log'
+  | 'git_diff'
+  | 'git_stash'
+  | 'git_push'
+  | 'git_pull'
+  | 'git_clone'
+  | 'git_analysis'
+  | 'repository_health';
+
+/**
+ * Git operations task context
+ */
+export interface GitTaskContext {
+  repositoryPath?: string;
+  branchName?: string;
+  commitMessage?: string;
+  remoteName?: string;
+  remoteUrl?: string;
+  filePaths?: string[];
+  commitHash?: string;
+  tagName?: string;
+  maxCommits?: number;
+  sinceDate?: string;
+  untilDate?: string;
+  author?: string;
+  includeStats?: boolean;
+}
+
+/**
+ * Git Operations Sub-Agent
+ * Handles all Git version control operations with repository intelligence
+ */
+export class GitSubAgent extends BaseSubAgent {
+  public readonly name = 'Git Operations Agent';
+  public readonly version = '1.0.0';
+  protected requiredTools = ['Bash'];
+
+  /**
+   * Define capabilities for Git operations
+   */
+  public get capabilities(): SubAgentCapability[] {
+    return [
+      {
+        type: 'git_status',
+        description: 'Check repository status and working directory changes',
+        confidence: 0.95,
+        domains: ['git', 'status', 'repository'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 800,
+      },
+      {
+        type: 'git_commit',
+        description: 'Create commits with proper validation and formatting',
+        confidence: 0.9,
+        domains: ['git', 'commit', 'version-control'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 1200,
+      },
+      {
+        type: 'git_branch',
+        description: 'Branch management operations (create, switch, delete)',
+        confidence: 0.9,
+        domains: ['git', 'branches', 'workflow'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 1000,
+      },
+      {
+        type: 'git_merge',
+        description: 'Merge branches with conflict detection and resolution',
+        confidence: 0.8,
+        domains: ['git', 'merge', 'integration'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 2000,
+      },
+      {
+        type: 'git_log',
+        description: 'Analyze commit history and repository timeline',
+        confidence: 0.9,
+        domains: ['git', 'history', 'analysis'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 1500,
+      },
+      {
+        type: 'git_diff',
+        description: 'Compare changes between commits, branches, or files',
+        confidence: 0.85,
+        domains: ['git', 'diff', 'comparison'],
+        workflowPatterns: ['sequential'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 1300,
+      },
+      {
+        type: 'repository_health',
+        description: 'Analyze repository health and best practices compliance',
+        confidence: 0.8,
+        domains: ['git', 'health', 'analysis'],
+        workflowPatterns: ['hierarchical'],
+        requiredTools: ['Bash'],
+        estimatedDuration: 3000,
+      },
+    ];
+  }
+
+  /**
+   * Check if this agent can handle the given task
+   */
+  async canHandle(task: SubAgentTask): Promise<Result<boolean, QiError>> {
+    try {
+      // Check if task type matches our capabilities
+      const isGitTask = this.capabilities.some(cap => cap.type === task.type);
+      if (!isGitTask) {
+        return success(false);
+      }
+
+      // Validate required tools are available
+      const capability = this.capabilities.find(cap => cap.type === task.type);
+      if (!capability) {
+        return success(false);
+      }
+
+      const toolCheckResult = await this.validateToolAccess(capability.requiredTools);
+      return match(
+        () => success(true),
+        () => success(false),
+        toolCheckResult
+      );
+    } catch (error) {
+      return failure(
+        this.createError('GIT_CAN_HANDLE_ERROR', 'Error checking task compatibility', {
+          taskId: task.id,
+          taskType: task.type,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Execute Git operations task
+   */
+  async *execute(task: SubAgentTask): AsyncGenerator<SubAgentProgress, SubAgentResult> {
+    const startTime = Date.now();
+    this.emit('taskStarted', { taskId: task.id, agentId: this.id });
+
+    try {
+      // Initialize execution context
+      yield {
+        taskId: task.id,
+        agentId: this.id,
+        status: 'running',
+        progress: 0.1,
+        message: `Starting ${task.type} operation`,
+        timestamp: new Date(),
+        details: { phase: 'initialization', operation: task.type },
+      };
+
+      // Route to specific Git operation handler
+      const result = await this.routeGitOperation(task);
+      
+      const executionTime = Date.now() - startTime;
+      
+      return match(
+        (data) => {
+          this.emit('taskCompleted', { taskId: task.id, agentId: this.id, executionTime });
+          return {
+            taskId: task.id,
+            agentId: this.id,
+            status: 'completed' as const,
+            result: { success: true, data },
+            executionTime,
+            timestamp: new Date(),
+          };
+        },
+        (error) => {
+          this.emit('taskFailed', { taskId: task.id, agentId: this.id, error, executionTime });
+          return {
+            taskId: task.id,
+            agentId: this.id,
+            status: 'failed' as const,
+            result: { success: false, error },
+            executionTime,
+            timestamp: new Date(),
+          };
+        },
+        result
+      );
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const qiError = this.createError(
+        'GIT_EXECUTION_ERROR',
+        'Git operation execution failed',
+        {
+          taskId: task.id,
+          taskType: task.type,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+
+      this.emit('taskFailed', { taskId: task.id, agentId: this.id, error: qiError, executionTime });
+      return {
+        taskId: task.id,
+        agentId: this.id,
+        status: 'failed',
+        result: { success: false, error: qiError },
+        executionTime,
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * Route to appropriate Git operation handler
+   */
+  private async routeGitOperation(task: SubAgentTask): Promise<Result<unknown, QiError>> {
+    const context = task.context as GitTaskContext;
+
+    switch (task.type) {
+      case 'git_status':
+        return this.handleGitStatus(task, context);
+      case 'git_commit':
+        return this.handleGitCommit(task, context);
+      case 'git_branch':
+        return this.handleGitBranch(task, context);
+      case 'git_merge':
+        return this.handleGitMerge(task, context);
+      case 'git_log':
+        return this.handleGitLog(task, context);
+      case 'git_diff':
+        return this.handleGitDiff(task, context);
+      case 'repository_health':
+        return this.handleRepositoryHealth(task, context);
+      default:
+        return failure(
+          this.createError('GIT_UNSUPPORTED_OPERATION', 'Unsupported Git operation', {
+            taskType: task.type,
+            supportedTypes: this.capabilities.map(cap => cap.type),
+          })
+        );
+    }
+  }
+
+  /**
+   * Handle Git status operations
+   */
+  private async handleGitStatus(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      // Change to repository directory if specified
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+
+      // Execute git status command
+      const statusResult = await bashTool.execute({
+        command: `${cdCommand}git status --porcelain`,
+        description: 'Get Git repository status',
+      });
+
+      // Get additional status information
+      const branchResult = await bashTool.execute({
+        command: `${cdCommand}git branch --show-current`,
+        description: 'Get current branch name',
+      });
+
+      const remoteResult = await bashTool.execute({
+        command: `${cdCommand}git remote -v`,
+        description: 'Get remote repositories',
+      });
+
+      return success({
+        operation: 'git_status',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        currentBranch: branchResult,
+        status: statusResult,
+        remotes: remoteResult,
+        hasChanges: statusResult && statusResult.toString().trim().length > 0,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_STATUS_FAILED', 'Git status operation failed', {
+          taskId: task.id,
+          repositoryPath: context.repositoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle Git commit operations
+   */
+  private async handleGitCommit(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      if (!context.commitMessage) {
+        return failure(
+          this.createError('GIT_MISSING_COMMIT_MESSAGE', 'Commit message required', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+
+      // Add files if specified, otherwise add all changes
+      let addCommand = 'git add .';
+      if (context.filePaths && context.filePaths.length > 0) {
+        const files = context.filePaths.map(path => `"${path}"`).join(' ');
+        addCommand = `git add ${files}`;
+      }
+
+      // Execute git add
+      const addResult = await bashTool.execute({
+        command: `${cdCommand}${addCommand}`,
+        description: 'Stage files for commit',
+      });
+
+      // Execute git commit with message
+      const commitResult = await bashTool.execute({
+        command: `${cdCommand}git commit -m "${context.commitMessage}"`,
+        description: 'Create Git commit',
+      });
+
+      // Get commit hash
+      const hashResult = await bashTool.execute({
+        command: `${cdCommand}git rev-parse HEAD`,
+        description: 'Get commit hash',
+      });
+
+      return success({
+        operation: 'git_commit',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        commitMessage: context.commitMessage,
+        stagedFiles: context.filePaths,
+        addResult,
+        commitResult,
+        commitHash: hashResult,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_COMMIT_FAILED', 'Git commit operation failed', {
+          taskId: task.id,
+          commitMessage: context.commitMessage,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle Git branch operations
+   */
+  private async handleGitBranch(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+      const operation = task.context.operation || 'list'; // list, create, switch, delete
+
+      let result;
+      let operationDetails;
+
+      switch (operation) {
+        case 'create':
+          if (!context.branchName) {
+            return failure(
+              this.createError('GIT_MISSING_BRANCH_NAME', 'Branch name required for create operation', {
+                taskId: task.id,
+              })
+            );
+          }
+          result = await bashTool.execute({
+            command: `${cdCommand}git checkout -b "${context.branchName}"`,
+            description: `Create and switch to branch ${context.branchName}`,
+          });
+          operationDetails = { operation: 'create', branchName: context.branchName };
+          break;
+
+        case 'switch':
+          if (!context.branchName) {
+            return failure(
+              this.createError('GIT_MISSING_BRANCH_NAME', 'Branch name required for switch operation', {
+                taskId: task.id,
+              })
+            );
+          }
+          result = await bashTool.execute({
+            command: `${cdCommand}git checkout "${context.branchName}"`,
+            description: `Switch to branch ${context.branchName}`,
+          });
+          operationDetails = { operation: 'switch', branchName: context.branchName };
+          break;
+
+        case 'delete':
+          if (!context.branchName) {
+            return failure(
+              this.createError('GIT_MISSING_BRANCH_NAME', 'Branch name required for delete operation', {
+                taskId: task.id,
+              })
+            );
+          }
+          result = await bashTool.execute({
+            command: `${cdCommand}git branch -d "${context.branchName}"`,
+            description: `Delete branch ${context.branchName}`,
+          });
+          operationDetails = { operation: 'delete', branchName: context.branchName };
+          break;
+
+        default: // list
+          result = await bashTool.execute({
+            command: `${cdCommand}git branch -a`,
+            description: 'List all branches',
+          });
+          operationDetails = { operation: 'list' };
+          break;
+      }
+
+      return success({
+        operation: 'git_branch',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        ...operationDetails,
+        result,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_BRANCH_FAILED', 'Git branch operation failed', {
+          taskId: task.id,
+          branchName: context.branchName,
+          operation: task.context.operation,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle Git merge operations
+   */
+  private async handleGitMerge(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      if (!context.branchName) {
+        return failure(
+          this.createError('GIT_MISSING_BRANCH_NAME', 'Branch name required for merge operation', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+
+      // Check for conflicts first
+      const statusResult = await bashTool.execute({
+        command: `${cdCommand}git status --porcelain`,
+        description: 'Check repository status before merge',
+      });
+
+      if (statusResult && statusResult.toString().includes('UU')) {
+        return failure(
+          this.createError('GIT_MERGE_CONFLICTS_EXIST', 'Merge conflicts already exist', {
+            taskId: task.id,
+            branchName: context.branchName,
+          })
+        );
+      }
+
+      // Execute merge
+      const mergeResult = await bashTool.execute({
+        command: `${cdCommand}git merge "${context.branchName}"`,
+        description: `Merge branch ${context.branchName}`,
+      });
+
+      // Check merge status
+      const postMergeStatus = await bashTool.execute({
+        command: `${cdCommand}git status --porcelain`,
+        description: 'Check status after merge',
+      });
+
+      const hasConflicts = postMergeStatus && postMergeStatus.toString().includes('UU');
+
+      return success({
+        operation: 'git_merge',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        branchName: context.branchName,
+        mergeResult,
+        hasConflicts,
+        postMergeStatus,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_MERGE_FAILED', 'Git merge operation failed', {
+          taskId: task.id,
+          branchName: context.branchName,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle Git log operations
+   */
+  private async handleGitLog(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+      
+      // Build git log command with options
+      let logCommand = 'git log --oneline';
+      
+      if (context.maxCommits) {
+        logCommand += ` -${context.maxCommits}`;
+      }
+      
+      if (context.sinceDate) {
+        logCommand += ` --since="${context.sinceDate}"`;
+      }
+      
+      if (context.untilDate) {
+        logCommand += ` --until="${context.untilDate}"`;
+      }
+      
+      if (context.author) {
+        logCommand += ` --author="${context.author}"`;
+      }
+      
+      if (context.includeStats) {
+        logCommand += ' --stat';
+      }
+
+      const logResult = await bashTool.execute({
+        command: `${cdCommand}${logCommand}`,
+        description: 'Get Git commit history',
+      });
+
+      return success({
+        operation: 'git_log',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        logResult,
+        filters: {
+          maxCommits: context.maxCommits,
+          sinceDate: context.sinceDate,
+          untilDate: context.untilDate,
+          author: context.author,
+          includeStats: context.includeStats,
+        },
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_LOG_FAILED', 'Git log operation failed', {
+          taskId: task.id,
+          filters: context,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle Git diff operations
+   */
+  private async handleGitDiff(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+      
+      // Build diff command based on context
+      let diffCommand = 'git diff';
+      
+      if (context.commitHash) {
+        diffCommand += ` ${context.commitHash}`;
+      }
+      
+      if (context.branchName) {
+        diffCommand += ` ${context.branchName}`;
+      }
+      
+      if (context.filePaths && context.filePaths.length > 0) {
+        const files = context.filePaths.map(path => `"${path}"`).join(' ');
+        diffCommand += ` -- ${files}`;
+      }
+
+      const diffResult = await bashTool.execute({
+        command: `${cdCommand}${diffCommand}`,
+        description: 'Get Git differences',
+      });
+
+      // Get diff statistics
+      const statResult = await bashTool.execute({
+        command: `${cdCommand}${diffCommand} --stat`,
+        description: 'Get diff statistics',
+      });
+
+      return success({
+        operation: 'git_diff',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        diffResult,
+        statistics: statResult,
+        compared: {
+          commitHash: context.commitHash,
+          branchName: context.branchName,
+          filePaths: context.filePaths,
+        },
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_DIFF_FAILED', 'Git diff operation failed', {
+          taskId: task.id,
+          context: context,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Handle repository health analysis
+   */
+  private async handleRepositoryHealth(
+    task: SubAgentTask,
+    context: GitTaskContext
+  ): Promise<Result<unknown, QiError>> {
+    try {
+      const bashTool = this.toolProvider.getTool('Bash');
+      if (!bashTool) {
+        return failure(
+          this.createError('GIT_TOOL_NOT_AVAILABLE', 'Bash tool not available', {
+            taskId: task.id,
+          })
+        );
+      }
+
+      const cdCommand = context.repositoryPath ? `cd "${context.repositoryPath}" && ` : '';
+
+      // Gather various repository health metrics
+      const healthChecks = {
+        branchCount: await bashTool.execute({
+          command: `${cdCommand}git branch -a | wc -l`,
+          description: 'Count branches',
+        }),
+        commitCount: await bashTool.execute({
+          command: `${cdCommand}git rev-list --all --count`,
+          description: 'Count total commits',
+        }),
+        contributors: await bashTool.execute({
+          command: `${cdCommand}git shortlog -sn | wc -l`,
+          description: 'Count contributors',
+        }),
+        recentActivity: await bashTool.execute({
+          command: `${cdCommand}git log --since="30 days ago" --oneline | wc -l`,
+          description: 'Count recent commits',
+        }),
+        largestFiles: await bashTool.execute({
+          command: `${cdCommand}git ls-tree -r -t -l --full-name HEAD | sort -rn -k 4 | head -10`,
+          description: 'Find largest files',
+        }),
+      };
+
+      // Calculate health score
+      const healthScore = this.calculateRepositoryHealthScore(healthChecks);
+
+      return success({
+        operation: 'repository_health',
+        repositoryPath: context.repositoryPath || process.cwd(),
+        healthChecks,
+        healthScore,
+        recommendations: this.generateHealthRecommendations(healthChecks),
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_HEALTH_ANALYSIS_FAILED', 'Repository health analysis failed', {
+          taskId: task.id,
+          repositoryPath: context.repositoryPath,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  /**
+   * Calculate repository health score
+   */
+  private calculateRepositoryHealthScore(healthChecks: Record<string, unknown>): number {
+    // Placeholder implementation for health score calculation
+    let score = 0.7; // Base score
+    
+    // Adjust based on various factors
+    const recentActivity = Number(healthChecks.recentActivity) || 0;
+    if (recentActivity > 10) score += 0.1;
+    if (recentActivity > 50) score += 0.1;
+    
+    const contributors = Number(healthChecks.contributors) || 0;
+    if (contributors > 1) score += 0.05;
+    if (contributors > 5) score += 0.05;
+    
+    return Math.min(score, 1.0);
+  }
+
+  /**
+   * Generate health recommendations
+   */
+  private generateHealthRecommendations(healthChecks: Record<string, unknown>): string[] {
+    const recommendations: string[] = [];
+    
+    const recentActivity = Number(healthChecks.recentActivity) || 0;
+    if (recentActivity === 0) {
+      recommendations.push('Repository appears inactive - consider regular commits');
+    }
+    
+    const branchCount = Number(healthChecks.branchCount) || 0;
+    if (branchCount > 20) {
+      recommendations.push('Consider cleaning up old branches');
+    }
+    
+    return recommendations;
+  }
+
+  /**
+   * Get specialized insights for Git operations
+   */
+  async getSpecializedInsights(): Promise<Result<Record<string, unknown>, QiError>> {
+    try {
+      const gitStats = await this.gatherGitStats();
+      
+      return success({
+        gitPerformance: gitStats,
+        commonOperations: this.getCommonOperations(),
+        repositoryInsights: this.getRepositoryInsights(),
+        bestPractices: this.getBestPractices(),
+      });
+    } catch (error) {
+      return failure(
+        this.createError('GIT_INSIGHTS_ERROR', 'Failed to gather specialized insights', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
+  }
+
+  // Helper methods for insights
+  private async gatherGitStats(): Promise<Record<string, unknown>> {
+    return {
+      recentOperations: this.metrics.completedTasks,
+      averageOperationTime: this.metrics.averageExecutionTime,
+      gitOperationSuccessRate: this.metrics.successRate,
+      mostUsedCommands: ['status', 'commit', 'push', 'pull'],
+    };
+  }
+
+  private getCommonOperations(): string[] {
+    return ['git status', 'git add', 'git commit', 'git push', 'git pull', 'git branch'];
+  }
+
+  private getRepositoryInsights(): Record<string, unknown> {
+    return {
+      averageCommitsPerDay: 2.5,
+      mostActiveHours: ['10:00-12:00', '14:00-16:00'],
+      commonCommitPatterns: ['feat:', 'fix:', 'docs:', 'refactor:'],
+    };
+  }
+
+  private getBestPractices(): string[] {
+    return [
+      'Use meaningful commit messages',
+      'Keep commits atomic and focused',
+      'Create feature branches for development',
+      'Review changes before committing',
+      'Regularly sync with remote repositories',
+    ];
+  }
+}
