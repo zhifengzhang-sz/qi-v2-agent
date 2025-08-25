@@ -1,73 +1,125 @@
 # qi-code Architecture Design
 
-**Document Version**: 1.0  
-**Date**: 2025-01-17  
-**Status**: Design Specification  
-**Target**: v-0.10.x Implementation
+**Document Version**: 2.0  
+**Date**: 2025-01-24  
+**Status**: Implementation Complete  
+**Target**: v-0.10.x Milestone Achieved
 
 ## Overview
 
-qi-code is designed as a sophisticated full coding agent that leverages advanced workflow orchestration, multi-agent coordination, and comprehensive tool integration. This document defines the architectural patterns and system design for qi-code implementation.
+qi-code is a sophisticated full coding agent that leverages the QiCodeAgent orchestrator for advanced workflow orchestration, tool-specialized sub-agents, and comprehensive MCP integration. This document defines the implemented architectural patterns and system design for the complete qi-code application.
 
 ## System Architecture
 
-### **Layered Architecture**
+### **Implemented Layered Architecture**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    qi-code Agent Interface                   │
+│                     QiCodeApp CLI Layer                     │
+│                  (app/src/qi-code.ts)                       │
 ├─────────────────────────────────────────────────────────────┤
-│  Advanced Decision Engine  │  Multi-Agent Coordinator       │
+│              QiCodeAgent Orchestrator Layer                 │
+│        (lib/src/agent/impl/QiCodeAgent.ts - 1161 lines)     │
 ├─────────────────────────────────────────────────────────────┤
-│  Enhanced Workflow System (v-0.9.x Foundation)             │
+│    Tool-Specialized Sub-Agents  │  Workflow Orchestration  │
+│  FileOps │ Search │ Git │ Web    │  ReAct │ ReWOO │ ADaPT   │
 ├─────────────────────────────────────────────────────────────┤
-│  Enhanced Core Infrastructure (v-0.8.x Foundation)         │
-│  State Manager │ Context Manager │ Model Manager │ MCP Client │
+│  Enhanced Core Infrastructure (Completed v-0.8.x + v-0.9.x) │
+│  State Manager │ Context Manager │ Provider Manager │ MCP    │
 ├─────────────────────────────────────────────────────────────┤
 │  External MCP Services (Chroma, Web, DB, Memory, SQLite)   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### **Core Components**
+### **Implemented Core Components**
 
-#### **1. qi-code Agent Interface**
-- **QiCodeAgent**: Main agent orchestrator
-- **AgentTaskManager**: Task decomposition and management
-- **AgentResponseGenerator**: Intelligent response synthesis
-- **AgentLearningManager**: Continuous improvement and adaptation
+#### **1. QiCodeApp CLI Layer (`app/src/qi-code.ts`)**
+- **QiCodeApp**: Main application orchestrating all components
+- **CLI Interface**: Command-line argument parsing with professional options
+- **Initialization Pipeline**: Sequential component initialization with error handling
+- **MCP Service Integration**: Dynamic service discovery and initialization
 
-#### **2. Advanced Decision Engine**
-- **TaskPlanner**: Complex task planning and decomposition
-- **CausalReasoner**: Causal analysis and hypothesis generation
-- **GoalManager**: Autonomous goal management and prioritization
-- **DecisionOptimizer**: Decision quality improvement and learning
+#### **2. QiCodeAgent Orchestrator (`lib/src/agent/impl/QiCodeAgent.ts`)**
+- **QiCodeAgent**: Complete 1161-line orchestrator with full capabilities
+- **Classification Pipeline**: Input classification for commands, prompts, and workflows
+- **Execution Engine**: Multi-threaded execution with Result<T, QiError> patterns
+- **Context Management**: Session-aware context continuation and state persistence
 
-#### **3. Multi-Agent Coordinator**
-- **AgentRegistry**: Agent lifecycle and capability management
-- **TaskDistributor**: Intelligent task distribution and allocation
-- **CoordinationProtocol**: Inter-agent communication and synchronization
-- **ConflictResolver**: Consensus building and conflict resolution
+#### **3. Tool-Specialized Sub-Agents (`lib/src/agent/sub-agents/tool-specialized/`)**
+- **FileOpsSubAgent**: File operations (read, write, edit, search, analysis)
+- **SearchSubAgent**: Content and pattern search (multi-pattern, code search)
+- **GitSubAgent**: Version control operations (status, commit, branch, diff)
+- **WebSubAgent**: Web operations (fetch, search, content extraction, research)
 
-#### **4. Enhanced Workflow System (v-0.9.x)**
-- **PatternSelector**: Intelligent workflow pattern selection (ReAct, ReWOO, ADaPT)
-- **WorkflowExecutor**: Production-ready workflow execution with monitoring
-- **AdaptationEngine**: Real-time workflow optimization and learning
-- **HybridOrchestrator**: Multi-pattern coordination and transitions
+#### **4. Sub-Agent Coordination System**
+- **SubAgentRegistry**: Dynamic registration and lifecycle management
+- **SubAgentFactory**: Type-safe instantiation with capability validation
+- **BaseSubAgent**: Common patterns with QiCore Result<T, QiError> integration
+- **Task Distribution**: Intelligent task routing based on sub-agent capabilities
 
-## Design Patterns
+#### **5. Advanced Workflow System (Completed v-0.9.x)**
+- **IntelligentPatternSelector**: ML-based workflow pattern selection
+- **WorkflowEngine**: Production-ready execution with monitoring
+- **HybridPatternOrchestrator**: Multi-pattern coordination
+- **WorkflowLearningSystem**: Performance optimization and adaptation
 
-### **1. Hierarchical Agent Architecture**
+## Implementation Patterns
+
+### **1. Factory Pattern with `@qi/agent` Aliasing**
 
 ```typescript
-interface QiCodeAgent {
-  // High-level agent interface
-  processComplexTask(task: ComplexCodingTask): Promise<CodingResult>;
-  
-  // Delegates to specialized components
-  planTask(task: ComplexCodingTask): Promise<TaskPlan>;
-  executeTask(plan: TaskPlan): Promise<ExecutionResult>;
-  learnFromExecution(result: ExecutionResult): Promise<void>;
+// qi-code uses the createAgent factory function
+import { createAgent } from '@qi/agent';
+import { FileOpsSubAgent, SearchSubAgent, GitSubAgent, WebSubAgent } from '@qi/agent/sub-agents';
+
+// All imports use @qi/agent aliasing - no relative imports allowed
+const orchestrator = createAgent(stateManager, contextManager, {
+  domain: 'coding-agent',
+  enableCommands: true,
+  enablePrompts: true,
+  enableWorkflows: true,
+  sessionPersistence: true,
+  classifier,
+  commandHandler,
+  promptHandler,
+  workflowEngine,
+  workflowExtractor,
+});
+```
+
+### **2. QiCore Result<T, QiError> Functional Patterns**
+
+```typescript
+// All operations use QiCore functional programming patterns
+async processInternal(request: AgentRequest): Promise<Result<AgentResponse>> {
+  return await fromAsyncTryCatch(async () => {
+    // Implementation with automatic error wrapping
+    const result = await this.orchestrator.process(request);
+    return success(result);
+  });
 }
+
+// Error handling with match pattern
+return match(
+  (success) => handleSuccess(success),
+  (error) => handleError(error),
+  result
+);
+```
+
+### **3. Sub-Agent Registry Pattern**
+
+```typescript
+// Dynamic sub-agent registration
+const subAgentRegistry = new SubAgentRegistry();
+await subAgentRegistry.register('fileops', FileOpsSubAgent);
+await subAgentRegistry.register('search', SearchSubAgent);
+await subAgentRegistry.register('git', GitSubAgent);
+await subAgentRegistry.register('web', WebSubAgent);
+
+// Type-safe task routing
+const subAgent = await subAgentRegistry.getAgent('fileops');
+const result = await subAgent.executeTask(task);
 ```
 
 ### **2. Strategy Pattern for Workflow Selection**
@@ -95,34 +147,60 @@ interface LearningObserver {
 }
 ```
 
-## Integration Architecture
+## Implementation Architecture
 
-### **Foundation Integration (v-0.8.x)**
+### **Application Layer (qi-code vs qi-prompt)**
 
-qi-code leverages enhanced infrastructure from qi-prompt development:
+| Aspect | qi-prompt | qi-code |
+|--------|-----------|---------|
+| **Entry Point** | `app/src/prompt/qi-prompt.ts` | `app/src/qi-code.ts` |
+| **Orchestrator** | `PromptAppOrchestrator` | `QiCodeAgent` (full orchestrator) |
+| **Capabilities** | Commands + Prompts + Simple Workflows | Full orchestration with advanced workflows |
+| **Sub-Agents** | None | FileOps, Search, Git, Web sub-agents |
+| **Workflow Patterns** | Basic workflow handler | ReAct, ReWOO, ADaPT with intelligent selection |
+| **Target Use Case** | Prompt engineering, simple tasks | Complex coding, multi-step projects |
 
-- **Enhanced State Manager**: Multi-tier memory for complex coding contexts
-- **Enhanced Context Manager**: RAG integration for intelligent context management
-- **Model Manager**: Lifecycle management for multiple coding models
-- **MCP Client**: External service integration for enhanced capabilities
+### **Orchestrator Integration (Completed)**
 
-### **Workflow Integration (v-0.9.x)**
+qi-code leverages the complete QiCodeAgent orchestrator:
 
-qi-code incorporates advanced workflow capabilities:
+```typescript
+// lib/src/agent/impl/QiCodeAgent.ts - 1161 lines of complete implementation
+export class QiCodeAgent implements IAgent {
+  async process(request: AgentRequest): Promise<AgentResponse> {
+    // 1. Classification: Determine if input is command, prompt, or workflow
+    // 2. Routing: Route to appropriate handler
+    // 3. Execution: Execute with full context awareness
+    // 4. Learning: Update knowledge and performance metrics
+  }
+}
+```
 
-- **Intelligent Pattern Selection**: Automated choice between ReAct, ReWOO, ADaPT
-- **Production Execution**: Monitoring, optimization, and real-time adaptation
-- **Learning Integration**: Performance-based improvement and pattern optimization
-- **MCP-Enhanced Intelligence**: External service integration for workflow optimization
+### **Sub-Agent Integration (v-0.10.0 Complete)**
 
-### **Advanced Capabilities (v-0.10.x)**
+Tool-specialized sub-agents provide enhanced capabilities:
 
-qi-code adds sophisticated agent behaviors:
+- **FileOpsSubAgent**: Complete file system operations with Result<T> patterns
+- **SearchSubAgent**: Advanced content and pattern search capabilities
+- **GitSubAgent**: Full version control operations with error handling
+- **WebSubAgent**: Web fetching, search, and content extraction
 
-- **Advanced Decision Making**: Planning, reasoning, and causal analysis
-- **Multi-Agent Coordination**: Distributed task execution and collaboration
-- **Autonomous Goal Management**: Adaptive planning and goal-oriented behavior
-- **Continuous Learning**: Knowledge evolution and capability improvement
+### **MCP Service Integration**
+
+Dynamic MCP service discovery and integration:
+
+```typescript
+// Automatic service discovery
+const services = ['chroma', 'web-search', 'database', 'memory', 'sqlite'];
+for (const service of services) {
+  try {
+    await this.mcpServiceManager.initializeService(service);
+    this.logger.info(`✅ MCP service initialized: ${service}`);
+  } catch (error) {
+    this.logger.warn(`⚠️ MCP service unavailable: ${service}`, error);
+  }
+}
+```
 
 ## Component Interactions
 

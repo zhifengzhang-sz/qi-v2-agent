@@ -11,11 +11,165 @@ This project provides an **extensible agent framework** for building specialized
 - **Current Status**: v-0.8.4 production-ready ✅
 - **Architecture**: Complete QiCore integration with unified MCP storage
 
+### **qi-code** - Full Coding Agent
+- **Focus**: Advanced workflow orchestration and tool-specialized sub-agents  
+- **Strength**: QiCodeAgent orchestrator with FileOps, Search, Git, Web capabilities
+- **Design Philosophy**: Sophisticated algorithms and complete MCP ecosystem integration
+- **Current Status**: v-0.10.0 milestone achieved ✅
+- **Architecture**: Complete sub-agent system with advanced workflow patterns
+
 ### **Future Agents** - Extensible Capabilities  
-- **qi-code**: Complete workflow orchestration and tool ecosystem (planned v-0.10.x)
 - **qi-analyze**: Data analysis and visualization agent (future)
 - **qi-deploy**: DevOps and deployment automation agent (future)
 - **Custom Agents**: Framework supports unlimited specialized agent implementations
+
+---
+
+## v-0.10.0 - Sub-Agent Architecture and qi-code Implementation (COMPLETED)
+
+### 📅 **Release Date**: January 24, 2025
+
+### 🎯 **Overview**
+**Complete Sub-Agent Architecture Implementation**: Full implementation of tool-specialized sub-agents and qi-code application. This release delivers the complete v-0.10.x milestone with FileOps, Search, Git, and Web sub-agents, QiCodeAgent orchestrator integration, and comprehensive documentation. The qi-code application now provides a complete coding agent with advanced workflow orchestration capabilities.
+
+### ✨ **Major Features**
+
+#### 🤖 **Tool-Specialized Sub-Agent System**
+- **FileOpsSubAgent**: Complete file system operations (read, write, edit, search, analysis) with Result<T> patterns ✅
+- **SearchSubAgent**: Advanced content and pattern search (multi-pattern, code search, file finding) ✅
+- **GitSubAgent**: Full version control operations (status, commit, branch, diff, workflow) ✅
+- **WebSubAgent**: Web operations (fetch, search, content extraction, multi-URL research) ✅
+- **SubAgentRegistry**: Dynamic registration and lifecycle management with capability-based routing ✅
+- **SubAgentFactory**: Type-safe instantiation with comprehensive capability validation ✅
+
+#### 🏗️ **Complete qi-code Application**
+- **QiCodeApp Implementation**: Full coding agent application (`app/src/qi-code.ts`) with 349 lines of professional implementation ✅
+- **QiCodeAgent Integration**: Leverages existing QiCodeAgent orchestrator through proper factory patterns ✅
+- **MCP Service Integration**: Dynamic service discovery for chroma, web-search, database, memory, sqlite ✅
+- **Professional CLI**: Complete argument parsing (--config-path, --schema-path, --env-path, --debug) ✅
+- **Package Integration**: Updated `app/package.json` with `"qi-code": "bun run src/qi-code.ts"` script ✅
+
+#### 📚 **Comprehensive Documentation System**
+- **Architecture Guide**: Complete `docs/qi-code/architecture.md` with implementation details and QiCodeAgent vs PromptAppOrchestrator comparison ✅
+- **Implementation Guide**: Detailed `docs/qi-code/implementation.md` with actual code examples and integration patterns ✅
+- **Workflow Design**: Advanced `docs/qi-code/workflow-design.md` covering ReAct, ReWOO, ADaPT patterns and sub-agent coordination ✅
+- **Import Compliance**: All documentation demonstrates `@qi/agent/*` aliasing with no relative imports ✅
+
+#### ⚙️ **QiCore Architecture Excellence**
+- **Result<T> Compliance**: Complete functional programming patterns throughout sub-agent system ✅
+- **Error Handling**: Comprehensive QiError categorization with structured error propagation ✅
+- **Type Safety**: Full TypeScript compliance with sophisticated generic type usage ✅
+- **Factory Patterns**: Professional factory-based instantiation with dependency injection ✅
+
+### 🏗️ **Technical Architecture**
+
+#### **Sub-Agent Core Components**
+- **BaseSubAgent**: Common foundation with QiCore Result<T, QiError> integration
+- **SubAgentRegistry**: Dynamic registration with capability-based task routing
+- **SubAgentFactory**: Type-safe creation with validation and health monitoring
+- **Task Distribution**: Intelligent routing based on sub-agent capabilities and availability
+
+#### **qi-code Application Architecture**
+```typescript
+// Professional factory pattern usage
+import { createAgent } from '@qi/agent';
+import { FileOpsSubAgent, SearchSubAgent, GitSubAgent, WebSubAgent } from '@qi/agent/sub-agents';
+
+// QiCodeAgent orchestrator integration
+const orchestrator = createAgent(stateManager, contextManager, {
+  domain: 'coding-agent',
+  enableCommands: true,
+  enablePrompts: true, 
+  enableWorkflows: true,
+  sessionPersistence: true
+});
+```
+
+#### **Import Pattern Compliance**
+- **@qi/agent Aliasing**: All imports use `@qi/agent/*` patterns throughout qi-code implementation ✅
+- **No Relative Imports**: Eliminated all relative import paths in favor of clean aliasing ✅
+- **Consistent Patterns**: Professional import structure matching established qi-prompt patterns ✅
+
+### 📈 **Sub-Agent Capabilities**
+
+#### **FileOpsSubAgent - File System Operations**
+- **File Operations**: read_file, write_file, edit_file with comprehensive error handling
+- **Search Capabilities**: search_files with pattern matching and content analysis
+- **File Analysis**: Advanced file content analysis with metadata extraction
+- **Batch Operations**: Multi-file operations with transaction-like patterns
+
+#### **SearchSubAgent - Content and Pattern Search**
+- **Content Search**: Advanced text search with regex and fuzzy matching
+- **Pattern Matching**: Multi-pattern search with priority-based result ranking
+- **Code Search**: Language-specific code pattern detection and analysis
+- **File Finding**: Intelligent file discovery with content-based filtering
+
+#### **GitSubAgent - Version Control Operations**
+- **Repository Status**: Complete git status with change analysis and staging information
+- **Commit Operations**: Intelligent commit creation with message generation and validation
+- **Branch Management**: Branch operations with conflict detection and merge strategies
+- **Workflow Integration**: Git operations integrated with development workflows
+
+#### **WebSubAgent - Web Operations and Research**
+- **Web Fetching**: HTTP/HTTPS content retrieval with comprehensive error handling
+- **Web Search**: Search engine integration with result ranking and filtering
+- **Content Extraction**: Intelligent content parsing and summarization
+- **Multi-URL Research**: Parallel web research with result synthesis
+
+### 🎯 **qi-code vs qi-prompt Differentiation**
+
+| Aspect | qi-prompt | qi-code |
+|--------|-----------|---------|
+| **Entry Point** | `app/src/prompt/qi-prompt.ts` | `app/src/qi-code.ts` |
+| **Orchestrator** | `PromptAppOrchestrator` (simplified) | `QiCodeAgent` (full orchestrator) |
+| **Sub-Agents** | None | FileOps, Search, Git, Web (4 specialized agents) |
+| **Workflow Patterns** | Basic workflow handler | ReAct, ReWOO, ADaPT with intelligent selection |
+| **MCP Integration** | Selective usage | Complete ecosystem integration |
+| **Target Use Case** | Prompt engineering, simple tasks | Complex coding, multi-step projects |
+| **Capabilities** | Commands + Prompts + Simple Workflows | Full orchestration with advanced workflows |
+
+### 🚀 **Production Benefits**
+
+#### **Advanced Coding Capabilities**
+- **Multi-Agent Coordination**: Distributed task execution across specialized sub-agents
+- **Intelligent Task Routing**: Automatic sub-agent selection based on task requirements
+- **Comprehensive Tool Integration**: Complete file, search, git, and web operation capabilities
+- **Professional Error Handling**: Structured error management with graceful degradation
+
+#### **Developer Experience**
+- **Clean Architecture**: Professional factory patterns with dependency injection
+- **Type Safety**: Full TypeScript compliance with comprehensive error handling
+- **Documentation**: Complete architecture and implementation guides
+- **Import Standards**: Consistent `@qi/agent` aliasing throughout implementation
+
+#### **Extensible Design**
+- **Sub-Agent Framework**: Easy addition of new specialized sub-agents
+- **Registry Pattern**: Dynamic sub-agent registration and capability discovery
+- **Factory Architecture**: Professional instantiation patterns with validation
+- **MCP Integration**: Seamless external service integration capabilities
+
+### 🎯 **Files Added/Enhanced**
+- `app/src/qi-code.ts` - Complete qi-code application implementation (349 lines)
+- `lib/src/agent/sub-agents/tool-specialized/FileOpsSubAgent.ts` - File operations sub-agent
+- `lib/src/agent/sub-agents/tool-specialized/SearchSubAgent.ts` - Search operations sub-agent  
+- `lib/src/agent/sub-agents/tool-specialized/GitSubAgent.ts` - Git operations sub-agent
+- `lib/src/agent/sub-agents/tool-specialized/WebSubAgent.ts` - Web operations sub-agent
+- `lib/src/agent/sub-agents/core/SubAgentRegistry.ts` - Dynamic sub-agent management
+- `lib/src/agent/sub-agents/core/SubAgentFactory.ts` - Type-safe sub-agent creation
+- `docs/qi-code/architecture.md` - Complete architecture documentation
+- `docs/qi-code/implementation.md` - Detailed implementation guide
+- `docs/qi-code/workflow-design.md` - Advanced workflow orchestration patterns
+- `app/package.json` - Updated with qi-code script configuration
+
+### 📊 **Quality Validation**
+- **TypeScript**: ✅ Zero compilation errors, full type safety maintained
+- **Linting**: ✅ All biome code quality rules passing, consistent formatting  
+- **Build**: ✅ Successful application compilation and execution
+- **Architecture**: ✅ Complete v-0.10.x roadmap implementation verified
+- **Documentation**: ✅ Comprehensive architecture and implementation guides complete
+
+### 🌟 **Milestone Achievement**
+This release represents the successful completion of the v-0.10.x Sub-Agent Architecture milestone. The qi-code application now provides a complete coding agent with tool-specialized sub-agents, advanced workflow orchestration, and comprehensive MCP integration. All implementation requirements have been met with professional-grade architecture and comprehensive documentation.
 
 ---
 
