@@ -151,7 +151,11 @@ export class IntelligentPatternSelector {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Pattern selection failed', { error: errorMessage });
+      this.logger.error(
+        'Pattern selection failed',
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'IntelligentPatternSelector' }
+      );
 
       return failure(
         create(

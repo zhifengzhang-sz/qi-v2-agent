@@ -167,7 +167,11 @@ export class AdvancedWorkflowOrchestrator implements IAdvancedWorkflowOrchestrat
       return success(undefined);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Failed to initialize orchestrator', { error: errorMessage });
+      this.logger.error(
+        'Failed to initialize orchestrator',
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'AdvancedWorkflowOrchestrator' }
+      );
 
       return failure(
         create(

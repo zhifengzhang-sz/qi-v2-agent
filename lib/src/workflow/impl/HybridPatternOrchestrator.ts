@@ -189,7 +189,11 @@ export class HybridPatternOrchestrator {
       return success(executionResult.value);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Hybrid execution coordination failed', { error: errorMessage });
+      this.logger.error(
+        'Hybrid execution coordination failed',
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'HybridPatternOrchestrator' }
+      );
 
       return failure(
         create(

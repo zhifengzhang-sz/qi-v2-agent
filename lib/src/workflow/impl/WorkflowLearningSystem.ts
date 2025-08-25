@@ -212,7 +212,11 @@ export class WorkflowLearningSystem {
       return success(insights);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Workflow learning analysis failed', { error: errorMessage });
+      this.logger.error(
+        'Workflow learning analysis failed',
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'WorkflowLearningSystem' }
+      );
 
       return failure(
         create('LEARNING_ANALYSIS_FAILED', `Learning analysis failed: ${errorMessage}`, 'SYSTEM')
@@ -267,7 +271,11 @@ export class WorkflowLearningSystem {
       return success(undefined);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Failed to apply learnings', { error: errorMessage });
+      this.logger.error(
+        'Failed to apply learnings',
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'WorkflowLearningSystem' }
+      );
 
       return failure(
         create(

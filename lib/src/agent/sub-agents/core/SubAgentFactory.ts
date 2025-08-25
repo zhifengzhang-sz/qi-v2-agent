@@ -9,6 +9,11 @@ import type { Result } from '@qi/base';
 import { failure, match, success } from '@qi/base';
 import type { QiError } from '@qi/core';
 import { createQiLogger, type SimpleLogger } from '../../../utils/QiCoreLogger.js';
+// Import tool-specialized sub-agents
+import { FileOpsSubAgent } from '../tool-specialized/FileOpsSubAgent.js';
+import { GitSubAgent } from '../tool-specialized/GitSubAgent.js';
+import { SearchSubAgent } from '../tool-specialized/SearchSubAgent.js';
+import { WebSubAgent } from '../tool-specialized/WebSubAgent.js';
 import type { ISubAgent, ISubAgentFactory, SubAgentConfig } from './types.js';
 
 /**
@@ -335,17 +340,77 @@ export class SubAgentFactory implements ISubAgentFactory {
   }
 
   private registerBuiltInTypes(): void {
-    // Note: Built-in types will be registered when their implementations are available
-    // This is a placeholder for future built-in sub-agent types
+    // Register all tool-specialized sub-agents
+    const registrations = [
+      {
+        type: 'file-operations',
+        constructor: FileOpsSubAgent,
+        description:
+          'File operations sub-agent specializing in Read, Write, Edit, and Glob operations',
+        version: '1.0.0',
+        tools: ['Read', 'Write', 'Edit', 'Glob', 'Grep'],
+      },
+      {
+        type: 'search-operations',
+        constructor: SearchSubAgent,
+        description: 'Search operations sub-agent specializing in content and pattern search',
+        version: '1.0.0',
+        tools: ['Grep', 'Glob'],
+      },
+      {
+        type: 'web-operations',
+        constructor: WebSubAgent,
+        description: 'Web operations sub-agent specializing in web fetch and search operations',
+        version: '1.0.0',
+        tools: ['WebFetch', 'WebSearch'],
+      },
+      {
+        type: 'git-operations',
+        constructor: GitSubAgent,
+        description: 'Git operations sub-agent specializing in version control operations',
+        version: '1.0.0',
+        tools: ['Bash'],
+      },
+    ];
 
-    this.logger.debug('Built-in sub-agent types registration placeholder', {
-      note: 'Will be populated when concrete sub-agent implementations are available',
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const reg of registrations) {
+      const result = this.register(
+        reg.type,
+        reg.constructor as any,
+        reg.description,
+        reg.version,
+        reg.tools
+      );
+
+      match(
+        () => {
+          successCount++;
+          this.logger.debug('Built-in sub-agent type registered successfully', {
+            type: reg.type,
+            version: reg.version,
+            toolCount: reg.tools.length,
+          });
+        },
+        (error) => {
+          failureCount++;
+          this.logger.warn('Failed to register built-in sub-agent type', {
+            type: reg.type,
+            error: error.message,
+          });
+        },
+        result
+      );
+    }
+
+    this.logger.info('Built-in sub-agent types registration completed', {
+      totalTypes: registrations.length,
+      successful: successCount,
+      failed: failureCount,
+      availableTypes: this.getAvailableTypes(),
     });
-
-    // Example of how built-in types would be registered:
-    // this.register('file-operations', FileToolSubAgent, 'File operations sub-agent', '1.0.0', ['Read', 'Write', 'Edit']);
-    // this.register('search-operations', SearchToolSubAgent, 'Search operations sub-agent', '1.0.0', ['Grep', 'Glob']);
-    // etc.
   }
 
   /**

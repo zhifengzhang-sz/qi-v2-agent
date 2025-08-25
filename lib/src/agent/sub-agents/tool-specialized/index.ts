@@ -1,20 +1,50 @@
 /**
  * Tool-Specialized Sub-Agents
- * 
- * Note: These implementations are in development.
- * Currently only exporting interfaces for build compatibility.
+ *
+ * Complete implementations of tool-specialized sub-agents following the v-0.10.0 roadmap.
+ * All sub-agents use QiCore Result<T, QiError> patterns and extend BaseSubAgent.
  */
 
-// Export types for now
-export type FileOpsTaskType = 'file_read' | 'file_write' | 'file_edit' | 'file_search';
-export type SearchTaskType = 'content_search' | 'pattern_match' | 'code_search';
-export type WebTaskType = 'web_fetch' | 'web_search' | 'content_extraction';
-export type CodeAnalysisTaskType = 'code_review' | 'pattern_detection' | 'dependency_analysis';
-export type GitTaskType = 'git_status' | 'git_commit' | 'git_branch' | 'git_merge';
+// Export task type definitions for type safety
+export type FileOpsTaskType =
+  | 'read_file'
+  | 'write_file'
+  | 'edit_file'
+  | 'search_files'
+  | 'file_analysis';
 
-// TODO: Export actual implementations once TypeScript errors are resolved
-// export { FileOpsSubAgent } from './FileOpsSubAgent.js';
-// export { SearchSubAgent } from './SearchSubAgent.js';
-// export { WebSubAgent } from './WebSubAgent.js';
-// export { CodeAnalysisSubAgent } from './CodeAnalysisSubAgent.js';
-// export { GitSubAgent } from './GitSubAgent.js';
+export type SearchTaskType =
+  | 'content_search'
+  | 'pattern_match'
+  | 'code_search'
+  | 'file_find'
+  | 'multi_pattern_search';
+
+export type WebTaskType =
+  | 'web_fetch'
+  | 'web_search'
+  | 'content_extraction'
+  | 'multi_url_fetch'
+  | 'web_research';
+
+export type GitTaskType =
+  | 'git_status'
+  | 'git_commit'
+  | 'git_branch'
+  | 'git_log'
+  | 'git_diff'
+  | 'git_workflow';
+
+// Re-export commonly used types from core for convenience
+export type {
+  SubAgentCapability,
+  SubAgentConfig,
+  SubAgentProgress,
+  SubAgentResult,
+  SubAgentTask,
+} from '../core/types.js';
+// Export all implemented tool-specialized sub-agents
+export { FileOpsSubAgent } from './FileOpsSubAgent.js';
+export { GitSubAgent } from './GitSubAgent.js';
+export { SearchSubAgent } from './SearchSubAgent.js';
+export { WebSubAgent } from './WebSubAgent.js';
