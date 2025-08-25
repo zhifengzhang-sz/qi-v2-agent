@@ -12,5 +12,11 @@ export type {
   AgentResponse,
   AgentStatus,
   AgentStreamChunk,
+  ClassificationData,
+  CompletionData,
+  DelegationCriteria,
   IAgent,
+  IAgentOrchestrator,
+  ISubagentRegistry,
+  SubagentDefinition,
 } from './IAgent.js';

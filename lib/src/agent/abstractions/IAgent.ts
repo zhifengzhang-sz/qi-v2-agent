@@ -5,6 +5,8 @@
  * The agent orchestrates classification, command execution, prompt processing, and workflows.
  */
 
+import type { QiError, Result } from '@qi/base';
+
 /**
  * Agent input request
  */
@@ -52,9 +54,10 @@ export interface AgentConfig {
     readonly memoryProvider?: string;
   };
   readonly timeouts?: {
-    readonly commandTimeout?: number;
-    readonly promptTimeout?: number;
-    readonly workflowTimeout?: number;
+    readonly classification?: number; // Classification timeout (ms)
+    readonly commandExecution?: number; // Command timeout (ms)
+    readonly promptProcessing?: number; // Prompt timeout (ms)
+    readonly workflowExecution?: number; // Workflow timeout (ms)
   };
   readonly retries?: {
     readonly maxRetries?: number;
@@ -105,12 +108,61 @@ export interface IAgent {
 }
 
 /**
- * Agent streaming chunk
+ * Agent streaming chunk - aligned with docs specification
  */
 export interface AgentStreamChunk {
-  readonly type: 'classification' | 'processing' | 'result' | 'error';
+  readonly type: 'classification' | 'processing' | 'completion' | 'error';
   readonly content: string;
   readonly isComplete: boolean;
   readonly metadata?: ReadonlyMap<string, unknown>;
   readonly error?: string;
+}
+
+/**
+ * Agent streaming data types
+ */
+export interface ClassificationData {
+  readonly type: 'command' | 'prompt' | 'workflow';
+  readonly confidence: number;
+  readonly method: string;
+}
+
+export interface CompletionData {
+  readonly executionTime: number;
+  readonly performance: {
+    readonly classificationTime?: number;
+    readonly processingTime?: number;
+    readonly totalTime: number;
+  };
+  readonly metadata: ReadonlyMap<string, unknown>;
+}
+
+/**
+ * Subagent integration interfaces - foundation for future implementation
+ */
+export interface SubagentDefinition {
+  readonly name: string;
+  readonly description: string;
+  readonly tools?: string[];
+  readonly model?: string;
+  readonly maxTurns?: number;
+  readonly permissionMode?: 'strict' | 'permissive';
+  readonly systemPrompt: string;
+}
+
+export interface DelegationCriteria {
+  readonly taskType: string;
+  readonly requiredTools: string[];
+  readonly contextSize: number;
+  readonly priority: 'low' | 'medium' | 'high';
+}
+
+export interface ISubagentRegistry {
+  discover(query: string): Promise<Result<SubagentDefinition[], QiError>>;
+  invoke(name: string, prompt: string): Promise<Result<AgentResponse, QiError>>;
+  register(agent: SubagentDefinition): Result<void, QiError>;
+}
+
+export interface IAgentOrchestrator {
+  delegate(task: string, criteria: DelegationCriteria): Promise<Result<AgentResponse, QiError>>;
 }

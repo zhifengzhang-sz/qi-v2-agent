@@ -607,7 +607,7 @@ export class PromptAppOrchestrator implements IAgent {
       const response = await this.process(request);
 
       yield {
-        type: 'result',
+        type: 'completion',
         content: response.content,
         isComplete: true,
         metadata: response.metadata,

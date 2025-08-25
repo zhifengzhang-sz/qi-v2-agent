@@ -1,6 +1,6 @@
 {
   "name": "@qi/app",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Qi V2 Agent - CLI + Agent with Command, Prompt & Context Continuation",
   "type": "module",
   "scripts": {
@@ -16,7 +16,6 @@
     "demo:config-manager": "bun run src/demos/config-manager-demo.ts",
     "demo:prompt-manager": "bun run src/demos/prompt-manager-demo.ts",
     "demo:cli-ink": "bun run src/demos/cli-ink-demo.ts",
-    "demo:cli-neo-blessed": "bun run src/demos/cli-neo-blessed-demo.ts",
     "demo:cli-complete": "bun run src/demos/cli-complete-test.ts",
     "demo:advanced-classifier": "bun run src/demos/advanced-classifier-demo.ts",
     "demo:cli-advanced-integration": "bun run src/demos/cli-advanced-parser-integration.ts",
@@ -63,7 +62,6 @@
     "commander": "^14.0.0",
     "ink": "^6.1.0",
     "multi-llm-ts": "^4.2.2",
-    "neo-blessed": "^0.2.0",
     "react": "^19.0.0",
     "xstate": "^5.20.1",
     "yaml": "^2.8.0",

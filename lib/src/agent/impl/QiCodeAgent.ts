@@ -22,6 +22,7 @@ import type { IContextManager } from '../../context/index.js';
 import { createContextAwarePromptHandler } from '../../context/utils/ContextAwarePrompting.js';
 import type { IPromptHandler, PromptOptions } from '../../prompt/index.js';
 import type { IStateManager } from '../../state/index.js';
+import type { PermissionManager } from '../../tools/security/PermissionManager.js';
 import type { IWorkflowEngine, IWorkflowExtractor } from '../../workflow/index.js';
 import type {
   AgentConfig,
@@ -30,7 +31,10 @@ import type {
   AgentResponse,
   AgentStatus,
   AgentStreamChunk,
+  DelegationCriteria,
   IAgent,
+  IAgentOrchestrator,
+  ISubagentRegistry,
 } from '../abstractions/index.js';
 
 /**
@@ -56,6 +60,13 @@ export class QiCodeAgent implements IAgent {
   private workflowEngine?: IWorkflowEngine;
   private workflowExtractor?: IWorkflowExtractor;
 
+  // Subagent integration (optional)
+  private subagentRegistry?: ISubagentRegistry;
+  private agentOrchestrator?: IAgentOrchestrator;
+
+  // Permission system integration (optional)
+  private permissionManager?: PermissionManager;
+
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
 
@@ -67,6 +78,27 @@ export class QiCodeAgent implements IAgent {
     context: Record<string, unknown> = {}
   ): QiError {
     return create(code, message, category, context);
+  }
+
+  // Timeout utility for operations
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              this.createQiError(
+                'OPERATION_TIMEOUT',
+                `${operation} timed out after ${timeoutMs}ms`,
+                'SYSTEM',
+                { timeout: timeoutMs, operation }
+              )
+            ),
+          timeoutMs
+        )
+      ),
+    ]);
   }
 
   private config: AgentConfig;
@@ -86,6 +118,9 @@ export class QiCodeAgent implements IAgent {
       promptHandler?: IPromptHandler;
       workflowEngine?: IWorkflowEngine;
       workflowExtractor?: IWorkflowExtractor;
+      subagentRegistry?: ISubagentRegistry;
+      agentOrchestrator?: IAgentOrchestrator;
+      permissionManager?: PermissionManager;
     } = {}
   ) {
     this.stateManager = stateManager;
@@ -96,6 +131,9 @@ export class QiCodeAgent implements IAgent {
     this.promptHandler = dependencies.promptHandler;
     this.workflowEngine = dependencies.workflowEngine;
     this.workflowExtractor = dependencies.workflowExtractor;
+    this.subagentRegistry = dependencies.subagentRegistry;
+    this.agentOrchestrator = dependencies.agentOrchestrator;
+    this.permissionManager = dependencies.permissionManager;
   }
 
   async initialize(): Promise<void> {
@@ -122,12 +160,25 @@ export class QiCodeAgent implements IAgent {
     this.isInitialized = true;
   }
 
-  // Public interface - clean API that hides QiCore complexity
+  // Public interface - uses QiCore functional patterns throughout
   async process(request: AgentRequest): Promise<AgentResponse> {
     const result = await this.processInternal(request);
     return match(
       (agentResponse: AgentResponse) => agentResponse,
-      (error: QiError) => this.transformQiErrorToResponse(error),
+      (error: QiError) => ({
+        content: `Agent processing failed: ${error.message}`,
+        type: 'command' as const,
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([
+          ['error', error.message],
+          ['errorCode', error.code],
+          ['errorCategory', error.category],
+          ['errorType', 'agent-processing-error'],
+        ]),
+        success: false,
+        error: error.message,
+      }),
       result
     );
   }
@@ -184,7 +235,12 @@ export class QiCodeAgent implements IAgent {
     }
 
     const classificationResult = await fromAsyncTryCatch(async () => {
-      return await this.classifier!.classify(request.input);
+      const classificationTimeout = this.config.timeouts?.classification ?? 5000; // 5 second default
+      return await this.withTimeout(
+        this.classifier!.classify(request.input),
+        classificationTimeout,
+        'Classification'
+      );
     });
 
     return await match(
@@ -243,27 +299,6 @@ export class QiCodeAgent implements IAgent {
     );
   }
 
-  // Helper method to transform QiError to AgentResponse for public API
-  private transformQiErrorToResponse(qiError: QiError): AgentResponse {
-    const executionTime = 0; // Will be set properly in actual timing
-    this.totalResponseTime += executionTime;
-
-    return {
-      content: `Agent processing failed: ${qiError.message}`,
-      type: 'command' as const, // Default type for errors
-      confidence: 0,
-      executionTime,
-      metadata: new Map([
-        ['error', qiError.message],
-        ['errorCode', qiError.code],
-        ['errorCategory', qiError.category],
-        ['errorType', 'agent-processing-error'],
-      ]),
-      success: false,
-      error: qiError.message,
-    };
-  }
-
   async *stream(request: AgentRequest): AsyncIterableIterator<AgentStreamChunk> {
     if (!this.isInitialized) {
       yield {
@@ -278,11 +313,15 @@ export class QiCodeAgent implements IAgent {
       return;
     }
 
+    const startTime = Date.now();
+    let classificationTime = 0;
+    let processingStartTime = 0;
+
     try {
-      // Classification phase
+      // Phase 1: Classification
       yield {
         type: 'classification',
-        content: 'Classifying input...',
+        content: 'Analyzing input type...',
         isComplete: false,
       };
 
@@ -299,37 +338,92 @@ export class QiCodeAgent implements IAgent {
         return;
       }
 
-      const classification = await this.classifier.classify(request.input);
+      const classificationStart = Date.now();
+      const classificationTimeout = this.config.timeouts?.classification ?? 5000;
+      const classification = await this.withTimeout(
+        this.classifier.classify(request.input),
+        classificationTimeout,
+        'Classification'
+      );
+      classificationTime = Date.now() - classificationStart;
 
       yield {
         type: 'classification',
-        content: `Classified as: ${classification.type} (${(classification.confidence * 100).toFixed(1)}% confidence)`,
+        content: `Input classified as: ${classification.type}`,
         isComplete: true,
-        metadata: new Map([['classification', classification]]),
+        metadata: new Map([
+          ['classificationType', classification.type],
+          ['confidence', classification.confidence.toString()],
+          ['method', classification.method],
+          ['classificationTime', classificationTime.toString()],
+        ]),
       };
 
-      // Processing phase
+      // Phase 2: Processing
+      processingStartTime = Date.now();
       yield {
         type: 'processing',
-        content: `Processing ${classification.type}...`,
+        content: `Executing ${classification.type} handler...`,
         isComplete: false,
       };
 
-      // Route and execute
-      const response = await this.process(request);
+      // Execute processing (reuse existing internal logic)
+      const response = await this.processInternal(request);
+
+      const processingTime = Date.now() - processingStartTime;
+      const totalTime = Date.now() - startTime;
+
+      const finalResponse = match(
+        (agentResponse: AgentResponse) => agentResponse,
+        (error: QiError) => ({
+          content: `Processing failed: ${error.message}`,
+          type: 'command' as const,
+          confidence: 0,
+          executionTime: processingTime,
+          metadata: new Map([
+            ['error', error.message],
+            ['errorCode', error.code],
+            ['errorCategory', error.category],
+          ]),
+          success: false,
+          error: error.message,
+        }),
+        response
+      );
 
       yield {
-        type: 'result',
-        content: response.content,
+        type: 'processing',
+        content: finalResponse.content,
         isComplete: true,
-        metadata: response.metadata,
+        metadata: finalResponse.metadata,
+      };
+
+      // Phase 3: Completion
+      yield {
+        type: 'completion',
+        content: `Processing completed in ${totalTime}ms`,
+        isComplete: true,
+        metadata: new Map([
+          ['success', finalResponse.success.toString()],
+          ['executionTime', totalTime.toString()],
+          ['classificationTime', classificationTime.toString()],
+          ['processingTime', processingTime.toString()],
+          ['confidence', (classification.confidence * 100).toFixed(1)],
+          ['type', finalResponse.type],
+        ]),
       };
     } catch (error) {
+      const totalTime = Date.now() - startTime;
       yield {
         type: 'error',
         content: `Stream processing failed: ${error instanceof Error ? error.message : String(error)}`,
         isComplete: true,
         error: error instanceof Error ? error.message : String(error),
+        metadata: new Map([
+          ['errorType', 'streaming-error'],
+          ['totalTime', totalTime.toString()],
+          ['classificationTime', classificationTime.toString()],
+        ]),
       };
     }
   }
@@ -356,18 +450,34 @@ export class QiCodeAgent implements IAgent {
     this.isInitialized = false;
   }
 
-  // Private routing methods
+  // Private routing methods - using QiCore Result<T> patterns
 
   private async handleCommand(
     request: AgentRequest,
     classification: ClassificationResult
   ): Promise<AgentResponse> {
     if (!this.config.enableCommands) {
-      return this.createDisabledResponse('command', 'Command processing is disabled');
+      return {
+        content: 'Command processing is disabled',
+        type: 'command',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([['disabled', true]]),
+        success: false,
+        error: 'Command processing is disabled',
+      };
     }
 
     if (!this.commandHandler) {
-      return this.createErrorResponse('command', 'Command handler not available');
+      return {
+        content: 'Command handler not available',
+        type: 'command',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([['errorType', 'component-unavailable']]),
+        success: false,
+        error: 'Command handler not available',
+      };
     }
 
     const commandRequest: CommandRequest = {
@@ -377,7 +487,12 @@ export class QiCodeAgent implements IAgent {
       context: request.context.environmentContext,
     };
 
-    const result = await this.commandHandler.executeCommand(commandRequest);
+    const commandTimeout = this.config.timeouts?.commandExecution ?? 30000; // 30 second default
+    const result = await this.withTimeout(
+      this.commandHandler.executeCommand(commandRequest),
+      commandTimeout,
+      'Command execution'
+    );
 
     return {
       content: result.content,
@@ -399,113 +514,162 @@ export class QiCodeAgent implements IAgent {
     classification: ClassificationResult
   ): Promise<AgentResponse> {
     if (!this.config.enablePrompts) {
-      return this.createDisabledResponse('prompt', 'Prompt processing is disabled');
+      return {
+        content: 'Prompt processing is disabled',
+        type: 'prompt',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([['disabled', true]]),
+        success: false,
+        error: 'Prompt processing is disabled',
+      };
     }
 
     if (!this.promptHandler) {
-      return this.createErrorResponse('prompt', 'Prompt handler not available');
+      return {
+        content: 'Prompt handler not available',
+        type: 'prompt',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([['errorType', 'component-unavailable']]),
+        success: false,
+        error: 'Prompt handler not available',
+      };
     }
 
-    try {
-      // Extract prompt options from context if available
-      const promptOptions = this.extractPromptOptions(request.context);
+    const promptResult = await fromAsyncTryCatch(
+      async () => {
+        const promptTimeout = this.config.timeouts?.promptProcessing ?? 120000; // 2 minute default
 
-      let result: any;
+        return await this.withTimeout(
+          (async () => {
+            // Extract prompt options from context if available
+            const promptOptions = this.extractPromptOptions(request.context);
 
-      // Use context-aware prompting if available
-      if (this.contextAwarePromptHandler) {
-        // Get or create conversation context for this session
-        const sessionId = request.context.sessionId;
-        let contextId = this.sessionContextMap.get(sessionId);
+            let result: any;
 
-        if (!contextId) {
-          // Create new conversation context for this session
-          const contextResult = this.contextManager.createConversationContext('main');
-          const newContextId = match(
-            (context) => context.id,
-            (error) => {
-              throw new Error(`Failed to create conversation context: ${error.message}`);
-            },
-            contextResult
-          );
-          contextId = newContextId;
+            // Use context-aware prompting if available
+            if (this.contextAwarePromptHandler) {
+              // Get or create conversation context for this session
+              const sessionId = request.context.sessionId;
+              let contextId = this.sessionContextMap.get(sessionId);
 
-          // Map session to context for future requests
-          this.sessionContextMap.set(sessionId, contextId);
-        }
+              if (!contextId) {
+                // Create new conversation context for this session
+                const contextResult = this.contextManager.createConversationContext('main');
 
-        // Verify context still exists (cleanup may have removed it)
-        const existingContext = this.contextManager.getConversationContext(contextId);
-        if (!existingContext) {
-          // Context was cleaned up, create a new one
-          const contextResult = this.contextManager.createConversationContext('main');
-          const newContextId = match(
-            (context) => context.id,
-            (error) => {
-              throw new Error(`Failed to create conversation context: ${error.message}`);
-            },
-            contextResult
-          );
-          contextId = newContextId;
-          this.sessionContextMap.set(sessionId, contextId);
-        }
+                if (contextResult.tag === 'failure') {
+                  throw new Error(
+                    `Failed to create conversation context: ${contextResult.error.message}`
+                  );
+                }
 
-        // Execute with context continuation
-        result = await (this.contextAwarePromptHandler as any).completeWithContext(
-          request.input,
-          promptOptions,
-          contextId,
-          true // Include conversation history
+                contextId = contextResult.value.id;
+                // Map session to context for future requests
+                this.sessionContextMap.set(sessionId, contextId);
+              }
+
+              // Verify context still exists (cleanup may have removed it)
+              const existingContext = this.contextManager.getConversationContext(contextId);
+              if (!existingContext) {
+                // Context was cleaned up, create a new one
+                const contextResult = this.contextManager.createConversationContext('main');
+
+                if (contextResult.tag === 'failure') {
+                  throw new Error(
+                    `Failed to create conversation context: ${contextResult.error.message}`
+                  );
+                }
+
+                contextId = contextResult.value.id;
+                this.sessionContextMap.set(sessionId, contextId);
+              }
+
+              // Execute with context continuation
+              result = await (this.contextAwarePromptHandler as any).completeWithContext(
+                request.input,
+                promptOptions,
+                contextId,
+                true // Include conversation history
+              );
+            } else {
+              // Fallback to basic prompt processing
+              result = await this.promptHandler!.complete(request.input, promptOptions);
+
+              // Manually update state manager for fallback
+              this.stateManager.addConversationEntry({
+                type: 'user_input',
+                content: request.input,
+                metadata: new Map([['inputType', 'prompt']]),
+              });
+
+              if (result.success) {
+                this.stateManager.addConversationEntry({
+                  type: 'agent_response',
+                  content: result.data,
+                  metadata: new Map([['responseType', 'prompt']]),
+                });
+              }
+            }
+
+            if (result.success) {
+              return {
+                content: result.data,
+                type: 'prompt' as const,
+                confidence: classification.confidence,
+                executionTime: 0, // Will be set by main process method
+                metadata: new Map<string, unknown>([
+                  ['promptOptions', JSON.stringify(promptOptions)],
+                  ['provider', promptOptions.provider || 'default'],
+                  ['contextAware', this.contextAwarePromptHandler ? 'true' : 'false'],
+                ]),
+                success: true,
+              };
+            } else {
+              // TypeScript knows result.success is false, so result.error exists
+              return {
+                content: (result as { success: false; error: string }).error,
+                type: 'prompt' as const,
+                confidence: 0,
+                executionTime: 0,
+                metadata: new Map([['errorType', 'prompt-processing-error']]),
+                success: false,
+                error: (result as { success: false; error: string }).error,
+              };
+            }
+          })(),
+          promptTimeout,
+          'Prompt processing'
         );
-      } else {
-        // Fallback to basic prompt processing
-        result = await this.promptHandler.complete(request.input, promptOptions);
+      },
+      (error) =>
+        this.createQiError(
+          'PROMPT_PROCESSING_ERROR',
+          `Prompt processing failed: ${error instanceof Error ? error.message : String(error)}`,
+          'SYSTEM',
+          { input: request.input, sessionId: request.context.sessionId }
+        )
+    );
 
-        // Manually update state manager for fallback
-        this.stateManager.addConversationEntry({
-          type: 'user_input',
-          content: request.input,
-          metadata: new Map([['inputType', 'prompt']]),
-        });
-
-        if (result.success) {
-          this.stateManager.addConversationEntry({
-            type: 'agent_response',
-            content: result.data,
-            metadata: new Map([['responseType', 'prompt']]),
-          });
-        }
-      }
-
-      if (result.success) {
-        return {
-          content: result.data,
-          type: 'prompt',
-          confidence: classification.confidence,
-          executionTime: 0, // Will be set by main process method
-          metadata: new Map([
-            ['promptOptions', JSON.stringify(promptOptions)],
-            ['provider', promptOptions.provider || 'default'],
-            ['contextAware', this.contextAwarePromptHandler ? 'true' : 'false'],
-          ]),
-          success: true,
-        };
-      } else {
-        // TypeScript knows result.success is false, so result.error exists
-        return this.createErrorResponse(
-          'prompt',
-          (result as { success: false; error: string }).error
-        );
-      }
-    } catch (error) {
-      return this.createErrorResponse(
-        'prompt',
-        `Prompt processing failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+    return match(
+      (response: AgentResponse) => response,
+      (error: QiError) => ({
+        content: error.message,
+        type: 'prompt',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([
+          ['errorType', 'prompt-processing-error'],
+          ['errorCode', error.code],
+        ]),
+        success: false,
+        error: error.message,
+      }),
+      promptResult
+    );
   }
 
-  // Public interface for backward compatibility
+  // QiCore functional pattern - workflow handling
   private async handleWorkflow(
     request: AgentRequest,
     classification: ClassificationResult
@@ -513,7 +677,18 @@ export class QiCodeAgent implements IAgent {
     const result = await this.handleWorkflowInternal(request, classification);
     return match(
       (success: AgentResponse) => success,
-      (error: QiError) => this.createErrorResponse('workflow', error.message),
+      (error: QiError) => ({
+        content: error.message,
+        type: 'workflow',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([
+          ['errorType', 'workflow-processing-error'],
+          ['errorCode', error.code],
+        ]),
+        success: false,
+        error: error.message,
+      }),
       result
     );
   }
@@ -524,7 +699,15 @@ export class QiCodeAgent implements IAgent {
     classification: ClassificationResult
   ): Promise<Result<AgentResponse>> {
     if (!this.config.enableWorkflows) {
-      return success(this.createDisabledResponse('workflow', 'Workflow processing is disabled'));
+      return success({
+        content: 'Workflow processing is disabled',
+        type: 'workflow',
+        confidence: 0,
+        executionTime: 0,
+        metadata: new Map([['disabled', true]]),
+        success: false,
+        error: 'Workflow processing is disabled',
+      });
     }
 
     if (!this.workflowExtractor || !this.workflowEngine) {
@@ -538,27 +721,45 @@ export class QiCodeAgent implements IAgent {
       );
     }
 
+    const workflowTimeout = this.config.timeouts?.workflowExecution ?? 600000; // 10 minute default
     const contextResult = await this.createWorkflowExecutionContextInternal(request);
 
     return await match(
       async (workflowContext: any) => {
-        const extractionResult = await this.extractWorkflowSpecInternal(request, workflowContext);
-
-        return await match(
-          async (extractionResultValue: any) => {
-            const executionResult = await this.executeWorkflowInternal(
+        return await this.withTimeout(
+          (async () => {
+            const extractionResult = await this.extractWorkflowSpecInternal(
               request,
-              extractionResultValue,
-              workflowContext,
-              classification
+              workflowContext
             );
 
             return await match(
-              async (agentResponse: AgentResponse) => {
-                const cleanupResult = await this.cleanupWorkflowContextInternal(workflowContext);
-                return match(
-                  () => success(agentResponse) as Result<AgentResponse, QiError>,
-                  (error: QiError) => {
+              async (extractionResultValue: any) => {
+                const executionResult = await this.executeWorkflowInternal(
+                  request,
+                  extractionResultValue,
+                  workflowContext,
+                  classification
+                );
+
+                return await match(
+                  async (agentResponse: AgentResponse) => {
+                    const cleanupResult =
+                      await this.cleanupWorkflowContextInternal(workflowContext);
+                    return match(
+                      () => success(agentResponse) as Result<AgentResponse, QiError>,
+                      (error: QiError) => {
+                        this.logWorkflowError(request, error, {
+                          classification: classification.type,
+                          confidence: classification.confidence,
+                          timestamp: new Date().toISOString(),
+                        });
+                        return failure(error) as Result<AgentResponse, QiError>;
+                      },
+                      cleanupResult
+                    );
+                  },
+                  async (error: QiError) => {
                     this.logWorkflowError(request, error, {
                       classification: classification.type,
                       confidence: classification.confidence,
@@ -566,7 +767,7 @@ export class QiCodeAgent implements IAgent {
                     });
                     return failure(error) as Result<AgentResponse, QiError>;
                   },
-                  cleanupResult
+                  executionResult
                 );
               },
               async (error: QiError) => {
@@ -577,18 +778,11 @@ export class QiCodeAgent implements IAgent {
                 });
                 return failure(error) as Result<AgentResponse, QiError>;
               },
-              executionResult
+              extractionResult
             );
-          },
-          async (error: QiError) => {
-            this.logWorkflowError(request, error, {
-              classification: classification.type,
-              confidence: classification.confidence,
-              timestamp: new Date().toISOString(),
-            });
-            return failure(error) as Result<AgentResponse, QiError>;
-          },
-          extractionResult
+          })(),
+          workflowTimeout,
+          'Workflow execution'
         );
       },
       async (error: QiError) => {
@@ -1014,8 +1208,8 @@ export class QiCodeAgent implements IAgent {
 
   private handleWorkflowProgress(nodeId: string, progress: any, workflowContext: any): void {
     // Handle real-time progress updates during workflow execution
-    // This could emit events, update UI, or log progress
-    console.log(`Workflow progress - Node: ${nodeId}, Progress:`, progress);
+    // This could emit events, update UI, or integrate with monitoring systems
+    // Implementation can be expanded when progress tracking infrastructure is needed
   }
 
   private formatWorkflowOutput(workflowResult: any, extractionResult: any): string {
@@ -1059,8 +1253,9 @@ export class QiCodeAgent implements IAgent {
       // Handle potential error when adding message
       match(
         () => {}, // Success - continue
-        (error) => {
-          console.warn(`Failed to add workflow message to context: ${error.message}`);
+        (_error) => {
+          // Message addition failed - workflow still succeeded
+          // Error handling can be enhanced with proper monitoring infrastructure
         },
         messageResult
       );
@@ -1069,57 +1264,76 @@ export class QiCodeAgent implements IAgent {
 
   private async cleanupWorkflowContext(workflowContext: any): Promise<void> {
     // Clean up workflow execution context and release resources
-    // In full implementation, this would use WorkflowExecutionContextFactory.cleanupWorkflowContext
-    console.log(`Cleaning up workflow context: ${workflowContext.id}`);
+    // Context cleanup implementation can be expanded when resource management is needed
   }
 
   private logWorkflowError(
-    request: AgentRequest,
-    error: unknown,
-    additionalContext: Record<string, unknown>
+    _request: AgentRequest,
+    _error: unknown,
+    _additionalContext: Record<string, unknown>
   ): void {
-    // Use QiCore logging patterns for structured error logging
-    console.error('Workflow execution error:', {
-      sessionId: request.context.sessionId,
-      input: request.input.substring(0, 200),
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date().toISOString(),
-      ...additionalContext,
+    // Workflow error logging implementation can be enhanced with proper monitoring infrastructure
+    // This method provides a hook for future structured error logging integration
+  }
+
+  // Permission system integration
+
+  private async checkOperationPermission(
+    operation: string,
+    resource: string,
+    context: AgentContext
+  ): Promise<Result<boolean>> {
+    if (!this.permissionManager) {
+      return success(true); // No permission system, allow all operations
+    }
+
+    return fromAsyncTryCatch(async () => {
+      // Extract user/session information from context
+      const userId = (context.environmentContext?.get('userId') as string) || 'anonymous';
+
+      // Use a generic tool name - in practice, this would map to specific tools
+      const toolName = `Agent${operation}`;
+
+      // Create a basic tool context
+      const toolContext = {
+        sessionId: context.sessionId,
+        userId,
+        timestamp: context.timestamp,
+      };
+
+      const result = await this.permissionManager!.checkToolPermission(
+        toolName,
+        operation.toLowerCase() as any, // Cast to match expected permission action type
+        resource,
+        toolContext as any // Cast to match ToolContext interface
+      );
+
+      return match(
+        (permissionResult) => permissionResult.allowed,
+        (error) => {
+          throw error;
+        },
+        result
+      );
     });
   }
 
-  // Helper methods
+  // Subagent delegation methods (stubs for future implementation)
 
-  private createDisabledResponse(
-    type: 'command' | 'prompt' | 'workflow',
-    message: string
-  ): AgentResponse {
-    return {
-      content: message,
-      type,
-      confidence: 0,
-      executionTime: 0,
-      metadata: new Map([['disabled', true]]),
-      success: false,
-      error: message,
-    };
+  private async tryDelegateToSubagent(
+    request: AgentRequest,
+    taskType: string
+  ): Promise<Result<AgentResponse | null>> {
+    if (!this.agentOrchestrator || !this.subagentRegistry) {
+      return success(null); // No subagent support available
+    }
+
+    // Future implementation would analyze the request and determine if delegation is beneficial
+    // For now, this is a stub that always returns null (no delegation)
+    return success(null);
   }
 
-  private createErrorResponse(
-    type: 'command' | 'prompt' | 'workflow',
-    message: string
-  ): AgentResponse {
-    return {
-      content: message,
-      type,
-      confidence: 0,
-      executionTime: 0,
-      metadata: new Map([['errorType', 'component-unavailable']]),
-      success: false,
-      error: message,
-    };
-  }
+  // Helper methods for parameter extraction
 
   private extractCommandName(input: string): string {
     const trimmed = input.trim();

@@ -2,7 +2,7 @@
  * Terminal abstraction interface
  *
  * Provides a framework-agnostic interface for terminal operations.
- * Implemented by ReadlineTerminal and InkTerminal (Hybrid delegates to Ink).
+ * Implemented by ReadlineTerminal (Ink/Hybrid use React components instead).
  */
 
 export interface TerminalDimensions {

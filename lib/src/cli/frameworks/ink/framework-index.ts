@@ -8,7 +8,7 @@
  */
 
 // Stub implementations
-export { InkTerminal, isInkAvailable } from './InkTerminal.js';
+// InkTerminal removed - was fake stub with fallbacks
 
 // TODO: Implement remaining components when Ink support is added
 // export { InkInputManager } from './InkInputManager.js';
