@@ -141,12 +141,27 @@ See `config/` directory for examples.
 
 ## Version
 
-**Current**: v-0.10.1 - Complete Sub-Agent Architecture with qi-code Implementation
+**Current**: v-0.10.3 - CLI Framework Fix & Development Experience
+
+### **Latest Updates (v-0.10.3)**
+- 🔧 **Fixed CLI Framework**: Resolved "Cannot access 'InkCLIFramework' before initialization" error
+- 🛠️ **Development Support**: Both qi-prompt and qi-code now work with `bun run` for development
+- ⚡ **Zod Conflict Resolution**: Fixed module loading issues that prevented Hybrid CLI initialization
+- 📱 **CLI Argument Parity**: qi-code now supports same configuration arguments as qi-prompt
+- 🎯 **Production Ready**: Built binaries continue to work, now with improved development experience
+
+### **Development Experience**
+```bash
+# Both applications now work with CLI arguments during development
+bun run --cwd app qi-prompt --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env --framework hybrid
+bun run --cwd app qi-code --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env --debug
+```
 
 ### **Milestones Achieved**
 - ✅ **v-0.8.x**: qi-prompt production-ready with unified MCP storage  
 - ✅ **v-0.9.x**: Enhanced workflow system with intelligent pattern selection
 - ✅ **v-0.10.x**: qi-code milestone with tool-specialized sub-agents
+- ✅ **v-0.10.3**: CLI framework issues resolved, seamless development experience
 
 ---
 

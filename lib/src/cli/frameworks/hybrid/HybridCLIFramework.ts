@@ -16,7 +16,7 @@ import type { QiAsyncMessageQueue } from '../../../messaging/impl/QiAsyncMessage
 import type { QiMessage } from '../../../messaging/types/MessageTypes.js';
 import { Cursor } from '../../../utils/Cursor.js';
 import type { CLIConfig } from '../../abstractions/ICLIFramework.js';
-import { InkCLIFramework } from '../ink/InkCLIFramework.js';
+import { InkCLIFramework } from '../ink/InkCLIFramework';
 
 /**
  * QiCore error types for hybrid framework operations

@@ -1,7 +1,7 @@
 # qi-code - Full Coding Agent
 
-**Status**: 🚧 Under Development (Target: v-0.10.x)  
-**Type**: Full coding agent with advanced workflow orchestration and tool ecosystem
+**Status**: ✅ Implemented (v-0.10.0 Complete)  
+**Type**: Full coding agent with QiCodeAgent orchestrator, sub-agent system, and modern CLI
 
 ## Overview
 
@@ -9,13 +9,13 @@ qi-code is the advanced coding agent in the qi-v2-agent dual-agent architecture.
 
 ## Agent Architecture
 
-### **qi-code Capabilities**
-- **Complete Workflow Orchestration**: Full pattern library (ReAct, ReWOO, ADaPT) with intelligent selection
-- **Advanced Decision Engine**: Planning, reasoning, causal analysis, and hypothesis generation
-- **Multi-Agent Coordination**: Distributed task execution and collaborative problem-solving
-- **Tool Layer Excellence**: Complete MCP server integration (Chroma, Web, Database, Memory, SQLite)
-- **Autonomous Goal Management**: Adaptive planning and goal-oriented behavior
-- **Sophisticated Agent Behaviors**: Context-aware decision making and learning integration
+### **qi-code Capabilities (Implemented)**
+- **QiCodeAgent Orchestrator**: Uses proper factory patterns with `createAgent()` from `@qi/agent`
+- **Tool-Specialized Sub-Agents**: FileOps, Search, Git, and Web sub-agents with dynamic registry
+- **QiCore Integration**: Result<T> patterns, structured logging, caching, and configuration management
+- **MCP Service Integration**: Dynamic service discovery with graceful degradation (chroma, web-search, database, memory, sqlite)
+- **Modern Ink CLI**: React-based terminal interface with interactive components and status display
+- **Complete Error Handling**: QiCore Result<T> patterns throughout with proper error categorization
 
 ### **Design Philosophy**
 - **Advanced Patterns**: Uses sophisticated algorithms and "fancy" capabilities
@@ -66,38 +66,48 @@ qi-code is the advanced coding agent in the qi-v2-agent dual-agent architecture.
 
 ## Current Status
 
-### **✅ Foundation Complete (v-0.8.x)**
-- Enhanced core infrastructure established via qi-prompt development
-- Multi-tier memory architecture, context management, model lifecycle
-- MCP client integration with 5 service types
+### **✅ Complete Implementation (v-0.10.0)**
+- **QiCodeAgent Orchestrator**: Fully implemented using proper factory patterns
+- **Sub-Agent System**: Tool-specialized agents (FileOps, Search, Git, Web) with registry
+- **QiCore Integration**: Complete Result<T> patterns, logger, cache, and config
+- **MCP Services**: Dynamic discovery with graceful fallback handling
+- **Modern CLI**: Ink-based React interface with interactive status display
+- **Error Handling**: Comprehensive QiError categories and Result<T> composition
 
-### **🚧 In Development (v-0.9.x)**
-- Enhanced Workflow System with intelligent pattern selection
-- Production-ready workflow execution with monitoring
-- Real-time adaptation and learning capabilities
-
-### **📋 Planned (v-0.10.x)**
-- Advanced Decision Engine with planning and reasoning
-- Multi-Agent Coordination for distributed tasks
-- Autonomous Goal Management with adaptive planning
-- **qi-code agent integration and deployment**
+### **✅ Architecture Alignment**
+- Implementation matches documented design patterns
+- All imports use `@qi/agent/*` aliasing correctly
+- QiCore functional patterns used throughout
+- Professional CLI experience with React components
 
 ## Getting Started
 
 ### **Prerequisites**
-- qi-prompt v-0.8.x complete (enhanced infrastructure)
-- Enhanced Workflow System v-0.9.x (intelligent patterns)
-- Development environment with MCP server support
+- Node.js 18+ with Bun runtime
+- qi-v2-agent repository cloned
+- Dependencies installed (`bun install`)
 
-### **Development Setup**
+### **Running qi-code**
 ```bash
-# qi-code will be available after v-0.10.x implementation
-# Current development focuses on foundation components
+# Navigate to app directory
+cd app
 
-# Monitor development progress
-git log --oneline --grep="qi-code"
-git log --oneline --grep="v-0.9.x\|v-0.10.x"
+# Run qi-code agent
+bun run qi-code
+
+# Run with debug mode
+bun run qi-code --debug
+
+# Run with specific provider/model
+bun run qi-code --provider openai --model gpt-4
 ```
+
+### **Features in Action**
+- Modern Ink CLI with React components
+- QiCodeAgent orchestrator with sub-agent coordination
+- Dynamic MCP service discovery and integration
+- QiCore Result<T> patterns for reliable error handling
+- Structured logging with context accumulation
 
 ### **Integration Points**
 qi-code builds on qi-prompt foundation:
@@ -106,13 +116,21 @@ qi-code builds on qi-prompt foundation:
 - **MCP Integration**: Full ecosystem vs selective usage
 - **Different Interface**: Coding agent vs prompt application
 
-## Next Steps
+## Implementation Details
 
-1. **Complete v-0.9.x Enhanced Workflow System**
-2. **Implement v-0.10.x Advanced Agent Capabilities**
-3. **Integrate components into qi-code agent**
-4. **Deploy and validate qi-code functionality**
+### **Key Components**
+- **app/src/qi-code.ts**: Main application entry point with complete architecture
+- **lib/src/agent/**: QiCodeAgent orchestrator and sub-agent system
+- **@qi/base + @qi/core**: Result<T> patterns and infrastructure tools
+- **Ink Components**: React-based CLI interface components
+
+### **Architecture Highlights**
+- Factory pattern usage: `createAgent()`, `createLogger()`, `createMemoryCache()`
+- Sub-agent registry with dynamic registration and lifecycle management
+- MCP service integration with graceful degradation strategy
+- Comprehensive error handling using QiCore Result<T> composition
+- Modern terminal UI using React Ink framework
 
 ---
 
-**Note**: qi-code documentation will be updated as development progresses through v-0.9.x and v-0.10.x milestones.
+**Status**: qi-code v-0.10.0 implementation complete and functional.

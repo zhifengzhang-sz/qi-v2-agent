@@ -14,7 +14,7 @@ export {
 } from './components/OutputDisplay.js';
 export { StateIndicator } from './components/StateIndicator.js';
 // Main Ink CLI Framework
-export { createInkCLIImpl, InkCLIFramework } from './InkCLIFramework.js';
+export { createInkCLIImpl, InkCLIFramework } from './InkCLIFramework';
 
 // Legacy components (deprecated)
 // export { InkCLIApplication, createInkCLI } from './InkCLI.js' // DEPRECATED

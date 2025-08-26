@@ -37,6 +37,10 @@ export interface AgentFactoryConfig extends AgentConfig {
   readonly promptHandler?: IPromptHandler;
   readonly workflowEngine?: IWorkflowEngine;
   readonly workflowExtractor?: IWorkflowExtractor;
+  // Sub-agent system support
+  readonly subagentRegistry?: any; // ISubagentRegistry - using any to avoid circular import
+  readonly agentOrchestrator?: any; // IAgentOrchestrator - using any to avoid circular import
+  readonly permissionManager?: any; // PermissionManager - using any to avoid circular import
 }
 
 /**
@@ -61,6 +65,10 @@ export function createAgent(
     promptHandler: config.promptHandler,
     workflowEngine: config.workflowEngine,
     workflowExtractor: config.workflowExtractor,
+    // Sub-agent system support
+    subagentRegistry: config.subagentRegistry,
+    agentOrchestrator: config.agentOrchestrator,
+    permissionManager: config.permissionManager,
   };
 
   return new QiCodeAgent(stateManager, contextManager, agentConfig, dependencies);

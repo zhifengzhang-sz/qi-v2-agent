@@ -18,6 +18,11 @@ import {
   createValidatedReadlineCLI,
 } from './createReadlineCLI.js';
 
+// TEMP: Static imports for development to avoid Zod conflicts
+// TODO: Remove these for binary compilation
+import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework';
+import { HybridCLIFramework } from '../frameworks/hybrid/HybridCLIFramework';
+
 /**
  * Framework types supported by the CLI
  */
@@ -309,8 +314,8 @@ async function createInkCLIAsync(
       );
     }
 
-    // Dynamic import to avoid top-level await issues in binary compilation
-    const { InkCLIFramework } = await import('../frameworks/ink/InkCLIFramework.js');
+    // TEMP: Use static import - InkCLIFramework already imported at top
+    // const { InkCLIFramework } = await import('../frameworks/ink/InkCLIFramework');
 
     // Create actual Ink CLI implementation with messageQueue and stateManager from config
     const cli = new InkCLIFramework(config, config.messageQueue || messageQueue);
@@ -435,11 +440,9 @@ async function createHybridCLIAsync(
       );
     }
 
-    // Dynamic imports to avoid top-level await issues in binary compilation
-    const [{ InkCLIFramework }, { HybridCLIFramework }] = await Promise.all([
-      import('../frameworks/ink/InkCLIFramework.js'),
-      import('../frameworks/hybrid/HybridCLIFramework.js'),
-    ]);
+    // TEMP: Use static imports for development - avoids Zod caching conflicts with bun run
+    // TODO: Revert to dynamic imports for binary compilation
+    // Classes are already imported statically at top of file
 
     // Create hybrid CLI implementation with shared message queue and state manager
     logger.trace('createHybridCLIAsync - config keys:', Object.keys(config));
