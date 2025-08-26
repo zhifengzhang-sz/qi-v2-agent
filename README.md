@@ -1,31 +1,41 @@
 # qi-v2-agent
 
-**Extensible AI coding assistant framework with dual-agent architecture and tool-specialized sub-agents.**
+Reusable and extensible AI agent framework with tool-specialized sub-agents and workflow orchestration.
 
 ## Overview
 
-qi-v2-agent provides both a professional prompt application (qi-prompt) and a complete coding agent (qi-code) with advanced workflow orchestration. Features intelligent context management, multi-provider LLM support, tool-specialized sub-agents, and unified MCP storage. Built with QiCore functional programming patterns for enterprise-grade reliability.
+qi-v2-agent is an extensible framework for building specialized AI agents. It provides a foundation for creating agents with tool-specialized sub-agents, multi-provider LLM support, and unified MCP storage, built on QiCore functional programming patterns. The framework includes reference implementations: qi-prompt for prompt engineering and qi-code for coding assistance.
 
-## Key Features
+## Framework Architecture
 
-### **🤖 Dual-Agent Architecture**
-- **qi-prompt**: Advanced prompt application with context management and simple workflows
-- **qi-code**: Full coding agent with tool-specialized sub-agents and advanced orchestration
-- **Extensible Framework**: Support for unlimited specialized agent implementations
+### Extensible Agent System
+- **QiCore Foundation**: Functional programming patterns with Result<T> error handling
+- **Sub-Agent Architecture**: Composable, tool-specialized agents for specific domains
+- **Workflow Orchestration**: ReAct, ReWOO, and ADaPT patterns for complex task coordination
+- **Multi-Provider LLM**: Unified interface across 5 providers with 25+ models
+- **MCP Integration**: Model Context Protocol for standardized storage and persistence
 
-### **🔧 Tool-Specialized Sub-Agents (qi-code)**
-- **FileOpsSubAgent**: Complete file system operations (read, write, edit, search)
-- **SearchSubAgent**: Advanced content and pattern search capabilities
-- **GitSubAgent**: Full version control operations with workflow integration
+### Reference Sub-Agent Implementations
+- **FileOpsSubAgent**: File system operations (read, write, edit, search)
+- **SearchSubAgent**: Content and pattern search capabilities
+- **GitSubAgent**: Version control operations with workflow integration
 - **WebSubAgent**: Web operations, search, and content extraction
 
-### **🏗️ Enterprise Architecture**
-- **🔄 Unified Storage**: MCP memory server for all persistence - no scattered state
-- **📁 File References**: Use `@file` patterns to include content in prompts
-- **🤖 Multi-Provider LLM**: 5 providers with 25+ models and smart fallback
-- **⚡ Binary Compilation**: Portable executables with no dependencies
-- **🎯 Professional CLI**: Complete configuration flexibility
-- **🧠 QiCore Architecture**: Functional programming with Result<T> patterns
+### Framework Features
+- **Composable Architecture**: Mix and match sub-agents for different use cases
+- **Extensible Design**: Create custom agents by extending base classes
+- **Unified Storage**: Model Context Protocol (MCP) for consistent persistence
+- **Multi-Provider LLM**: Abstract interface supporting multiple LLM providers
+- **Binary Distribution**: Compile to portable executables with zero dependencies
+- **Professional CLI**: Complete configuration flexibility and professional interface
+
+## Reference Implementations
+
+### qi-prompt
+Advanced prompt application demonstrating context management and simple workflows.
+
+### qi-code  
+Complete coding agent showcasing tool-specialized sub-agents and advanced orchestration.
 
 ## Quick Start
 
@@ -43,7 +53,7 @@ bun run --cwd app qi-code
 
 ### Usage Examples
 
-#### **qi-prompt: Advanced Context Management**
+#### Using qi-prompt (Context Management)
 ```bash
 # File reference patterns
 @package.json analyze dependencies
@@ -51,19 +61,18 @@ bun run --cwd app qi-code
 @config/llm-providers.yaml check this configuration
 
 # Framework options
-./app/qi-prompt --framework hybrid  # Auto-detect (default)
-./app/qi-prompt --framework ink     # Rich UI with colors
-./app/qi-prompt --framework readline # Basic terminal
+./app/qi-prompt --framework hybrid    # Auto-detect (default)
+./app/qi-prompt --framework ink       # Rich UI with colors
+./app/qi-prompt --framework readline  # Basic terminal
 ```
 
-#### **qi-code: Full Coding Agent**
+#### Using qi-code (Advanced Workflow Orchestration)
 ```bash
-# Complex coding tasks with sub-agent coordination
-bun run --cwd app qi-code --debug
+# Development mode
+bun run --cwd app qi-code --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env
 
-# Advanced workflow patterns (ReAct, ReWOO, ADaPT)
-# Automatic sub-agent selection for file, search, git, web operations
-# Complete MCP service integration
+# Production binary
+./app/qi-code --config-path config/llm-providers.yaml --schema-path config/qi-prompt.schema.json --env-path .env
 ```
 
 ## Binary Compilation
@@ -76,26 +85,26 @@ bun run build
 ./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path .env --framework hybrid
 ```
 
-**Binary Features:**
+Binary features:
 - Single 5.1MB executable 
-- No native dependencies (SQLite removed)
+- No native dependencies
 - Complete configuration flexibility
-- Works on any Linux/macOS system
+- Cross-platform compatibility (Linux/macOS)
 
-## Architecture
+## Storage and State Management
 
-### Unified MCP Storage
-- **Single storage system**: MCP memory server only
-- **No scattered state**: Everything persists through unified architecture
-- **Functional composition**: QiCore Result<T> patterns throughout
-- **Session persistence**: Reliable conversation and context storage
+### MCP Integration
+- Single storage system using MCP memory server
+- Unified persistence architecture 
+- QiCore Result<T> functional patterns
+- Reliable session and conversation storage
 
-### Technical Stack
+### Implementation Details
 - **Frontend**: React/Ink with hybrid framework support
-- **Backend**: Bun runtime with TypeScript
-- **State**: XState v5 with MCP integration
-- **Storage**: Model Context Protocol memory server
-- **Patterns**: QiCore functional programming
+- **Runtime**: Bun with TypeScript
+- **State Management**: XState v5 with MCP integration
+- **Storage Protocol**: Model Context Protocol
+- **Error Handling**: QiCore functional programming patterns
 
 ## Commands
 
@@ -111,8 +120,9 @@ bun run check   # TypeScript + lint + tests
 bun run build   # Build library and compile binary
 ```
 
-## Hotkeys
+## Interface
 
+### Keyboard Controls
 - **Shift+Tab**: Cycle through Interactive/Command/Streaming modes
 - **↑/↓**: Navigate command history
 - **ESC**: Cancel operations or clear input
@@ -127,42 +137,42 @@ Requires three configuration files:
 
 See `config/` directory for examples.
 
-## Architecture Comparison
+## Framework Usage
 
-| Feature | qi-prompt | qi-code |
-|---------|-----------|---------|
-| **Purpose** | Advanced prompt application | Full coding agent |
+| Component | qi-prompt | qi-code |
+|-----------|-----------|---------|
+| **Purpose** | Demonstrates context management | Showcases advanced orchestration |
 | **Orchestrator** | PromptAppOrchestrator | QiCodeAgent |
 | **Sub-Agents** | None | FileOps, Search, Git, Web |
-| **Workflows** | Simple, well-defined patterns | Advanced ReAct, ReWOO, ADaPT |
-| **Complexity** | Clean, no fancy algorithms | Sophisticated orchestration |
-| **Use Cases** | Prompt engineering, simple tasks | Complex coding, multi-step projects |
-| **Target Users** | Context-focused prompt work | Full coding assistance |
+| **Workflows** | Simple patterns | Advanced ReAct, ReWOO, ADaPT |
+| **Complexity** | Minimal, focused | Sophisticated multi-agent coordination |
+| **Use Cases** | Prompt engineering, context work | Complex coding, multi-step projects |
+| **Framework Role** | Simple reference implementation | Advanced framework demonstration |
 
 ## Version
 
 **Current**: v-0.10.3 - CLI Framework Fix & Development Experience
 
-### **Latest Updates (v-0.10.3)**
-- 🔧 **Fixed CLI Framework**: Resolved "Cannot access 'InkCLIFramework' before initialization" error
-- 🛠️ **Development Support**: Both qi-prompt and qi-code now work with `bun run` for development
-- ⚡ **Zod Conflict Resolution**: Fixed module loading issues that prevented Hybrid CLI initialization
-- 📱 **CLI Argument Parity**: qi-code now supports same configuration arguments as qi-prompt
-- 🎯 **Production Ready**: Built binaries continue to work, now with improved development experience
+### Latest Updates (v-0.10.3)
+- Fixed CLI Framework: Resolved "Cannot access 'InkCLIFramework' before initialization" error
+- Development Support: Both qi-prompt and qi-code work with `bun run` for development
+- Zod Conflict Resolution: Fixed module loading issues that prevented Hybrid CLI initialization
+- CLI Argument Parity: qi-code now supports same configuration arguments as qi-prompt
+- Production Ready: Built binaries continue to work with improved development experience
 
-### **Development Experience**
+### Development Experience
 ```bash
-# Both applications now work with CLI arguments during development
+# Both applications work with CLI arguments during development
 bun run --cwd app qi-prompt --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env --framework hybrid
 bun run --cwd app qi-code --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env --debug
 ```
 
-### **Milestones Achieved**
-- ✅ **v-0.8.x**: qi-prompt production-ready with unified MCP storage  
-- ✅ **v-0.9.x**: Enhanced workflow system with intelligent pattern selection
-- ✅ **v-0.10.x**: qi-code milestone with tool-specialized sub-agents
-- ✅ **v-0.10.3**: CLI framework issues resolved, seamless development experience
+### Release History
+- **v-0.8.x**: qi-prompt production-ready with unified MCP storage  
+- **v-0.9.x**: Enhanced workflow system with intelligent pattern selection
+- **v-0.10.x**: qi-code milestone with tool-specialized sub-agents
+- **v-0.10.3**: CLI framework issues resolved, seamless development experience
 
----
+## Status
 
-**Status**: ✅ Dual-agent framework complete with extensible sub-agent architecture
+Extensible agent framework complete with reference implementations and sub-agent architecture.
