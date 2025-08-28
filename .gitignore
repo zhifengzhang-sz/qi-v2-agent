@@ -57,3 +57,7 @@ yarn-error.log*
 **/prompt-workflow/
 **/personachat*
 **/large-datasets/
+
+# Trading agents implementation directory
+trading-agents/
+trading-system/
