@@ -1277,11 +1277,9 @@ function parseArgs(): {
 
 // Display help function
 function displayHelp() {
-  // Import configuration utilities for dynamic help
-  const { getAvailableFrameworks, autoDetectFramework } = require('@qi/agent/cli');
-
-  const available = getAvailableFrameworks();
-  const recommended = autoDetectFramework();
+  // Use static values for binary compilation compatibility
+  const available = ['readline', 'ink', 'hybrid'];
+  const recommended = 'hybrid';
 
   console.log(`
 

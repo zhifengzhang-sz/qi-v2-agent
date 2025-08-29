@@ -80,8 +80,11 @@ export function InputBox({
     framework.constructor.name === 'HybridCLIFramework' && 
     framework.isHybridEnabled;
   
+  // Check if we're in a TTY environment for hybrid mode
+  const isHybridTTYMode = isHybridMode && process.stdin.isTTY;
+  
   // DEBUG: Log component renders and state changes
-  debugLog(`🔍 InputBox render: hybrid=${isHybridMode}, state=${state}, cursor=${hybridCursor}, ref=${cursorPositionRef.current}`);
+  debugLog(`🔍 InputBox render: hybrid=${isHybridMode}, tty=${isHybridTTYMode}, state=${state}, cursor=${hybridCursor}, ref=${cursorPositionRef.current}`);
 
 
   // In hybrid mode, use hybrid input; otherwise use currentInput or localInput
@@ -339,23 +342,35 @@ export function InputBox({
         <Box>
           <Text color="#007acc">{getPromptPrefix()} </Text>
           {!isDisabled ? (
-            <HybridTextInput
-              value={hybridInput}
-              onChange={handleHybridInputChange}
-              onSubmit={handleSubmit}
-              onHistoryUp={handleHistoryUp}
-              onHistoryDown={handleHistoryDown}
-              onCommandSuggestionUp={handleCommandSuggestionUp}
-              onCommandSuggestionDown={handleCommandSuggestionDown}
-              onCommandSuggestionAccept={handleCommandSuggestionAccept}
-              hasCommandSuggestions={suggestions.length > 0}
-              placeholder={placeholder}
-              focus={true}
-              framework={framework}
-              cursorOffset={hybridCursor}
-              onCursorOffsetChange={handleHybridCursorChange}
-              columns={80}
-            />
+            <>
+              <HybridTextInput
+                value={hybridInput}
+                onChange={handleHybridInputChange}
+                onSubmit={handleSubmit}
+                onHistoryUp={handleHistoryUp}
+                onHistoryDown={handleHistoryDown}
+                onCommandSuggestionUp={handleCommandSuggestionUp}
+                onCommandSuggestionDown={handleCommandSuggestionDown}
+                onCommandSuggestionAccept={handleCommandSuggestionAccept}
+                hasCommandSuggestions={suggestions.length > 0}
+                placeholder={placeholder}
+                focus={true}
+                framework={framework}
+                cursorOffset={hybridCursor}
+                onCursorOffsetChange={handleHybridCursorChange}
+                columns={80}
+              />
+              {!isHybridTTYMode && (
+                <Box paddingTop={1}>
+                  <Text dimColor>📝 Using fallback input mode (no raw terminal)</Text>
+                </Box>
+              )}
+              {isHybridTTYMode && (
+                <Box paddingTop={1}>
+                  <Text dimColor>🔧 Hybrid Mode: Raw terminal input active (Claude Code navigation enabled)</Text>
+                </Box>
+              )}
+            </>
           ) : (
             <Box>
               <LoadingSpinner />

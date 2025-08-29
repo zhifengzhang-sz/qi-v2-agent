@@ -181,10 +181,15 @@ export class InkCLIFramework implements ICLIFramework, IAgentCLIBridge {
       throw new Error('CLI already started');
     }
 
-    // Enable hotkeys after start
-    if (this.hotkeyManager) {
+    // Enable hotkeys after start - only in interactive TTY environments
+    if (this.hotkeyManager && process.stdin.isTTY) {
       this.hotkeyManager.enable();
       this.logger.debug('InkCLIFramework HotkeyManager enabled', undefined, {
+        component: 'InkCLIFramework',
+        method: 'start',
+      });
+    } else if (this.hotkeyManager) {
+      this.logger.debug('InkCLIFramework HotkeyManager not enabled (non-interactive environment)', undefined, {
         component: 'InkCLIFramework',
         method: 'start',
       });

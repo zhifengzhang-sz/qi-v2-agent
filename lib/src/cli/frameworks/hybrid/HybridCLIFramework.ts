@@ -82,6 +82,12 @@ export class HybridCLIFramework extends InkCLIFramework {
    * This complements Ink's input handling for keys that Ink doesn't handle well
    */
   private setupRawStdinHandling(): void {
+    // Only set up raw stdin handling in interactive TTY environments
+    if (!process.stdin.isTTY) {
+      this.logger.debug('Hybrid: Non-TTY environment detected, using fallback input mode');
+      return;
+    }
+
     this.rawStdinHandler = (chunk: Buffer) => {
       const input = chunk.toString('utf8');
       const bytes = Array.from(chunk);
@@ -98,7 +104,7 @@ export class HybridCLIFramework extends InkCLIFramework {
       }
     };
 
-    // Note: We'll enable this when the framework starts to avoid conflicts with Ink's setup
+    this.logger.debug('Hybrid: Raw stdin handler configured for TTY environment');
   }
 
   /**
@@ -143,9 +149,15 @@ export class HybridCLIFramework extends InkCLIFramework {
       return;
     }
 
-    this.logger.debug('Hybrid: Enabling raw stdin handling for special keys');
+    // Only enable raw mode if we're in an interactive TTY environment
+    // This prevents conflicts when input is piped (like in tests)
+    if (!process.stdin.isTTY) {
+      this.logger.debug('⚠️ No TTY detected, using fallback mode');
+      return;
+    }
 
-    // Set up raw mode and listener
+    this.logger.debug('✅ Hybrid terminal input initialized');
+
     if (process.stdin.setRawMode) {
       try {
         process.stdin.setRawMode(true);

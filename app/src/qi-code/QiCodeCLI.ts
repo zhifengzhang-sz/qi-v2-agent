@@ -130,6 +130,12 @@ export class QiCodeCLI {
       component: 'QiCodeCLI',
     });
 
+    // Debug: Check if CLI has message queue configured
+    this.logger.debug('🔍 Checking CLI message queue configuration', undefined, {
+      cliHasMessageQueue: !!(this.cli as any)?.messageQueue,
+      ourMessageQueue: !!this.messageQueue,
+    });
+
     // Start CLI
     await this.cli.start();
 
@@ -138,6 +144,11 @@ export class QiCodeCLI {
       async () => {
         this.logger.info('🔄 QiCode message processing loop started', undefined, {
           component: 'QiCodeCLI',
+        });
+
+        // Debug: Check message queue state before starting iteration
+        this.logger.debug('🔍 Message queue state before iteration', undefined, {
+          messageQueueType: this.messageQueue?.constructor?.name,
         });
 
         // Process messages using async iteration (like qi-prompt)
@@ -202,7 +213,7 @@ export class QiCodeCLI {
       // Handle different message types
       if (message.type === MessageType.USER_INPUT) {
         const userMessage = message as UserInputMessage;
-        
+
         this.logger.debug('📨 Processing user input with QiCodeAgent', undefined, {
           messageId: message.id,
           input: userMessage.input.substring(0, 50),
@@ -225,11 +236,11 @@ export class QiCodeCLI {
 
         // Process with QiCodeAgent
         const response = await this.qiCodeAgent.process(agentRequest);
-        
+
         // Display response through CLI
         if (response && response.content) {
           this.cli.displayMessage?.(response.content, 'info');
-          
+
           this.logger.info('✅ QiCodeAgent response displayed', undefined, {
             messageId: message.id,
             responseLength: response.content.length,
@@ -240,7 +251,12 @@ export class QiCodeCLI {
 
         // Handle exit commands
         const trimmed = userMessage.input.trim();
-        if (trimmed === '/exit' || trimmed === '/quit' || trimmed === 'exit' || trimmed === 'quit') {
+        if (
+          trimmed === '/exit' ||
+          trimmed === '/quit' ||
+          trimmed === 'exit' ||
+          trimmed === 'quit'
+        ) {
           this.logger.info('🛑 Exit command received, stopping QiCode', undefined, {
             command: trimmed,
             component: 'QiCodeCLI',
@@ -257,7 +273,7 @@ export class QiCodeCLI {
         component: 'QiCodeCLI',
         method: 'processMessage',
       });
-      
+
       // Display error to user
       this.cli.displayMessage?.(`Error: ${error.message}`, 'error');
     }

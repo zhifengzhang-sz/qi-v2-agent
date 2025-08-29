@@ -143,7 +143,10 @@ function createContainer(): Result<CLIContainer, QiError> {
 function registerServices(
   container: CLIContainer,
   config: CLIConfig,
-  _options: { commandHandler?: ICommandHandler } = {}
+  options: {
+    commandHandler?: ICommandHandler;
+    messageQueue?: QiAsyncMessageQueue<QiMessage>;
+  } = {}
 ): Result<void, QiError> {
   // Register terminal implementation
   const terminalResult = container.register('terminal', () => new ReadlineTerminal(), {
@@ -152,6 +155,17 @@ function registerServices(
 
   if (terminalResult.tag === 'failure') {
     return terminalResult;
+  }
+
+  // Register message queue if provided (v-0.6.1: Required for message-driven architecture)
+  if (options.messageQueue) {
+    const messageQueueResult = container.register('messageQueue', () => options.messageQueue!, {
+      singleton: true,
+    });
+
+    if (messageQueueResult.tag === 'failure') {
+      return messageQueueResult;
+    }
   }
 
   // Register input manager

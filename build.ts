@@ -48,22 +48,36 @@ async function compile() {
   try {
     await build();
 
-    // Create single binary from main entry point
-    console.log('🔧 Creating single binary...');
-    const compile = spawn({
+    // Create binaries for both applications
+    console.log('🔧 Creating qi-prompt binary...');
+    const compilePrompt = spawn({
       cmd: ['/home/zzhang/.bun/bin/bun', 'build', 'src/prompt/qi-prompt.ts', '--outfile', 'qi-prompt', '--target', 'node'],
       cwd: './app',
       stdout: 'inherit',
       stderr: 'inherit'
     });
     
-    await compile.exited;
-    if (compile.exitCode !== 0) {
-      console.log('⚠️ Binary compilation failed, but build completed successfully');
-      return;
+    await compilePrompt.exited;
+    if (compilePrompt.exitCode !== 0) {
+      console.log('⚠️ qi-prompt binary compilation failed');
+    } else {
+      console.log('✅ qi-prompt binary created: app/qi-prompt');
     }
 
-    console.log('✅ Single binary created: app/qi-prompt');
+    console.log('🔧 Creating qi-code binary...');
+    const compileCode = spawn({
+      cmd: ['/home/zzhang/.bun/bin/bun', 'build', 'src/qi-code/qi-code.ts', '--outfile', 'qi-code', '--target', 'node'],
+      cwd: './app',
+      stdout: 'inherit',
+      stderr: 'inherit'
+    });
+    
+    await compileCode.exited;
+    if (compileCode.exitCode !== 0) {
+      console.log('⚠️ qi-code binary compilation failed');
+    } else {
+      console.log('✅ qi-code binary created: app/qi-code');
+    }
 
   } catch (error) {
     console.error('❌ Compilation failed:', error);

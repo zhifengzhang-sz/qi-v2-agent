@@ -9,6 +9,10 @@
 import { create, Err, match, Ok, type QiError, type Result } from '@qi/base';
 import { createDebugLogger } from '../../utils/DebugLogger.js';
 import type { CLIConfig, ICLIFramework } from '../abstractions/ICLIFramework.js';
+import { HybridCLIFramework } from '../frameworks/hybrid/HybridCLIFramework';
+// TEMP: Static imports for development to avoid Zod conflicts
+// TODO: Remove these for binary compilation
+import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework';
 // NOTE: Ink framework is imported dynamically to avoid top-level await issues in binary compilation
 // Framework factories
 import {
@@ -17,11 +21,6 @@ import {
   createReadlineCLIAsync,
   createValidatedReadlineCLI,
 } from './createReadlineCLI.js';
-
-// TEMP: Static imports for development to avoid Zod conflicts
-// TODO: Remove these for binary compilation
-import { InkCLIFramework } from '../frameworks/ink/InkCLIFramework';
-import { HybridCLIFramework } from '../frameworks/hybrid/HybridCLIFramework';
 
 /**
  * Framework types supported by the CLI

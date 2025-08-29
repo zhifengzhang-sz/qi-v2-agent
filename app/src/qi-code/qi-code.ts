@@ -59,16 +59,14 @@ import { createLogger, createMemoryCache } from '@qi/core';
 // import { createProviderCommand } from './prompt/commands/ProviderCommand.js';
 // import { createStatusCommand } from './prompt/commands/StatusCommand.js';
 
-// CLI integration with proper interfaces
-import { ProviderManagerPromptHandler } from '../prompt/ProviderManagerPromptHandler.js';
-
-// QiCode CLI - similar to qi-prompt pattern
-import { QiCodeCLI } from './QiCodeCLI.js';
-
 // Using real HybridCLIFramework - no mock needed
 import { Box, render, Text } from 'ink';
 // Ink components for modern CLI
 import React from 'react';
+// CLI integration with proper interfaces
+import { ProviderManagerPromptHandler } from '../prompt/ProviderManagerPromptHandler.js';
+// QiCode CLI - similar to qi-prompt pattern
+import { QiCodeCLI } from './QiCodeCLI.js';
 
 /**
  * QiCode Application - Complete Implementation
@@ -96,6 +94,7 @@ class QiCodeApp {
   private isRunning = false;
   private codeConfigPath?: string;
   private codeSchemaPath?: string;
+  private framework: 'readline' | 'ink' | 'hybrid' = 'hybrid';
   private debugMode: boolean = false;
 
   constructor(options: CLIOptions) {
@@ -103,6 +102,7 @@ class QiCodeApp {
     this.contextManager = new ContextManager(appContext);
     this.codeConfigPath = options.configPath;
     this.codeSchemaPath = options.schemaPath;
+    this.framework = (options.framework as 'readline' | 'ink' | 'hybrid') || 'hybrid';
     this.debugMode = options.debug;
   }
 
@@ -136,7 +136,7 @@ class QiCodeApp {
         // Validate required config paths (like qi-prompt)
         if (!this.codeConfigPath) {
           throw create(
-            'MISSING_STATE_CONFIG', 
+            'MISSING_STATE_CONFIG',
             'Code config path is required for StateManager. Use --config-path argument.',
             'SYSTEM',
             { code: 'MISSING_STATE_CONFIG' }
@@ -149,11 +149,14 @@ class QiCodeApp {
           defaultTtl: 300, // 5 minutes
         });
 
-        // Initialize state and context managers with config path
-        this.stateManager = createStateManager({ 
-          configPath: this.codeConfigPath,
-          schemaPath: this.codeSchemaPath 
-        });
+        // Initialize state and context managers
+        this.stateManager = createStateManager();
+
+        // Load LLM configuration if config path provided
+        if (this.codeConfigPath) {
+          await this.stateManager.loadLLMConfig(this.codeConfigPath);
+        }
+
         await this.contextManager.initialize();
 
         // Initialize provider manager
@@ -170,6 +173,10 @@ class QiCodeApp {
         // Create handlers using factory functions
         this.commandHandler = createCommandHandler();
         this.promptHandler = new ProviderManagerPromptHandler(this.providerManager);
+
+        // Initialize the prompt handler
+        await this.promptHandler.initialize(this.codeConfigPath || '', this.codeSchemaPath || '');
+
         this.workflowHandler = createWorkflowHandler();
 
         // Initialize MCP services (with graceful degradation)
@@ -184,17 +191,12 @@ class QiCodeApp {
           sessionPersistence: true,
         };
 
-        this.qiCodeAgent = new QiCodeAgent(
-          this.stateManager,
-          this.contextManager,
-          agentConfig,
-          {
-            commandHandler: this.commandHandler,
-            promptHandler: this.promptHandler,
-            workflowEngine: this.workflowHandler,
-            workflowExtractor: this.workflowHandler,
-          }
-        );
+        this.qiCodeAgent = new QiCodeAgent(this.stateManager, this.contextManager, agentConfig, {
+          commandHandler: this.commandHandler,
+          promptHandler: this.promptHandler,
+          workflowEngine: this.workflowHandler,
+          workflowExtractor: this.workflowHandler,
+        });
         await this.qiCodeAgent.initialize();
 
         this.logger.info('✅ QiCodeAgent orchestrator initialized successfully', {
@@ -336,8 +338,13 @@ class QiCodeApp {
         // Create CLI using factory pattern (like qi-prompt)
         const { createCLIAsync } = await import('@qi/agent/cli');
 
-        const selectedFramework = 'hybrid'; // Use hybrid framework for qi-code
+        const selectedFramework = this.framework; // Use configured framework for qi-code
         this.logger.info('🔍 Using framework: ' + selectedFramework);
+
+        this.logger.debug('🔍 Creating CLI with message queue', {
+          hasMessageQueue: !!this.messageQueue,
+          framework: selectedFramework,
+        });
 
         const cliResult = await createCLIAsync({
           framework: selectedFramework,
@@ -361,16 +368,16 @@ class QiCodeApp {
           );
         }
 
-        // Initialize QiCodeCLI (like qi-prompt's QiPromptCLI)
-        this.qiCodeCore = new QiCodeCLI(this.cli, this.qiCodeAgent!, this.messageQueue);
-
         this.logger.info('🖥️ Starting QiCode with Hybrid CLI Framework', {
           framework: 'HybridCLIFramework',
           features: 'Claude Code navigation + QiCodeAgent',
         });
 
-        // Initialize and start QiCodeCLI (handles both CLI and message processing)
+        // AFTER CLI is created (but auto-started), create and initialize QiCodeCLI
+        this.qiCodeCore = new QiCodeCLI(this.cli, this.qiCodeAgent!, this.messageQueue);
         await this.qiCodeCore.initialize();
+
+        // Start message processing AFTER everything is initialized
         await this.qiCodeCore.start();
 
         this.logger.info('👋 Hybrid CLI session ended');
@@ -458,7 +465,13 @@ class QiCodeApp {
 
         const processResult =
           inputResult.tag === 'success'
-            ? await this.processUserInput(inputResult.value)
+            ? failure(
+                create(
+                  'FALLBACK_NOT_SUPPORTED',
+                  'Basic CLI fallback does not support real LLM calls. Please use the Hybrid CLI Framework.',
+                  'SYSTEM'
+                )
+              )
             : (inputResult as Result<string, QiError>);
 
         match(
@@ -514,23 +527,6 @@ class QiCodeApp {
   }
 
   /**
-   * Process user input using QiCodeAgent and Result<T> patterns
-   */
-  private async processUserInput(input: string): Promise<Result<string, QiError>> {
-    this.logger.info('Processing user request', {
-      inputLength: input.length,
-      inputPreview: input.substring(0, 100),
-    });
-
-    if (input === 'status') {
-      return this.getAgentStatus();
-    }
-
-    // Use QiCodeAgent to process the request
-    return await this.executeWithQiCodeAgent(input);
-  }
-
-  /**
    * Get agent status using Result<T> patterns
    */
   private getAgentStatus(): Result<string, QiError> {
@@ -569,73 +565,6 @@ class QiCodeApp {
     });
 
     return success(status);
-  }
-
-  /**
-   * Execute request using QiCodeAgent with proper Result<T> handling
-   */
-  private async executeWithQiCodeAgent(input: string): Promise<Result<string, QiError>> {
-    return await fromAsyncTryCatch(
-      async () => {
-        // In the full implementation, this would:
-        // 1. Create AgentRequest from input
-        // 2. Call this.qiCodeAgent.process(request)
-        // 3. Extract response and format for user
-
-        this.logger.info('QiCodeAgent processing request', {
-          agent: 'QiCodeAgent',
-          requestType: 'coding-task',
-          inputLength: input.length,
-        });
-
-        // Simulate QiCodeAgent processing with actual sub-agent coordination
-        const availableAgents = ['fileops', 'search', 'git', 'web']; // QiCodeAgent handles these internally
-
-        // Simulate intelligent task routing based on input
-        let coordinatedAgents: string[] = [];
-        if (
-          input.toLowerCase().includes('file') ||
-          input.toLowerCase().includes('read') ||
-          input.toLowerCase().includes('write')
-        ) {
-          coordinatedAgents.push('FileOps');
-        }
-        if (input.toLowerCase().includes('search') || input.toLowerCase().includes('find')) {
-          coordinatedAgents.push('Search');
-        }
-        if (input.toLowerCase().includes('git') || input.toLowerCase().includes('commit')) {
-          coordinatedAgents.push('Git');
-        }
-        if (input.toLowerCase().includes('web') || input.toLowerCase().includes('fetch')) {
-          coordinatedAgents.push('Web');
-        }
-
-        // Default to using all agents for complex requests
-        if (coordinatedAgents.length === 0) {
-          coordinatedAgents = ['FileOps', 'Search', 'Git', 'Web'];
-        }
-
-        const mockResponse = [
-          `🤖 QiCode Agent processed: "${input.substring(0, 50)}${input.length > 50 ? '...' : ''}"`,
-          `📋 Coordinated with: ${coordinatedAgents.join(', ')} sub-agents`,
-          `✨ Advanced Workflow Orchestration: ReAct pattern selected`,
-          `🔄 Result<T> patterns used throughout execution pipeline`,
-          `📊 Available sub-agents: ${availableAgents.length}/4`,
-        ].join('\n');
-
-        return mockResponse;
-      },
-      (error: any) =>
-        create(
-          'AGENT_PROCESSING_ERROR',
-          `QiCodeAgent processing failed: ${error?.message || 'Unknown error'}`,
-          'SYSTEM',
-          {
-            input: input.substring(0, 100),
-            originalError: error,
-          }
-        )
-    );
   }
 
   /**
@@ -689,6 +618,7 @@ interface CLIOptions {
   configPath?: string;
   schemaPath?: string;
   envPath?: string;
+  framework?: string;
   debug: boolean;
   provider?: string;
   model?: string;
@@ -708,6 +638,7 @@ async function main() {
     .option('--config-path <path>', 'Path to configuration file')
     .option('--schema-path <path>', 'Path to schema configuration')
     .option('--env-path <path>', 'Path to environment file')
+    .option('--framework <framework>', 'CLI framework to use (readline, ink, hybrid)', 'hybrid')
     .option('--debug', 'Enable debug mode', false)
     .option('--provider <provider>', 'LLM provider to use')
     .option('--model <model>', 'Model to use')

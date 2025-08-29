@@ -27,6 +27,7 @@ export class ReadlineInputManager {
   private history: string[] = [];
   private messageQueue: QiAsyncMessageQueue<QiMessage>;
   private debug = createDebugLogger('ReadlineInputManager');
+  private inputCallbacks: ((input: string) => void)[] = [];
 
   constructor(messageQueue: QiAsyncMessageQueue<QiMessage>, config: Partial<ReadlineConfig> = {}) {
     this.messageQueue = messageQueue;
@@ -92,6 +93,15 @@ export class ReadlineInputManager {
 
     // Send USER_INPUT message to queue
     this.sendUserInputMessage(input);
+
+    // Call registered input callbacks (for MessageDrivenCLI compatibility)
+    this.inputCallbacks.forEach((callback) => {
+      try {
+        callback(input);
+      } catch (error) {
+        this.debug.warn('Error in input callback:', error);
+      }
+    });
   }
 
   /**
@@ -182,6 +192,14 @@ export class ReadlineInputManager {
     if (this.rl) {
       this.rl.setPrompt(this.config.prompt);
     }
+  }
+
+  /**
+   * Register input callback for MessageDrivenCLI compatibility
+   */
+  onInput(callback: (input: string) => void): void {
+    this.inputCallbacks.push(callback);
+    this.debug.log('Input callback registered for MessageDrivenCLI compatibility');
   }
 
   /**
