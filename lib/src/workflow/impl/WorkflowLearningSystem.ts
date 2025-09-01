@@ -10,7 +10,7 @@
  */
 
 import type { QiError, Result } from '@qi/base';
-import { create, failure, flatMap, match, success } from '@qi/base';
+import { create, failure, match, success } from '@qi/base';
 import type { MCPServiceManager } from '../../mcp/MCPServiceManager.js';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
@@ -19,8 +19,6 @@ import type {
   LearningInsights,
   OptimizationInsight,
   PerformanceImprovement,
-  WorkflowAdaptation,
-  WorkflowMetrics,
   WorkflowOutcome,
 } from '../abstractions/IAdvancedWorkflowOrchestrator.js';
 
@@ -367,7 +365,7 @@ export class WorkflowLearningSystem {
       // Group failures by pattern and analyze common characteristics
       const failureGroups = this.groupFailuresByPattern(failures);
 
-      for (const [pattern, patternFailures] of failureGroups) {
+      for (const [_pattern, patternFailures] of failureGroups) {
         const commonCharacteristics = this.extractCommonFailureCharacteristics(patternFailures);
 
         if (commonCharacteristics.frequency > 0.3) {
@@ -787,7 +785,7 @@ export class WorkflowLearningSystem {
     return `Implement early detection for ${characteristics.characteristics.join(' and ')} patterns`;
   }
 
-  private identifyWarningSignals(characteristics: any): string[] {
+  private identifyWarningSignals(_characteristics: any): string[] {
     return [
       'High memory usage detected',
       'Execution time exceeding baseline',
@@ -804,15 +802,17 @@ export class WorkflowLearningSystem {
   }
 
   // Stub methods for updating system components (would be implemented in integration)
-  private async updatePatternSelectionWeights(optimizations: OptimizationInsight[]): Promise<void> {
+  private async updatePatternSelectionWeights(
+    _optimizations: OptimizationInsight[]
+  ): Promise<void> {
     // Would update the IntelligentPatternSelector with new insights
   }
 
-  private async updateContextualMatching(patterns: ContextualPattern[]): Promise<void> {
+  private async updateContextualMatching(_patterns: ContextualPattern[]): Promise<void> {
     // Would update contextual pattern matching algorithms
   }
 
-  private async updateFailurePrevention(prevention: FailurePrevention[]): Promise<void> {
+  private async updateFailurePrevention(_prevention: FailurePrevention[]): Promise<void> {
     // Would update failure prevention mechanisms
   }
 
@@ -881,7 +881,7 @@ export class WorkflowLearningSystem {
 
   private createRAGIntegration(): ChromaMCPIntegration {
     return {
-      async storeContextualPattern(pattern: ContextualPattern): Promise<Result<void, QiError>> {
+      async storeContextualPattern(_pattern: ContextualPattern): Promise<Result<void, QiError>> {
         // Mock implementation - would integrate with actual RAG service
         return success(undefined);
       },
@@ -891,7 +891,7 @@ export class WorkflowLearningSystem {
   private createDatabaseIntegration(): DatabaseMCPIntegration {
     return {
       async recordLearningApplication(
-        application: LearningApplication
+        _application: LearningApplication
       ): Promise<Result<void, QiError>> {
         // Mock implementation - would store in actual database
         return success(undefined);

@@ -5,7 +5,6 @@
  * the existing IStateManager interface for compatibility.
  */
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   create,
@@ -1072,7 +1071,7 @@ export class StateManager implements IStateManager {
   clearOldContextMemory(maxAge: number): Result<void, QiError> {
     try {
       // Clear from local memory map
-      const cutoffTime = Date.now() - maxAge;
+      const _cutoffTime = Date.now() - maxAge;
 
       // For now, just clear all local memory (simple approach)
       // TODO: Implement timestamp tracking and selective clearing

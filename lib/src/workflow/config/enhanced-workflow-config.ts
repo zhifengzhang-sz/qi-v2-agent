@@ -232,7 +232,6 @@ export class WorkflowConfigValidator {
         return DEVELOPMENT_WORKFLOW_CONFIG;
       case 'high-performance':
         return HIGH_PERFORMANCE_WORKFLOW_CONFIG;
-      case 'production':
       default:
         return ENHANCED_WORKFLOW_CONFIG;
     }
@@ -384,7 +383,7 @@ export class WorkflowConfigLoader {
     if (process.env.WORKFLOW_CHECKPOINT_INTERVAL) {
       overrides.monitoring = {
         ...baseConfig.monitoring,
-        performanceCheckpointInterval: parseInt(process.env.WORKFLOW_CHECKPOINT_INTERVAL),
+        performanceCheckpointInterval: parseInt(process.env.WORKFLOW_CHECKPOINT_INTERVAL, 10),
       };
     }
 
@@ -398,7 +397,7 @@ export class WorkflowConfigLoader {
     if (process.env.WORKFLOW_MAX_PHASES) {
       overrides.hybridExecution = {
         ...baseConfig.hybridExecution,
-        maxPhasesPerExecution: parseInt(process.env.WORKFLOW_MAX_PHASES),
+        maxPhasesPerExecution: parseInt(process.env.WORKFLOW_MAX_PHASES, 10),
       };
     }
 

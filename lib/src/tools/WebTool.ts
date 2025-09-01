@@ -147,7 +147,7 @@ export class WebTool {
             try {
               const searchData = JSON.parse(contentItem.text);
 
-              if (searchData.web && searchData.web.results) {
+              if (searchData.web?.results) {
                 for (const item of searchData.web.results.slice(0, maxResults)) {
                   results.push({
                     title: item.title || '',
@@ -225,7 +225,7 @@ export class WebTool {
       }
 
       return success(undefined);
-    } catch (error) {
+    } catch (_error) {
       return failure(validationError(`Invalid URL format: ${url}`));
     }
   }

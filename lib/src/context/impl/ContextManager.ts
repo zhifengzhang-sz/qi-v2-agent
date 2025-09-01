@@ -422,7 +422,7 @@ export class ContextManager implements IContextManager {
     };
 
     // Validate access through security boundaries
-    const validateAccess = async (context: IsolatedContext): Promise<Result<boolean>> => {
+    const validateAccess = async (_context: IsolatedContext): Promise<Result<boolean>> => {
       const validationResult = await this.securityBoundaries.validateAccess(contextId, operation);
 
       return match(

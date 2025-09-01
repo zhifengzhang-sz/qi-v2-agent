@@ -10,7 +10,7 @@
  */
 
 import type { QiError, Result } from '@qi/base';
-import { create, failure, flatMap, match, success } from '@qi/base';
+import { create, failure, match, success } from '@qi/base';
 import type { MCPServiceManager } from '../../mcp/MCPServiceManager.js';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 
@@ -42,10 +42,7 @@ import {
 } from '../config/enhanced-workflow-config.js';
 import { HybridPatternOrchestrator } from './HybridPatternOrchestrator.js';
 import { IntelligentPatternSelector } from './IntelligentPatternSelector.js';
-import {
-  ProductionWorkflowExecutor,
-  type WorkflowPerformanceMonitor,
-} from './ProductionWorkflowExecutor.js';
+import { ProductionWorkflowExecutor } from './ProductionWorkflowExecutor.js';
 import { WorkflowLearningSystem } from './WorkflowLearningSystem.js';
 import {
   type WorkflowMetricsCollector,
@@ -209,7 +206,7 @@ export class AdvancedWorkflowOrchestrator implements IAdvancedWorkflowOrchestrat
     this.ensureInitialized();
 
     // Convert TaskDescription to WorkflowRequest format for analysis
-    const mockRequest: WorkflowRequest = {
+    const _mockRequest: WorkflowRequest = {
       id: `analysis_${Date.now()}`,
       description: task.content,
       context: {},
@@ -748,7 +745,7 @@ export class AdvancedWorkflowOrchestrator implements IAdvancedWorkflowOrchestrat
 
   private createWorkflowAdaptationEngine(): any {
     return {
-      async assessAdaptationNeed(metrics: any, state: any): Promise<any> {
+      async assessAdaptationNeed(_metrics: any, _state: any): Promise<any> {
         // Mock adaptation need assessment
         return {
           shouldAdapt: Math.random() > 0.8, // 20% chance of adaptation
@@ -758,7 +755,7 @@ export class AdvancedWorkflowOrchestrator implements IAdvancedWorkflowOrchestrat
         };
       },
 
-      async generateAdaptation(currentPattern: string, reason: string, state: any): Promise<any> {
+      async generateAdaptation(currentPattern: string, reason: string, _state: any): Promise<any> {
         return {
           adaptationId: `adapt_${Date.now()}`,
           timestamp: new Date(),

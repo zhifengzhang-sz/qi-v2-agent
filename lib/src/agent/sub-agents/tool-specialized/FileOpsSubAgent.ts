@@ -5,9 +5,8 @@
  * Follows the v-0.10.0 roadmap specification exactly without creating new interfaces.
  */
 
-import type { Result } from '@qi/base';
+import type { QiError, Result } from '@qi/base';
 import { failure, success } from '@qi/base';
-import type { QiError } from '@qi/core';
 import { BaseSubAgent } from '../core/BaseSubAgent.js';
 import type {
   SubAgentArtifact,
@@ -488,7 +487,7 @@ export class FileOpsSubAgent extends BaseSubAgent {
     return artifacts;
   }
 
-  protected generateRecommendations(task: SubAgentTask, output: unknown): string[] {
+  protected generateRecommendations(task: SubAgentTask, _output: unknown): string[] {
     const recommendations: string[] = [];
 
     // Generate recommendations based on task type and results

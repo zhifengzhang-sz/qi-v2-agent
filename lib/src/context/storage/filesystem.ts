@@ -686,10 +686,6 @@ export class FilesystemContextStorage {
   private performCompression(data: string, algorithm: CompressionAlgorithm): string {
     // Simplified compression - in reality would use actual compression libraries
     switch (algorithm) {
-      case 'gzip':
-      case 'lz4':
-      case 'brotli':
-      case 'zstd':
       default:
         // For demo purposes, just use base64 encoding
         return Buffer.from(data).toString('base64');
@@ -699,10 +695,6 @@ export class FilesystemContextStorage {
   private performDecompression(data: string, algorithm: CompressionAlgorithm): string {
     // Simplified decompression - in reality would use actual compression libraries
     switch (algorithm) {
-      case 'gzip':
-      case 'lz4':
-      case 'brotli':
-      case 'zstd':
       default:
         // For demo purposes, decode from base64
         return Buffer.from(data, 'base64').toString('utf-8');
@@ -728,7 +720,7 @@ export class FilesystemContextStorage {
     });
   }
 
-  private updateStoreMetrics(sizeBytes: number, operationTime: number): void {
+  private updateStoreMetrics(sizeBytes: number, _operationTime: number): void {
     this.metrics.totalFiles++;
     this.metrics.totalSizeBytes += sizeBytes;
   }

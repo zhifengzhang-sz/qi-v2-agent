@@ -9,13 +9,10 @@
  */
 
 import type { QiError, Result } from '@qi/base';
-import { create, failure, flatMap, match, success } from '@qi/base';
+import { create, failure, match, success } from '@qi/base';
 import type { MCPServiceManager } from '../../mcp/MCPServiceManager.js';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
-  ExecutionContext,
-  ExecutionFeedback,
-  PatternAdaptation,
   PatternSelection,
   StepMetrics,
   WorkflowAdaptation,
@@ -151,7 +148,7 @@ export class ProductionWorkflowExecutor {
     private patternSelector: IntelligentPatternSelector,
     private performanceMonitor: WorkflowPerformanceMonitor,
     private adaptationEngine: WorkflowAdaptationEngine,
-    private mcpServiceManager: MCPServiceManager
+    _mcpServiceManager: MCPServiceManager
   ) {
     this.logger = createQiLogger({ name: 'ProductionWorkflowExecutor' });
     this.databaseIntegration = this.createDatabaseIntegration();
@@ -413,7 +410,7 @@ export class ProductionWorkflowExecutor {
   private createDatabaseIntegration(): DatabaseMCPIntegration {
     return {
       async persistWorkflowExecution(
-        execution: WorkflowExecutionRecord
+        _execution: WorkflowExecutionRecord
       ): Promise<Result<void, QiError>> {
         // For now, return success - would integrate with actual MCP database service
         return success(undefined);
@@ -502,7 +499,7 @@ class MockPatternExecution implements PatternExecution {
     }
   }
 
-  async applyAdaptation(adaptation: WorkflowAdaptation): Promise<void> {
+  async applyAdaptation(_adaptation: WorkflowAdaptation): Promise<void> {
     // Simulate adaptation application
     await new Promise((resolve) => setTimeout(resolve, 50));
   }

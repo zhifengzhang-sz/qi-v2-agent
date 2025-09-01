@@ -148,7 +148,7 @@ export async function createCLIAsync(
   );
 
   // If user explicitly requested a framework, it MUST work - NO FALLBACKS
-  const explicitFrameworkRequested = !!config.framework;
+  const _explicitFrameworkRequested = !!config.framework;
 
   switch (framework) {
     case 'readline':
@@ -273,8 +273,8 @@ export function recommendFramework(): {
 // Framework-specific factories
 
 function createInkCLI(
-  config: Partial<CLIConfig> = {},
-  messageQueue?: any
+  _config: Partial<CLIConfig> = {},
+  _messageQueue?: any
 ): Result<ICLIFramework, QiError> {
   return Err(
     cliFactoryError(

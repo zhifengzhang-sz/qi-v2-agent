@@ -8,7 +8,7 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatOpenAI } from '@langchain/openai';
 import type { QiError, Result } from '@qi/base';
-import { create, failure, fromAsyncTryCatch, match, success } from '@qi/base';
+import { create, fromAsyncTryCatch, match } from '@qi/base';
 import { z } from 'zod';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {

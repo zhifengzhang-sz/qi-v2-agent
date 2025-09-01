@@ -6,9 +6,8 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { Result } from '@qi/base';
+import type { QiError, Result } from '@qi/base';
 import { failure, match, success } from '@qi/base';
-import type { QiError } from '@qi/core';
 import { createQiLogger, type SimpleLogger } from '../../../utils/QiCoreLogger.js';
 import type {
   ISubAgent,

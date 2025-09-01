@@ -13,7 +13,6 @@ import {
   FilePathSchema,
   JSONObjectSchema,
   NonEmptyStringSchema,
-  type TaskStatus,
   TaskStatusSchema,
   TimestampSchema,
   UUIDSchema,

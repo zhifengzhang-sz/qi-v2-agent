@@ -62,7 +62,7 @@ export class LLMFunctionCallingWorkflowEngine implements IWorkflowEngine {
   private toolHandlers: Map<string, WorkflowNodeHandler> = new Map();
 
   constructor(
-    private llmProvider: any, // multi-llm-ts integration
+    _llmProvider: any, // multi-llm-ts integration
     private config: {
       model?: string;
       temperature?: number;
@@ -124,7 +124,7 @@ export class LLMFunctionCallingWorkflowEngine implements IWorkflowEngine {
   /**
    * Create an executable workflow from a pattern
    */
-  createWorkflow(pattern: string, customizations?: any[]): ExecutableWorkflow {
+  createWorkflow(pattern: string, _customizations?: any[]): ExecutableWorkflow {
     return {
       id: `llm-workflow-${Date.now()}`,
       pattern,
@@ -397,7 +397,7 @@ Execute the user's request by making appropriate function calls.`;
    * Call LLM with function calling capability
    */
   private async callLLMWithFunctions(
-    systemPrompt: string,
+    _systemPrompt: string,
     userInput: string,
     toolSchemas: LLMFunctionSchema[]
   ): Promise<Result<any, QiError>> {

@@ -5,16 +5,7 @@
  * This encapsulates all workflow patterns and tools as private members.
  */
 
-import {
-  create,
-  failure,
-  flatMap,
-  fromAsyncTryCatch,
-  match,
-  type QiError,
-  type Result,
-  success,
-} from '@qi/base';
+import { create, failure, fromAsyncTryCatch, type QiError, type Result, success } from '@qi/base';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   InternalPatternResult,
@@ -162,8 +153,6 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
             finalState = this.convertPatternResultToState(adaptResult.value, initialState);
             break;
           }
-
-          case 'simple':
           default:
             // Simple workflow execution
             finalState = {
@@ -225,7 +214,10 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
 
     return fromAsyncTryCatch(
       async (): Promise<InternalPatternResult> => {
-        const result = await this.reactPattern!.execute(input, context.sessionId, maxSteps);
+        if (!this.reactPattern) {
+          throw new Error('ReAct pattern not initialized');
+        }
+        const result = await this.reactPattern.execute(input, context.sessionId, maxSteps);
 
         return {
           output: result.output,
@@ -270,7 +262,10 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
 
     return fromAsyncTryCatch(
       async (): Promise<InternalPatternResult> => {
-        const result = await this.rewooPattern!.execute(input, context.sessionId);
+        if (!this.rewooPattern) {
+          throw new Error('ReWOO pattern not initialized');
+        }
+        const result = await this.rewooPattern.execute(input, context.sessionId);
 
         return {
           output: result.output,
@@ -319,7 +314,10 @@ export class QiCoreWorkflowManager implements IWorkflowManager {
 
     return fromAsyncTryCatch(
       async (): Promise<InternalPatternResult> => {
-        const result = await this.adaptPattern!.execute(input, context.sessionId);
+        if (!this.adaptPattern) {
+          throw new Error('ADaPT pattern not initialized');
+        }
+        const result = await this.adaptPattern.execute(input, context.sessionId);
 
         return {
           output: result.output,

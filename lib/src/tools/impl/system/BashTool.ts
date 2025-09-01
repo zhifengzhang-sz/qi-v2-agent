@@ -362,7 +362,7 @@ export class BashTool extends BaseFileTool<BashToolInput, BashToolOutput> {
 
   private async validateCommandSecurity(
     context: ExecutionContext,
-    toolContext: ToolContext
+    _toolContext: ToolContext
   ): Promise<Result<void, QiError>> {
     // Validate working directory exists and is accessible
     return fromAsyncTryCatch(

@@ -6,23 +6,9 @@
  * including semantic similarity, recency, and priority.
  */
 
-import {
-  create,
-  failure,
-  flatMap,
-  fromAsyncTryCatch,
-  match,
-  type QiError,
-  type Result,
-  success,
-} from '@qi/base';
+import { create, failure, fromAsyncTryCatch, type QiError, type Result, success } from '@qi/base';
 import type { SimpleLogger } from '../../utils/index.js';
-import {
-  type Context,
-  type ContextQuery,
-  type ContextType,
-  validateContext,
-} from '../schemas/index.js';
+import type { Context, ContextType } from '../schemas/index.js';
 import type { StorageQueryOptions, UnifiedContextStorageEngine } from '../storage/index.js';
 
 // =============================================================================
@@ -205,7 +191,6 @@ export class IntelligentSelectStrategy implements SelectStrategy {
   private logger: SimpleLogger;
   private metrics: SelectStrategyMetrics;
   private semanticCache: Map<string, ScoredContext[]>;
-  private initialized = false;
 
   constructor(storageEngine: UnifiedContextStorageEngine, logger: SimpleLogger) {
     this.storageEngine = storageEngine;
@@ -1186,13 +1171,13 @@ export class IntelligentSelectStrategy implements SelectStrategy {
         // Apply type filters
         if (constraints.requiredTypes && constraints.requiredTypes.length > 0) {
           filteredContexts = filteredContexts.filter((context) =>
-            constraints.requiredTypes!.includes(context.type)
+            constraints.requiredTypes?.includes(context.type)
           );
         }
 
         if (constraints.excludeTypes && constraints.excludeTypes.length > 0) {
           filteredContexts = filteredContexts.filter(
-            (context) => !constraints.excludeTypes!.includes(context.type)
+            (context) => !constraints.excludeTypes?.includes(context.type)
           );
         }
 
@@ -1201,8 +1186,8 @@ export class IntelligentSelectStrategy implements SelectStrategy {
           filteredContexts = filteredContexts.filter((context) => {
             const contextTime = context.metadata.lastAccessed;
             return (
-              contextTime >= constraints.timeRange!.start &&
-              contextTime <= constraints.timeRange!.end
+              contextTime >= constraints.timeRange?.start &&
+              contextTime <= constraints.timeRange?.end
             );
           });
         }

@@ -9,7 +9,6 @@ import {
   failure,
   flatMap,
   fromAsyncTryCatch,
-  map,
   match,
   type QiError,
   type Result,

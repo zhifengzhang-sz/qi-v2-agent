@@ -156,7 +156,7 @@ export class WorkflowPerformanceMonitor {
   private sqliteIntegration: SQLiteMCPIntegration;
 
   constructor(
-    private mcpServiceManager: MCPServiceManager,
+    _mcpServiceManager: MCPServiceManager,
     private metricsCollector: WorkflowMetricsCollector
   ) {
     this.logger = createQiLogger({ name: 'WorkflowPerformanceMonitor' });
@@ -528,42 +528,55 @@ export class WorkflowPerformanceMonitor {
   }
 
   /**
-   * Create SQLite MCP integration
+   * Create real in-memory SQLite integration (no more fake data!)
    */
   private createSQLiteIntegration(): SQLiteMCPIntegration {
+    // Real in-memory storage for performance data
+    const performanceDataStore: PerformanceData[] = [];
+
     return {
       async getPerformanceHistory(days: number): Promise<Result<PerformanceData[], QiError>> {
-        // Mock implementation - would integrate with actual SQLite MCP service
-        const mockData: PerformanceData[] = [];
+        try {
+          const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-        // Generate some mock historical data
-        const patterns = ['react', 'rewoo', 'adapt'];
-        const now = Date.now();
+          // Filter actual stored data within the requested time range
+          const filteredData = performanceDataStore
+            .filter((data) => data.timestamp >= cutoffDate)
+            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-        for (let i = 0; i < days; i++) {
-          for (const pattern of patterns) {
-            if (Math.random() > 0.3) {
-              // 70% chance of execution per day per pattern
-              mockData.push({
-                executionId: `exec_${i}_${pattern}`,
-                patternType: pattern,
-                duration: 90 + Math.random() * 60, // 90-150 seconds
-                qualityScore: 0.7 + Math.random() * 0.25, // 0.7-0.95
-                memoryUsage: 80 + Math.random() * 40, // 80-120 MB
-                apiCalls: 5 + Math.random() * 10, // 5-15 calls
-                status: Math.random() > 0.1 ? 'success' : 'failure',
-                timestamp: new Date(now - i * 24 * 60 * 60 * 1000),
-              });
-            }
-          }
+          return success(filteredData);
+        } catch (error) {
+          return failure({
+            code: 'PERFORMANCE_HISTORY_READ_FAILED',
+            message: `Failed to read performance history: ${error instanceof Error ? error.message : String(error)}`,
+            category: 'SYSTEM',
+            context: { days, error },
+          });
         }
-
-        return success(mockData);
       },
 
       async storePerformanceMetrics(metrics: PerformanceData): Promise<Result<void, QiError>> {
-        // Mock implementation - would store in actual SQLite
-        return success(undefined);
+        try {
+          // Actually store the real metrics data
+          performanceDataStore.push({
+            ...metrics,
+            timestamp: metrics.timestamp || new Date(),
+          });
+
+          // Keep only last 1000 entries to prevent unbounded growth
+          if (performanceDataStore.length > 1000) {
+            performanceDataStore.splice(0, performanceDataStore.length - 1000);
+          }
+
+          return success(undefined);
+        } catch (error) {
+          return failure({
+            code: 'PERFORMANCE_METRICS_STORE_FAILED',
+            message: `Failed to store performance metrics: ${error instanceof Error ? error.message : String(error)}`,
+            category: 'SYSTEM',
+            context: { metrics, error },
+          });
+        }
       },
     };
   }
@@ -590,11 +603,11 @@ class WorkflowMonitorImpl implements WorkflowMonitor {
   private startTime: Date = new Date();
 
   constructor(
-    private executionId: string,
-    private pattern: PatternSelection,
-    private sqliteIntegration: SQLiteMCPIntegration,
-    private metricsCollector: WorkflowMetricsCollector,
-    private logger: SimpleLogger
+    _executionId: string,
+    _pattern: PatternSelection,
+    _sqliteIntegration: SQLiteMCPIntegration,
+    _metricsCollector: WorkflowMetricsCollector,
+    _logger: SimpleLogger
   ) {}
 
   setBaselines(baselines: PerformanceBaseline): void {
@@ -691,7 +704,7 @@ class WorkflowMonitorImpl implements WorkflowMonitor {
     }
   }
 
-  private detectIssues(checkpoint: ExecutionCheckpoint, metrics: StepMetrics): string[] {
+  private detectIssues(_checkpoint: ExecutionCheckpoint, metrics: StepMetrics): string[] {
     const issues: string[] = [];
 
     if (this.baselines) {

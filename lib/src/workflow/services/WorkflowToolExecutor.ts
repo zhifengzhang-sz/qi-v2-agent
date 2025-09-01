@@ -6,12 +6,7 @@
  */
 
 import { failure, fromAsyncTryCatch, type QiError, type Result, success } from '@qi/base';
-import type {
-  ITool,
-  ToolCall,
-  ToolContext,
-  ToolResult,
-} from '../../tools/core/interfaces/ITool.js';
+import type { ToolCall, ToolContext, ToolResult } from '../../tools/core/interfaces/ITool.js';
 import type { IToolExecutor } from '../../tools/core/interfaces/IToolExecutor.js';
 import type { IToolRegistry } from '../../tools/core/interfaces/IToolRegistry.js';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
@@ -87,7 +82,7 @@ export class WorkflowToolExecutor {
       return failure(toolResult.error);
     }
 
-    const tool = toolResult.value;
+    const _tool = toolResult.value;
 
     // Create tool context for workflow execution
     const toolContext = this.createWorkflowToolContext(request);

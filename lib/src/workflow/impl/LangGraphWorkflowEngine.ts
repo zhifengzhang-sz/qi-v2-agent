@@ -6,19 +6,15 @@
  */
 
 import { Annotation, StateGraph } from '@langchain/langgraph';
-import { fromAsyncTryCatch } from '@qi/base';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   ExecutableWorkflow,
   IWorkflowEngine,
   IWorkflowEngineConfig,
   ToolResult,
-  WorkflowCondition,
   WorkflowCustomization,
   WorkflowEdge,
   WorkflowNode,
-  WorkflowNodeHandler,
-  WorkflowNodeSpec,
   WorkflowResult,
   WorkflowSpec,
   WorkflowState,
@@ -76,7 +72,7 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
     });
   }
 
-  createWorkflow(pattern: string, customizations?: WorkflowCustomization[]): ExecutableWorkflow {
+  createWorkflow(pattern: string, _customizations?: WorkflowCustomization[]): ExecutableWorkflow {
     this.logger.info('🏗️ Creating LangGraph StateGraph workflow', undefined, {
       component: 'LangGraphWorkflowEngine',
       method: 'createWorkflow',
@@ -503,7 +499,7 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
   /**
    * Create node specifications for ExecutableWorkflow compatibility
    */
-  private createNodeSpecs(pattern: string): WorkflowNode[] {
+  private createNodeSpecs(_pattern: string): WorkflowNode[] {
     return [
       {
         id: 'input',
@@ -529,7 +525,7 @@ export class LangGraphWorkflowEngine implements IWorkflowEngine {
   /**
    * Create edge specifications for ExecutableWorkflow compatibility
    */
-  private createEdgeSpecs(pattern: string): WorkflowEdge[] {
+  private createEdgeSpecs(_pattern: string): WorkflowEdge[] {
     return [
       { from: 'input', to: 'reasoning' },
       { from: 'reasoning', to: 'output' },

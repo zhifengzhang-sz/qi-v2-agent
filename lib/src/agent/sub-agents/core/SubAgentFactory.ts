@@ -5,9 +5,8 @@
  * Uses QiCore Result<T, QiError> patterns for consistent error handling.
  */
 
-import type { Result } from '@qi/base';
+import type { QiError, Result } from '@qi/base';
 import { failure, match, success } from '@qi/base';
-import type { QiError } from '@qi/core';
 import { createQiLogger, type SimpleLogger } from '../../../utils/QiCoreLogger.js';
 // Import tool-specialized sub-agents
 import { FileOpsSubAgent } from '../tool-specialized/FileOpsSubAgent.js';

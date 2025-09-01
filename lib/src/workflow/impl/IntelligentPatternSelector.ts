@@ -8,14 +8,12 @@
  */
 
 import type { QiError, Result } from '@qi/base';
-import { create, failure, flatMap, match, success } from '@qi/base';
+import { create, failure, match, success } from '@qi/base';
 import type { MCPServiceManager } from '../../mcp/MCPServiceManager.js';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
-  ComplexityAnalysis,
   PatternRecommendation,
   PatternSelection,
-  TaskDescription,
   WorkflowRequest,
 } from '../abstractions/IAdvancedWorkflowOrchestrator.js';
 
@@ -513,6 +511,13 @@ export class IntelligentPatternSelector {
       );
     }
 
+    // Ensure we always provide some reasoning, even without historical data
+    if (reasons.length === 0) {
+      reasons.push(
+        'Pattern selected based on task characteristics and fundamental pattern strengths'
+      );
+    }
+
     return reasons.join('. ');
   }
 
@@ -615,22 +620,82 @@ export class IntelligentPatternSelector {
    * Create MCP RAG integration for pattern knowledge retrieval
    */
   private createRAGIntegration(): ChromaMCPIntegration {
+    // Real knowledge base for patterns (no more fake scores!)
+    const patternKnowledgeBase: Record<string, PatternKnowledge> = {
+      react: {
+        pattern: 'react',
+        confidenceScore: 0.0, // Will be calculated from actual usage
+        averageDuration: 0, // Will be calculated from real metrics
+        successRate: 0.0, // Will be calculated from real outcomes
+        qualityScore: 0.0, // Will be calculated from real quality assessments
+        applicableContexts: ['problem-solving', 'research', 'analysis', 'reasoning'],
+      },
+      rewoo: {
+        pattern: 'rewoo',
+        confidenceScore: 0.0,
+        averageDuration: 0,
+        successRate: 0.0,
+        qualityScore: 0.0,
+        applicableContexts: ['planning', 'task-decomposition', 'workflow-management'],
+      },
+      adapt: {
+        pattern: 'adapt',
+        confidenceScore: 0.0,
+        averageDuration: 0,
+        successRate: 0.0,
+        qualityScore: 0.0,
+        applicableContexts: ['adaptive-reasoning', 'complex-tasks', 'iterative-improvement'],
+      },
+    };
+
     return {
       async retrievePatternKnowledge(
         patterns: string[]
       ): Promise<Result<PatternKnowledge[], QiError>> {
-        // For now, return mock data until RAG MCP service is properly configured
-        const mockKnowledge: PatternKnowledge[] = patterns.map((pattern) => ({
-          pattern,
-          confidenceScore: 0.8,
-          averageDuration: pattern === 'rewoo' ? 90 : pattern === 'react' ? 120 : 150,
-          successRate: pattern === 'rewoo' ? 0.85 : pattern === 'adapt' ? 0.9 : 0.8,
-          qualityScore: pattern === 'adapt' ? 0.9 : pattern === 'rewoo' ? 0.85 : 0.8,
-          applicableContexts: ['general', 'analysis', 'development'],
-        }));
+        try {
+          const knowledge: PatternKnowledge[] = [];
 
-        return success(mockKnowledge);
+          for (const pattern of patterns) {
+            const baseKnowledge = patternKnowledgeBase[pattern];
+            if (baseKnowledge) {
+              // TODO: Calculate real metrics from actual performance data
+              // For now, start with base knowledge and update with real metrics over time
+              knowledge.push({
+                ...baseKnowledge,
+                // These should be calculated from real performance monitoring data
+                // Using conservative defaults until real data is available
+                confidenceScore: 0.5, // Conservative default
+                averageDuration: 0, // No real data yet
+                successRate: 0.0, // No real data yet
+                qualityScore: 0.0, // No real data yet
+              });
+            } else {
+              // Unknown pattern - return minimal knowledge
+              knowledge.push({
+                pattern,
+                confidenceScore: 0.0,
+                averageDuration: 0,
+                successRate: 0.0,
+                qualityScore: 0.0,
+                applicableContexts: ['unknown'],
+              });
+            }
+          }
+
+          return success(knowledge);
+        } catch (error) {
+          return failure({
+            code: 'PATTERN_KNOWLEDGE_RETRIEVAL_FAILED',
+            message: `Failed to retrieve pattern knowledge: ${error instanceof Error ? error.message : String(error)}`,
+            category: 'SYSTEM',
+            context: { patterns, error },
+          });
+        }
       },
     };
   }
+
+  // TODO: Add integration with real performance monitoring data
+  // When WorkflowPerformanceMonitor collects real data, these patterns should
+  // calculate their metrics from actual execution history instead of hardcoded values
 }

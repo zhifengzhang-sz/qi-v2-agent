@@ -5,7 +5,7 @@
  * to prevent hitting token limits while preserving important information.
  */
 
-import { create, failure, fromAsyncTryCatch, type QiError, type Result, success } from '@qi/base';
+import { create, fromAsyncTryCatch, type QiError, type Result } from '@qi/base';
 
 /**
  * Context optimization error factory functions
@@ -357,7 +357,7 @@ export class ContextOptimizer {
             const partialTokens = this.calculateTokenCount(partialContent);
             selectedSections.push({
               ...section,
-              content: partialContent + '...',
+              content: `${partialContent}...`,
               tokens: partialTokens,
             });
             tokenCount += partialTokens;

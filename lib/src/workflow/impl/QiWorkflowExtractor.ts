@@ -8,7 +8,6 @@ import {
   create,
   type ErrorCategory,
   failure,
-  flatMap,
   fromAsyncTryCatch,
   match,
   type QiError,
@@ -119,7 +118,7 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
    */
   private analyzeComplexityWithQiCore(
     input: string,
-    context?: ProcessingContext
+    _context?: ProcessingContext
   ): Result<{ detectedMode: string; confidence: number }> {
     if (!input || input.trim().length === 0) {
       return failure(
@@ -345,13 +344,6 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
     return edges;
   }
 
-  /**
-   * Get pattern for a given mode
-   */
-  private getPatternForMode(mode: string): string {
-    return mode; // Pattern is same as mode for template-based
-  }
-
   async extractWorkflow(
     input: string,
     method: WorkflowExtractionMethod,
@@ -391,7 +383,7 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
    */
   private async extractWithLLM(
     input: string,
-    method: WorkflowExtractionMethod,
+    _method: WorkflowExtractionMethod,
     context: WorkflowContext,
     startTime: number
   ): Promise<WorkflowExtractionResult> {
@@ -420,7 +412,10 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
 
     const extractionResult = await fromAsyncTryCatch(
       async (): Promise<WorkflowExtractionResult> => {
-        return await this.llmPlanner!.extractWorkflowWithFallback(input, processingContext);
+        if (!this.llmPlanner) {
+          throw new Error('LLM planner not available');
+        }
+        return await this.llmPlanner.extractWorkflowWithFallback(input, processingContext);
       },
       (error: unknown): QiError => ({
         code: 'LLM_EXTRACTION_FAILED',
@@ -559,7 +554,7 @@ export class QiWorkflowExtractor implements IWorkflowExtractor {
     return true;
   }
 
-  async getWorkflowTemplates(mode: string): Promise<readonly WorkflowSpec[]> {
+  async getWorkflowTemplates(_mode: string): Promise<readonly WorkflowSpec[]> {
     // Return empty array for now - templates could be loaded from config
     return [];
   }

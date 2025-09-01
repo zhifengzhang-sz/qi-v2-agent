@@ -7,15 +7,19 @@
 
 // Core Agent Framework
 export * from './agent/index.js';
-
-// Input Classification System
-export {
+export type {
   ClassificationConfig,
   ClassificationMethod,
   ClassificationOptions,
   ClassificationResult,
   ClassificationStats,
   ClassificationType,
+  IClassificationMethod,
+  IClassifier,
+  ProcessingContext as ClassificationProcessingContext,
+} from './classifier/index.js';
+// Input Classification System
+export {
   createAccurateClassifier,
   createBasicClassifier,
   createClassifier,
@@ -26,28 +30,27 @@ export {
   getClassificationSchema,
   // Schema registry exports
   globalSchemaRegistry,
-  IClassificationMethod,
-  IClassifier,
-  ProcessingContext as ClassificationProcessingContext,
   selectOptimalClassificationSchema,
 } from './classifier/index.js';
 // Command Processing
 export * from './command/index.js';
-// Context Management
-export {
+export type {
   AgentSpecialization,
   AppContext,
   ContextAccessAudit,
-  ContextManager,
   ContextMessage,
   ConversationContext,
-  createContextManager,
-  createDefaultAppContext,
   IContextManager,
   IsolatedContext,
   IsolatedContextConfig,
-  SecurityBoundaryManager,
   SecurityRestrictions,
+} from './context/index.js';
+// Context Management
+export {
+  ContextManager,
+  createContextManager,
+  createDefaultAppContext,
+  SecurityBoundaryManager,
 } from './context/index.js';
 
 // MCP Integration System
@@ -71,15 +74,12 @@ export {
   type TopicResult,
   TopicSchema,
 } from './schemas/ClassificationSchemas.js';
-
+export type { IStateManager as StateManagerInterface } from './state/index.js';
 // State Management
-export {
-  createStateManager as createStateManagerFactory,
-  IStateManager as StateManagerInterface,
-} from './state/index.js';
+export { createStateManager as createStateManagerFactory } from './state/index.js';
 
 // Workflow Processing
-export {
+export type {
   ExecutableWorkflow,
   IWorkflowEngine,
   IWorkflowEngineConfig,

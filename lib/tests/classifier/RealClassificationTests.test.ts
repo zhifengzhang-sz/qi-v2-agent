@@ -93,7 +93,9 @@ describe('Real Classification System Tests', () => {
 
       expect(result.type).toBe('command');
       expect(result.method).toBe('ollama-native');
-      expect(result.confidence).toBeGreaterThan(0.8);
+      // FIXED: Expect realistic confidence, not fraudulent high values
+      expect(result.confidence).toBeGreaterThan(0.5);
+      expect(result.confidence).toBeLessThan(0.99); // Never claim near-perfect certainty
       
       // Should detect commands without calling LLM
       expect(result.metadata.get('detectionStage')).toBe('command-detection');

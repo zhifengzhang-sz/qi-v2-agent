@@ -5,8 +5,7 @@
  * All interfaces use QiCore Result<T, QiError> patterns for consistent error handling.
  */
 
-import type { Result } from '@qi/base';
-import type { QiError } from '@qi/core';
+import type { QiError, Result } from '@qi/base';
 
 /**
  * Sub-agent capability definition

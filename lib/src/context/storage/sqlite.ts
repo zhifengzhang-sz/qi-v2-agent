@@ -216,7 +216,7 @@ export class SQLiteContextStorage {
         const searchableContent = this.extractSearchableContent(validatedContext);
 
         // Insert or replace context
-        const result = await this.executeQuery(
+        const _result = await this.executeQuery(
           `
           INSERT OR REPLACE INTO contexts (
             id, type, schema_version, content_json, metadata_json, checksum, version, parent_version,
@@ -809,7 +809,7 @@ export class SQLiteContextStorage {
     return { sql, params };
   }
 
-  private buildFilterQuery(filter: ContextFilter): { sql: string; params: any[] } {
+  private buildFilterQuery(_filter: ContextFilter): { sql: string; params: any[] } {
     // This would implement more complex filtering logic
     // For now, return a basic implementation
     return {
@@ -863,7 +863,7 @@ export class SQLiteContextStorage {
     this.updateAverageQueryTime(executionTime);
   }
 
-  private updateQueryMetrics(executionTime: number, resultCount: number): void {
+  private updateQueryMetrics(executionTime: number, _resultCount: number): void {
     this.metrics.queryCount++;
     this.updateAverageQueryTime(executionTime);
   }

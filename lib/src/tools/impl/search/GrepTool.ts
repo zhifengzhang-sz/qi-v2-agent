@@ -224,7 +224,7 @@ export class GrepTool extends BaseFileTool<GrepToolInput, GrepToolOutput> {
         regexPattern = `\\b${regexPattern}\\b`;
       }
 
-      const flags = (caseInsensitive ? 'gi' : 'g') + 'm'; // multiline mode
+      const flags = `${caseInsensitive ? 'gi' : 'g'}m`; // multiline mode
       return success(new RegExp(regexPattern, flags));
     } catch (error) {
       return failure(

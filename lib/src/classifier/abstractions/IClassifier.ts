@@ -19,7 +19,7 @@ export type ClassificationMethod =
 /**
  * Three input types for classification
  */
-export type ClassificationType = 'command' | 'prompt' | 'workflow' | 'simple-workflow';
+export type ClassificationType = 'command' | 'prompt' | 'workflow';
 
 /**
  * Processing context for classification

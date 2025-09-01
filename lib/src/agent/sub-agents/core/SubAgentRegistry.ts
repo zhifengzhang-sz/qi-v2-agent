@@ -5,9 +5,8 @@
  * Uses QiCore Result<T, QiError> patterns for consistent error handling.
  */
 
-import type { Result } from '@qi/base';
+import type { QiError, Result } from '@qi/base';
 import { failure, match, success } from '@qi/base';
-import type { QiError } from '@qi/core';
 import { createQiLogger, type SimpleLogger } from '../../../utils/QiCoreLogger.js';
 import type { ISubAgent, ISubAgentRegistry, SubAgentCapability, SubAgentTask } from './types.js';
 
@@ -55,7 +54,7 @@ export class SubAgentRegistry implements ISubAgentRegistry {
 
       // Validate sub-agent health before registration
       const healthResult = await subAgent.getHealth();
-      const healthCheck = match(
+      const _healthCheck = match(
         (health) => {
           if (health.status === 'unhealthy') {
             throw createRegistryError(
@@ -84,7 +83,7 @@ export class SubAgentRegistry implements ISubAgentRegistry {
         if (!this.capabilityIndex.has(capability.type)) {
           this.capabilityIndex.set(capability.type, new Set());
         }
-        this.capabilityIndex.get(capability.type)!.add(subAgent.id);
+        this.capabilityIndex.get(capability.type)?.add(subAgent.id);
       }
 
       this.logger.info('Sub-agent registered successfully', {

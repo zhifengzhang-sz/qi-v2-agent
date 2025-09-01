@@ -9,6 +9,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -16,8 +17,6 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@qi/base": ["../../qi-v2-qicore/typescript/dist/base"],
-      "@qi/core": ["../../qi-v2-qicore/typescript/dist/core"],
       "@qi/lib": ["./src"],
       "@qi/lib/*": ["./src/*"],
       "@qi/agent": ["./src/agent"],

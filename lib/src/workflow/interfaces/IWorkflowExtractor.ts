@@ -7,7 +7,6 @@
 // Strategy system removed - using direct pattern implementations instead
 
 import type {
-  ProcessingContext,
   WorkflowContext,
   WorkflowExtractionResult,
   WorkflowMode,

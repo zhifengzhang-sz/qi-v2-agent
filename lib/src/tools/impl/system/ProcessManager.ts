@@ -6,8 +6,6 @@
  */
 
 import { type ChildProcess, exec, spawn } from 'node:child_process';
-import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
 import {
   failure,
   fromAsyncTryCatch,
@@ -134,10 +132,6 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
     { process: ChildProcess; command: string; startTime: number }
   >();
   private monitoringIntervals = new Map<number, NodeJS.Timeout>();
-
-  constructor() {
-    super();
-  }
 
   /**
    * Execute process management action
@@ -308,8 +302,8 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
           const parts = line.trim().split(/\s+/);
           if (parts.length < 8) continue;
 
-          const pid = parseInt(parts[0]);
-          const ppid = parseInt(parts[1]);
+          const pid = parseInt(parts[0], 10);
+          const ppid = parseInt(parts[1], 10);
           const name = parts[2];
           const command = parts.slice(3, -5).join(' ');
           const cpu = parseFloat(parts[parts.length - 5]);
@@ -342,7 +336,7 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
 
   private async listProcessesWindows(
     filter?: string,
-    includeSystem = false
+    _includeSystem = false
   ): Promise<ProcessInfo[]> {
     return new Promise((resolve, reject) => {
       const wmicCommand =
@@ -361,11 +355,11 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
           const parts = line.split(',');
           if (parts.length < 7) continue;
 
-          const pid = parseInt(parts[5]) || 0;
-          const ppid = parseInt(parts[4]) || 0;
+          const pid = parseInt(parts[5], 10) || 0;
+          const ppid = parseInt(parts[4], 10) || 0;
           const name = parts[3] || 'unknown';
           const command = parts[1] || '';
-          const memory = parseInt(parts[6]) || 0;
+          const memory = parseInt(parts[6], 10) || 0;
 
           if (filter && !name.includes(filter) && !command.includes(filter)) {
             continue;
@@ -602,7 +596,7 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
   }
 
   private async cleanupProcesses(
-    input: ProcessManagerInput,
+    _input: ProcessManagerInput,
     startTime: number
   ): Promise<Result<ProcessManagerOutput, QiError>> {
     return fromAsyncTryCatch(
@@ -624,7 +618,7 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
         this.managedProcesses.clear();
 
         // Cleanup monitoring intervals
-        for (const [pid, interval] of this.monitoringIntervals.entries()) {
+        for (const [_pid, interval] of this.monitoringIntervals.entries()) {
           clearInterval(interval);
         }
         this.monitoringIntervals.clear();
@@ -673,7 +667,7 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
                 name: data[2] || 'unknown',
                 command: data[1] || '',
                 cpu: 0,
-                memory: parseInt(data[3]) / 1024 || 0,
+                memory: parseInt(data[3], 10) / 1024 || 0,
                 startTime: '',
                 status: 'running',
               });
@@ -684,8 +678,8 @@ export class ProcessManager extends BaseFileTool<ProcessManagerInput, ProcessMan
             const parts = stdout.trim().split(/\s+/);
             if (parts.length >= 8) {
               resolve({
-                pid: parseInt(parts[0]),
-                ppid: parseInt(parts[1]),
+                pid: parseInt(parts[0], 10),
+                ppid: parseInt(parts[1], 10),
                 name: parts[2],
                 command: parts.slice(3, -4).join(' '),
                 cpu: parseFloat(parts[parts.length - 4]),

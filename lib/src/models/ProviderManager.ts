@@ -3,7 +3,7 @@
  * Following implementation guide Step 2.5: Integration with qi-prompt
  */
 
-import { businessError, Err, fromAsyncTryCatch, Ok, type QiError, type Result } from '@qi/base';
+import { businessError, fromAsyncTryCatch, type QiError, type Result } from '@qi/base';
 
 export interface ModelRequest {
   prompt: string;

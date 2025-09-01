@@ -540,7 +540,7 @@ export class QiAsyncMessageQueue<T extends QiMessage = QiMessage> implements IAs
     if (this.options.cleanupFn) {
       const cleanupResult = await fromAsyncTryCatch(
         async () => {
-          await this.options.cleanupFn!();
+          await this.options.cleanupFn?.();
           return undefined; // Explicit return for TypeScript
         },
         (error: unknown) =>

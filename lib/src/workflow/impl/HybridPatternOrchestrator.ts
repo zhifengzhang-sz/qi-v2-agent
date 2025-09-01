@@ -9,13 +9,12 @@
  */
 
 import type { QiError, Result } from '@qi/base';
-import { create, failure, flatMap, match, success } from '@qi/base';
+import { create, failure, success } from '@qi/base';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   HybridWorkflowExecution,
   TransitionResult,
   WorkflowMetrics,
-  WorkflowPattern,
   WorkflowRequest,
   WorkflowState,
 } from '../abstractions/IAdvancedWorkflowOrchestrator.js';
@@ -426,7 +425,7 @@ export class HybridPatternOrchestrator {
    */
   private async planReActAdaptReWOOExecution(
     plan: HybridExecutionPlan,
-    request: WorkflowRequest
+    _request: WorkflowRequest
   ): Promise<void> {
     // Phase 1: ReAct for exploration
     plan.phases.push({
@@ -528,7 +527,7 @@ export class HybridPatternOrchestrator {
    */
   private async planReActReWOOExecution(
     plan: HybridExecutionPlan,
-    request: WorkflowRequest
+    _request: WorkflowRequest
   ): Promise<void> {
     plan.phases.push({
       id: 'react_exploration',
@@ -564,7 +563,7 @@ export class HybridPatternOrchestrator {
    */
   private async planAdaptReWOOExecution(
     plan: HybridExecutionPlan,
-    request: WorkflowRequest
+    _request: WorkflowRequest
   ): Promise<void> {
     plan.phases.push({
       id: 'adapt_decomposition',
@@ -601,7 +600,7 @@ export class HybridPatternOrchestrator {
   private async planCustomHybridExecution(
     plan: HybridExecutionPlan,
     patterns: string[],
-    request: WorkflowRequest
+    _request: WorkflowRequest
   ): Promise<void> {
     // Create phases for each pattern in sequence
     for (let i = 0; i < patterns.length; i++) {
@@ -703,7 +702,7 @@ export class HybridPatternOrchestrator {
     return Math.min(baselinePerformance + hybridBonus + complexityBonus, 1.0);
   }
 
-  private generateHybridReasoning(analysis: any, patterns: string[], strategy: string): string {
+  private generateHybridReasoning(analysis: any, patterns: string[], _strategy: string): string {
     const reasons: string[] = [];
 
     if (analysis.complexityScore > 0.6) {
@@ -733,7 +732,7 @@ export class HybridPatternOrchestrator {
     return patterns.includes('adapt') && patterns.includes('rewoo') && patterns.length === 2;
   }
 
-  private addFallbackStrategies(plan: HybridExecutionPlan, patterns: string[]): void {
+  private addFallbackStrategies(plan: HybridExecutionPlan, _patterns: string[]): void {
     plan.fallbackStrategies.push({
       triggerConditions: ['phase execution time exceeds 2x estimate', 'phase failure rate > 50%'],
       fallbackPattern: 'react',
@@ -797,7 +796,10 @@ export class HybridPatternOrchestrator {
     return success(result);
   }
 
-  private async executePhase(phase: ExecutionPhase, state: WorkflowState): Promise<PhaseExecution> {
+  private async executePhase(
+    phase: ExecutionPhase,
+    _state: WorkflowState
+  ): Promise<PhaseExecution> {
     // Mock phase execution
     const startTime = new Date();
 
@@ -816,9 +818,9 @@ export class HybridPatternOrchestrator {
   }
 
   private shouldTransition(
-    transition: PhaseTransition,
+    _transition: PhaseTransition,
     execution: PhaseExecution,
-    state: WorkflowState
+    _state: WorkflowState
   ): boolean {
     // Simple condition evaluation - would be more sophisticated in real implementation
     return execution.status === 'completed';
@@ -853,8 +855,8 @@ export class HybridPatternOrchestrator {
 
   private async applyFallbackStrategy(
     plan: HybridExecutionPlan,
-    failedPhaseIndex: number,
-    state: WorkflowState
+    _failedPhaseIndex: number,
+    _state: WorkflowState
   ): Promise<Result<{ output: any }, QiError>> {
     const fallback = plan.fallbackStrategies[0]; // Use first available fallback
 

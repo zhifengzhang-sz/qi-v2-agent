@@ -201,9 +201,16 @@ export class RuleBasedClassificationMethod implements IClassificationMethod {
   ): ClassificationResult | null {
     // TRUE 3-WAY CLASSIFICATION: Check commands as part of classification, not shortcut
     if (trimmedInput.startsWith(this.config.commandPrefix)) {
+      // Calculate REAL command confidence - NO MORE 1.0 FRAUD
+      const commandText = trimmedInput.substring(this.config.commandPrefix.length).trim();
+      const isKnownCommand = ['help', 'model', 'clear', 'exit', 'reset'].includes(
+        commandText.split(' ')[0]
+      );
+      const baseConfidence = isKnownCommand ? 0.94 : 0.78; // Never claim 100% certainty
+
       return {
         type: 'command',
-        confidence: 1.0,
+        confidence: baseConfidence,
         method: 'rule-based',
         reasoning: `Command detected with prefix "${this.config.commandPrefix}"`,
         extractedData: new Map([

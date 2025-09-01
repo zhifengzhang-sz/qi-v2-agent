@@ -22,8 +22,8 @@ import type {
 } from '../interfaces/index.js';
 
 export class QiWorkflowEngine implements IWorkflowEngine {
-  private compiledWorkflows = new Map<string, ExecutableWorkflow>();
   private config: IWorkflowEngineConfig;
+  private compiledWorkflows = new Map<string, ExecutableWorkflow>();
   private logger: SimpleLogger;
 
   constructor(config: IWorkflowEngineConfig = {}) {
@@ -510,7 +510,7 @@ export class QiWorkflowEngine implements IWorkflowEngine {
    */
   async executeWorkflow(
     spec: WorkflowSpec,
-    config: {
+    _config: {
       sessionId: string;
       contextId: string;
       streamingEnabled?: boolean;

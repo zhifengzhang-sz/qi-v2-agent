@@ -6,7 +6,7 @@
  */
 
 import { Annotation, StateGraph } from '@langchain/langgraph';
-import { fromAsyncTryCatch } from '@qi/base';
+import { fromAsyncTryCatch, match } from '@qi/base';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type { WorkflowToolResult } from '../interfaces/index.js';
 import type { WorkflowToolExecutor } from '../services/WorkflowToolExecutor.js';
@@ -396,10 +396,13 @@ export class ReActPattern {
     const actionInput = state.actionInput || {};
 
     // If it's a tool action and we have a tool executor
-    if (this.toolExecutor && this.toolExecutor.isToolAvailable(action)) {
+    if (this.toolExecutor?.isToolAvailable(action)) {
       const toolExecutionResult = await fromAsyncTryCatch(
         async (): Promise<string> => {
-          const result = await this.toolExecutor!.executeTool({
+          if (!this.toolExecutor) {
+            throw new Error('Tool executor not available');
+          }
+          const result = await this.toolExecutor.executeTool({
             toolName: action,
             input: actionInput,
             nodeId: 'react-observe',
@@ -407,14 +410,16 @@ export class ReActPattern {
             sessionId: state.metadata?.sessionId || 'react-session',
           });
 
-          if (result.tag === 'success') {
-            // Update tool results
-            const updatedResults = [...(state.toolResults || []), result.value];
-            // Note: This is a side effect, ideally we'd return this in state update
-            return `Tool ${action} executed successfully: ${JSON.stringify(result.value.output)}`;
-          } else {
-            return `Tool ${action} failed: ${result.error.message}`;
-          }
+          return match(
+            (toolResult) => {
+              // Update tool results
+              const _updatedResults = [...(state.toolResults || []), toolResult];
+              // Note: This is a side effect, ideally we'd return this in state update
+              return `Tool ${action} executed successfully: ${JSON.stringify(toolResult.output)}`;
+            },
+            (error) => `Tool ${action} failed: ${error.message}`,
+            result
+          );
         },
         (error: unknown) => ({
           code: 'REACT_TOOL_EXECUTION_ERROR',

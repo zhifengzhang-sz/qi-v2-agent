@@ -18,7 +18,6 @@ import {
 import type { MCPServiceConnection } from '../../mcp/index.js';
 import type { SimpleLogger } from '../../utils/index.js';
 import {
-  type CompressedContext,
   type Context,
   type ContextQuery,
   type MCPServiceType,
@@ -269,7 +268,7 @@ export class UnifiedContextStorageEngine {
           service: fallbackService,
         });
       },
-      (error) => {
+      (_error) => {
         // All fallbacks failed
         this.recordOperationMetrics('store', Date.now() - startTime, false, true);
         return failure(create('ALL_STORAGE_FAILED', 'All storage services failed', 'SYSTEM'));

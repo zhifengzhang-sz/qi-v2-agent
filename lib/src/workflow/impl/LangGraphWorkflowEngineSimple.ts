@@ -5,19 +5,16 @@
  * Focuses on basic functionality to get compilation working first
  */
 
-import { Annotation, StateGraph } from '@langchain/langgraph';
 import { createQiLogger, type SimpleLogger } from '../../utils/QiCoreLogger.js';
 import type {
   ExecutableWorkflow,
   IWorkflowEngine,
   IWorkflowEngineConfig,
   ToolResult,
-  WorkflowCondition,
   WorkflowCustomization,
   WorkflowEdge,
   WorkflowNode,
   WorkflowNodeHandler,
-  WorkflowNodeSpec,
   WorkflowResult,
   WorkflowSpec,
   WorkflowState,
@@ -40,7 +37,7 @@ export class LangGraphWorkflowEngineSimple implements IWorkflowEngine {
     });
   }
 
-  createWorkflow(pattern: string, customizations?: WorkflowCustomization[]): ExecutableWorkflow {
+  createWorkflow(pattern: string, _customizations?: WorkflowCustomization[]): ExecutableWorkflow {
     this.logger.debug('Creating simplified LangGraph workflow', undefined, {
       component: 'LangGraphWorkflowEngineSimple',
       method: 'createWorkflow',
@@ -304,7 +301,7 @@ export class LangGraphWorkflowEngineSimple implements IWorkflowEngine {
     ];
   }
 
-  private createBaseEdges(pattern: string): WorkflowEdge[] {
+  private createBaseEdges(_pattern: string): WorkflowEdge[] {
     return [
       { from: 'input', to: 'reasoning' },
       { from: 'reasoning', to: 'output' },
@@ -357,7 +354,7 @@ export class LangGraphWorkflowEngineSimple implements IWorkflowEngine {
     };
   }
 
-  private createOutputHandler(pattern: string): WorkflowNodeHandler {
+  private createOutputHandler(_pattern: string): WorkflowNodeHandler {
     return async (state: WorkflowState): Promise<WorkflowState> => {
       const output = `${state.reasoningOutput}\n\n✅ Processed via LangGraph StateGraph (Simplified)`;
 

@@ -564,7 +564,6 @@ export class MemoryContextStorage {
         case 'priority':
           comparison = a.metadata.priority - b.metadata.priority;
           break;
-        case 'relevance':
         default:
           comparison = a.metadata.relevanceScore - b.metadata.relevanceScore;
           break;

@@ -9,7 +9,6 @@
 import {
   create,
   failure,
-  flatMap,
   fromAsyncTryCatch,
   match,
   type QiError,
@@ -17,12 +16,7 @@ import {
   success,
 } from '@qi/base';
 import type { SimpleLogger } from '../../utils/index.js';
-import {
-  type Context,
-  type MCPServiceType,
-  type StorageLocation,
-  validateContext,
-} from '../schemas/index.js';
+import { type Context, type MCPServiceType, validateContext } from '../schemas/index.js';
 import type { UnifiedContextStorageEngine } from '../storage/index.js';
 
 // =============================================================================
@@ -829,7 +823,7 @@ export class WriteStrategy implements IWriteStrategy {
         const now = new Date();
         const evictedRefs: WriteStrategyRef[] = [];
 
-        for (const [refId, ref] of this.referenceStore.entries()) {
+        for (const [_refId, ref] of this.referenceStore.entries()) {
           if (ref.expiresAt && ref.expiresAt < now) {
             const deleteResult = await this.delete(ref);
             if (deleteResult.tag === 'success') {

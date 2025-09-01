@@ -144,7 +144,7 @@ export class MCPIntegration {
       }
 
       // Get relevant context from RAG
-      if (this.ragIntegration && this.ragIntegration.isAvailable()) {
+      if (this.ragIntegration?.isAvailable()) {
         const ragResults = await this.ragIntegration.searchRelevantContext(message, 3);
         if (ragResults.tag === 'success' && ragResults.value.length > 0) {
           const ragContext = ragResults.value
@@ -231,7 +231,7 @@ export class MCPIntegration {
     const availableServices = getAvailableServices();
 
     if (this.config.services && this.config.services.length > 0) {
-      return availableServices.filter((service) => this.config.services!.includes(service.name));
+      return availableServices.filter((service) => this.config.services?.includes(service.name));
     }
 
     return availableServices;

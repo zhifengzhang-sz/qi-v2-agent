@@ -5,9 +5,8 @@
  * Follows the v-0.10.0 roadmap specification exactly without creating new interfaces.
  */
 
-import type { Result } from '@qi/base';
+import type { QiError, Result } from '@qi/base';
 import { failure, success } from '@qi/base';
-import type { QiError } from '@qi/core';
 import { BaseSubAgent } from '../core/BaseSubAgent.js';
 import type {
   SubAgentArtifact,
@@ -821,9 +820,9 @@ export class GitSubAgent extends BaseSubAgent {
 
     return {
       hasStats: true,
-      filesChanged: fileMatch ? parseInt(fileMatch[1]) : 0,
-      insertions: insertionMatch ? parseInt(insertionMatch[1]) : 0,
-      deletions: deletionMatch ? parseInt(deletionMatch[1]) : 0,
+      filesChanged: fileMatch ? parseInt(fileMatch[1], 10) : 0,
+      insertions: insertionMatch ? parseInt(insertionMatch[1], 10) : 0,
+      deletions: deletionMatch ? parseInt(deletionMatch[1], 10) : 0,
     };
   }
 
@@ -870,7 +869,7 @@ export class GitSubAgent extends BaseSubAgent {
     return artifacts;
   }
 
-  protected generateRecommendations(task: SubAgentTask, output: unknown): string[] {
+  protected generateRecommendations(task: SubAgentTask, _output: unknown): string[] {
     const recommendations: string[] = [];
 
     // Generate recommendations based on git operation type

@@ -8,8 +8,6 @@
 import {
   create,
   failure,
-  fromAsyncTryCatch,
-  match,
   type QiError,
   type Result,
   success,
@@ -473,7 +471,7 @@ export class ToolExecutor implements IToolExecutor {
    * Phase 5: Result Processing & Transformation
    */
   private async *executePhase5Processing<TOutput>(
-    call: ToolCall,
+    _call: ToolCall,
     result: ToolResult<TOutput>,
     progress: any
   ): AsyncGenerator<Result<ExecutionProgress, QiError>, ToolResult<TOutput>, unknown> {
@@ -724,34 +722,6 @@ export class ToolExecutor implements IToolExecutor {
         this.eventListeners.splice(index, 1);
       }
     };
-  }
-
-  // Private helper methods
-
-  private handleExecutionError(
-    call: ToolCall,
-    error: unknown,
-    progress: any,
-    startTime: number
-  ): ToolExecutionError {
-    progress.state = ExecutionState.FAILED;
-
-    const executionError = toolExecutionError(
-      'EXECUTION_ERROR',
-      `Unexpected execution error: ${error instanceof Error ? error.message : String(error)}`,
-      'SYSTEM',
-      {
-        toolName: call.toolName,
-        callId: call.callId,
-        phase: 'execution',
-        executionTime: Date.now() - startTime,
-      }
-    );
-
-    this.updateExecutionStats(call.toolName, false, Date.now() - startTime);
-    this.emitEvent(ExecutionEventType.EXECUTION_FAILED, call, progress, undefined, executionError);
-
-    return executionError;
   }
 
   private isRetryableError(error: QiError, policy: RetryPolicy): boolean {

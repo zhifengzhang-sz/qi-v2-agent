@@ -9,7 +9,6 @@ import {
   create,
   type ErrorCategory,
   failure,
-  flatMap,
   fromAsyncTryCatch,
   match,
   type QiError,
@@ -31,7 +30,6 @@ import type {
   AgentResponse,
   AgentStatus,
   AgentStreamChunk,
-  DelegationCriteria,
   IAgent,
   IAgentOrchestrator,
   ISubagentRegistry,
@@ -236,8 +234,11 @@ export class QiCodeAgent implements IAgent {
 
     const classificationResult = await fromAsyncTryCatch(async () => {
       const classificationTimeout = this.config.timeouts?.classification ?? 5000; // 5 second default
+      if (!this.classifier) {
+        throw new Error('Classifier not available');
+      }
       return await this.withTimeout(
-        this.classifier!.classify(request.input),
+        this.classifier.classify(request.input),
         classificationTimeout,
         'Classification'
       );
@@ -594,7 +595,7 @@ export class QiCodeAgent implements IAgent {
               );
             } else {
               // Fallback to basic prompt processing
-              result = await this.promptHandler!.complete(request.input, promptOptions);
+              result = await this.promptHandler?.complete(request.input, promptOptions);
 
               // Manually update state manager for fallback
               this.stateManager.addConversationEntry({
@@ -666,30 +667,6 @@ export class QiCodeAgent implements IAgent {
         error: error.message,
       }),
       promptResult
-    );
-  }
-
-  // QiCore functional pattern - workflow handling
-  private async handleWorkflow(
-    request: AgentRequest,
-    classification: ClassificationResult
-  ): Promise<AgentResponse> {
-    const result = await this.handleWorkflowInternal(request, classification);
-    return match(
-      (success: AgentResponse) => success,
-      (error: QiError) => ({
-        content: error.message,
-        type: 'workflow',
-        confidence: 0,
-        executionTime: 0,
-        metadata: new Map([
-          ['errorType', 'workflow-processing-error'],
-          ['errorCode', error.code],
-        ]),
-        success: false,
-        error: error.message,
-      }),
-      result
     );
   }
 
@@ -828,14 +805,19 @@ export class QiCodeAgent implements IAgent {
     workflowContext: any
   ): Promise<Result<any>> {
     return fromAsyncTryCatch(async () => {
-      const extractionResult = await this.workflowExtractor!.extractWorkflow(
+      if (!this.workflowExtractor) {
+        throw new Error('Workflow extractor not available');
+      }
+      const extractionResult = await this.workflowExtractor.extractWorkflow(
         request.input,
         { method: 'hybrid', promptProvider: undefined },
         workflowContext
       );
 
-      if (!extractionResult.success || !extractionResult.workflowSpec) {
-        throw new Error(`Workflow extraction failed: ${extractionResult.error || 'Unknown error'}`);
+      if (!extractionResult || !extractionResult.success || !extractionResult.workflowSpec) {
+        throw new Error(
+          `Workflow extraction failed: ${extractionResult?.error || 'Unknown error'}`
+        );
       }
 
       return extractionResult;
@@ -846,7 +828,7 @@ export class QiCodeAgent implements IAgent {
     request: AgentRequest,
     extractionResult: any,
     workflowContext: any,
-    classification: ClassificationResult
+    _classification: ClassificationResult
   ): Promise<Result<AgentResponse>> {
     return fromAsyncTryCatch(async () => {
       const executionConfig = {
@@ -859,7 +841,7 @@ export class QiCodeAgent implements IAgent {
         },
       };
 
-      const workflowResult = await this.workflowEngine!.executeWorkflow(
+      const workflowResult = await this.workflowEngine?.executeWorkflow(
         extractionResult.workflowSpec,
         executionConfig
       );
@@ -871,15 +853,15 @@ export class QiCodeAgent implements IAgent {
       const agentResponse: AgentResponse = {
         content: this.formatWorkflowOutput(workflowResult, extractionResult),
         type: 'workflow',
-        confidence: extractionResult.confidence,
-        executionTime: workflowResult.performance.totalTime,
+        confidence: extractionResult?.confidence || 0,
+        executionTime: workflowResult?.performance?.totalTime || 0,
         metadata: new Map([
-          ['workflowId', extractionResult.workflowSpec.id],
-          ['strategy', extractionResult.workflowSpec.parameters.get('strategy') || 'unknown'],
-          ['nodeCount', extractionResult.workflowSpec.nodes.length.toString()],
-          ['executionPath', JSON.stringify(workflowResult.executionPath)],
-          ['toolExecutionTime', workflowResult.performance.toolExecutionTime.toString()],
-          ['reasoningTime', workflowResult.performance.reasoningTime.toString()],
+          ['workflowId', extractionResult?.workflowSpec?.id || 'unknown'],
+          ['strategy', extractionResult?.workflowSpec?.parameters?.get('strategy') || 'unknown'],
+          ['nodeCount', extractionResult?.workflowSpec?.nodes?.length?.toString() || '0'],
+          ['executionPath', JSON.stringify(workflowResult?.executionPath || [])],
+          ['toolExecutionTime', workflowResult?.performance?.toolExecutionTime?.toString() || '0'],
+          ['reasoningTime', workflowResult?.performance?.reasoningTime?.toString() || '0'],
           ['extractionMethod', extractionResult.extractionMethod],
           ['workflowContextId', workflowContext.id],
         ]),
@@ -1180,33 +1162,7 @@ export class QiCodeAgent implements IAgent {
     });
   }
 
-  // Workflow Integration Methods
-
-  private async createWorkflowExecutionContext(request: AgentRequest): Promise<any> {
-    // Create workflow execution context with proper isolation
-    // This would use WorkflowExecutionContextFactory in full implementation
-    const workflowId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    return {
-      id: workflowId,
-      sessionId: request.context.sessionId,
-      environmentContext: request.context.environmentContext,
-      availableTools: ['reasoning', 'search', 'general_tool'], // Simplified for now
-      resourceLimits: {
-        maxExecutionTime: 600000, // 10 minutes
-        maxMemoryUsage: 200 * 1024 * 1024, // 200MB
-        maxToolCalls: 50,
-        maxNodes: 20,
-      },
-      preferences: {
-        speedVsAccuracy: 'balanced',
-        allowParallelExecution: true,
-        allowIterativeExecution: true,
-      },
-    };
-  }
-
-  private handleWorkflowProgress(nodeId: string, progress: any, workflowContext: any): void {
+  private handleWorkflowProgress(_nodeId: string, _progress: any, _workflowContext: any): void {
     // Handle real-time progress updates during workflow execution
     // This could emit events, update UI, or integrate with monitoring systems
     // Implementation can be expanded when progress tracking infrastructure is needed
@@ -1262,7 +1218,7 @@ export class QiCodeAgent implements IAgent {
     }
   }
 
-  private async cleanupWorkflowContext(workflowContext: any): Promise<void> {
+  private async cleanupWorkflowContext(_workflowContext: any): Promise<void> {
     // Clean up workflow execution context and release resources
     // Context cleanup implementation can be expanded when resource management is needed
   }
@@ -1274,63 +1230,6 @@ export class QiCodeAgent implements IAgent {
   ): void {
     // Workflow error logging implementation can be enhanced with proper monitoring infrastructure
     // This method provides a hook for future structured error logging integration
-  }
-
-  // Permission system integration
-
-  private async checkOperationPermission(
-    operation: string,
-    resource: string,
-    context: AgentContext
-  ): Promise<Result<boolean>> {
-    if (!this.permissionManager) {
-      return success(true); // No permission system, allow all operations
-    }
-
-    return fromAsyncTryCatch(async () => {
-      // Extract user/session information from context
-      const userId = (context.environmentContext?.get('userId') as string) || 'anonymous';
-
-      // Use a generic tool name - in practice, this would map to specific tools
-      const toolName = `Agent${operation}`;
-
-      // Create a basic tool context
-      const toolContext = {
-        sessionId: context.sessionId,
-        userId,
-        timestamp: context.timestamp,
-      };
-
-      const result = await this.permissionManager!.checkToolPermission(
-        toolName,
-        operation.toLowerCase() as any, // Cast to match expected permission action type
-        resource,
-        toolContext as any // Cast to match ToolContext interface
-      );
-
-      return match(
-        (permissionResult) => permissionResult.allowed,
-        (error) => {
-          throw error;
-        },
-        result
-      );
-    });
-  }
-
-  // Subagent delegation methods (stubs for future implementation)
-
-  private async tryDelegateToSubagent(
-    request: AgentRequest,
-    taskType: string
-  ): Promise<Result<AgentResponse | null>> {
-    if (!this.agentOrchestrator || !this.subagentRegistry) {
-      return success(null); // No subagent support available
-    }
-
-    // Future implementation would analyze the request and determine if delegation is beneficial
-    // For now, this is a stub that always returns null (no delegation)
-    return success(null);
   }
 
   // Helper methods for parameter extraction

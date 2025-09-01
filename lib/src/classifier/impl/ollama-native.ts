@@ -178,7 +178,13 @@ Respond with valid JSON matching the required schema.`;
           };
         }
 
-        // For non-commands, use Ollama native structured output
+        // Pre-filter simple prompts using rule-based logic to avoid unnecessary LLM calls
+        const ruleBasedResult = await this.tryRuleBasedClassification(input, startTime);
+        if (ruleBasedResult !== null) {
+          return ruleBasedResult;
+        }
+
+        // For complex inputs, use Ollama native structured output
         const classificationResult = await this.performOllamaClassification(input, context);
 
         // Handle Result<T> pattern using QiCore functional composition
@@ -533,7 +539,10 @@ Respond with valid JSON matching the required schema.`;
         console.warn(`Invalid confidence value: ${confidence}, defaulting to 0.5`);
         confidence = 0.5;
       }
-      confidence = Math.max(0, Math.min(1, confidence)); // Clamp to [0,1]
+
+      // ANTI-FRAUD: Never allow perfect certainty claims
+      // AI systems should never claim 100% confidence
+      confidence = Math.max(0.1, Math.min(0.95, confidence));
 
       // Create metadata with enhanced debugging info
       const metadata = new Map<string, string>([
@@ -573,6 +582,52 @@ Respond with valid JSON matching the required schema.`;
         `Failed to process Ollama response: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  /**
+   * Try rule-based classification for simple inputs to avoid unnecessary LLM calls
+   */
+  private async tryRuleBasedClassification(
+    input: string,
+    startTime: number
+  ): Promise<ClassificationResult | null> {
+    const trimmedInput = input.trim().toLowerCase();
+
+    // Check for simple conversational greetings/prompts
+    const conversationalPatterns = [
+      /^(hi|hello|hey|good morning|good afternoon|good evening)\b/,
+      /^(thanks|thank you|ok|okay|yes|no|sure)\b/,
+      /\b(how are you|how's it going|how do you do)\b/,
+      /^(what|how|why|when|where|who)\b.*\?/,
+    ];
+
+    const isSimplePrompt = conversationalPatterns.some((pattern) => pattern.test(trimmedInput));
+
+    if (isSimplePrompt) {
+      const duration = Date.now() - startTime;
+      this.totalLatencyMs += duration;
+      this.successfulClassifications++;
+
+      return {
+        type: 'prompt',
+        confidence: 0.95, // High confidence for clear conversational patterns
+        method: 'ollama-native',
+        reasoning: 'Simple conversational prompt detected by rule-based pre-filter',
+        extractedData: new Map([
+          ['detectionMethod', 'rule-based-prefilter'],
+          ['promptType', 'conversational'],
+        ]),
+        metadata: new Map([
+          ['duration_ms', duration.toString()],
+          ['provider', 'ollama-native'],
+          ['prefiltered', 'true'],
+          ['detectionStage', 'rule-based-prefilter'],
+          ['timestamp', new Date().toISOString()],
+        ]),
+      };
+    }
+
+    return null; // Not a simple prompt, requires LLM classification
   }
 
   private formatContext(context?: ProcessingContext): string {

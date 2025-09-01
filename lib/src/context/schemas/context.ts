@@ -8,24 +8,18 @@
 import { z } from 'zod';
 import {
   AgentIdSchema,
-  type CompressionLevel,
   CompressionLevelSchema,
   ContextIdSchema,
-  type ContextType,
   ContextTypeSchema,
   createValidator,
   JSONObjectSchema,
-  type MCPServiceType,
   MCPServiceTypeSchema,
   NonEmptyStringSchema,
-  type Permission,
   PermissionSchema,
   PrioritySchema,
-  type RelationshipType,
   RelationshipTypeSchema,
   ScoreSchema,
   TimestampSchema,
-  UUIDSchema,
 } from './base.js';
 
 // =============================================================================

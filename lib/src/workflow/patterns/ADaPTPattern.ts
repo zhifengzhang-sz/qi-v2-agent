@@ -664,7 +664,14 @@ export class ADaPTPattern {
 
         // Determine if this should use a tool
         if (description.includes('file') && availableTools.includes('Read')) {
-          const result = await this.toolExecutor!.executeTool({
+          if (!this.toolExecutor) {
+            return {
+              success: false,
+              error: 'Tool executor not available',
+              executionTime: Date.now() - startTime,
+            };
+          }
+          const result = await this.toolExecutor.executeTool({
             toolName: 'Read',
             input: { file_path: '/tmp/sample.txt' },
             nodeId: 'adapt-execute',
@@ -674,17 +681,20 @@ export class ADaPTPattern {
 
           const executionTime = Date.now() - startTime;
 
-          if (result.tag === 'success') {
+          if (result?.tag === 'success') {
             return {
               success: true,
-              result: result.value.output,
+              result: result.value?.output || '',
               executionTime,
               toolResult: result.value,
             };
           } else {
             return {
               success: false,
-              error: result.error.message,
+              error:
+                result?.tag === 'failure'
+                  ? result.error?.message || 'Unknown error'
+                  : 'Tool execution failed',
               executionTime,
             };
           }

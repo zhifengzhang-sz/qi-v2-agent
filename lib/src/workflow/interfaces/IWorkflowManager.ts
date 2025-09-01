@@ -6,12 +6,7 @@
  */
 
 import type { QiError, Result } from '@qi/base';
-import type {
-  WorkflowResult,
-  WorkflowState,
-  WorkflowStreamChunk,
-  WorkflowToolResult,
-} from './IWorkflow.js';
+import type { WorkflowResult, WorkflowStreamChunk, WorkflowToolResult } from './IWorkflow.js';
 
 /**
  * Internal workflow execution context

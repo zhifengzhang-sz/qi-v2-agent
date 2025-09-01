@@ -5,15 +5,7 @@
  * Implements Claude Code's security patterns with QiCore Result<T> integration.
  */
 
-import {
-  create,
-  failure,
-  match,
-  type QiError,
-  type Result,
-  success,
-  validationError,
-} from '@qi/base';
+import { create, failure, match, type QiError, type Result, success } from '@qi/base';
 import { createQiLogger } from '../../utils/QiCoreLogger.js';
 import type { PermissionResult, ToolContext, ToolPermissions } from '../core/interfaces/ITool.js';
 

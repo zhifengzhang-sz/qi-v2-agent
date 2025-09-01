@@ -156,7 +156,7 @@ export class PromptAppOrchestrator implements IAgent {
   private workflowHandler?: IWorkflowHandler;
   private messageQueue?: QiAsyncMessageQueue<QiMessage>; // v-0.6.1: Message coordination
   private debug = createDebugLogger('PromptAppOrchestrator');
-  private logger: any; // QiCore logger instance
+  private logger: ReturnType<typeof createQiLogger>;
 
   // Session to context mapping for context continuation
   private sessionContextMap = new Map<string, string>();
@@ -164,16 +164,6 @@ export class PromptAppOrchestrator implements IAgent {
   // Cancellation support
   private abortController?: AbortController;
   private isProcessing = false;
-
-  // QiCore error factory method
-  private createQiError(
-    code: string,
-    message: string,
-    category: ErrorCategory,
-    context: Record<string, unknown> = {}
-  ): QiError {
-    return create(code, message, category, context);
-  }
 
   private config: AgentConfig;
   private isInitialized = false;

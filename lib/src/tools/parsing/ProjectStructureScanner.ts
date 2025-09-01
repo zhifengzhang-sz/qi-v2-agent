@@ -29,7 +29,7 @@ export class ProjectStructureScanner {
 
     try {
       await this.scanDirectory(projectPath, projectPath, files, directories, 0, maxDepth);
-    } catch (error) {
+    } catch (_error) {
       // Return empty structure on error
     }
 
@@ -70,7 +70,7 @@ export class ProjectStructureScanner {
           files.push(relativePath);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Skip directories that can't be read
     }
   }

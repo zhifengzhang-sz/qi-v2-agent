@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { success, failure } from '@qi/base';
 import { MessageDrivenCLI } from '../../src/cli/impl/MessageDrivenCLI.js';
 import { QiAsyncMessageQueue } from '../../src/messaging/impl/QiAsyncMessageQueue.js';
 import { MessageType, MessagePriority } from '../../src/messaging/types/MessageTypes.js';
@@ -518,10 +519,74 @@ describe('MessageDrivenCLI', () => {
       expect(() => brokenCLI.displayMessage('test')).not.toThrow();
     });
     
-    it.skip('should handle message queue errors gracefully', () => {
-      // This test is challenging due to QiCore Result type requirements
-      // Skipping for now - the error handling is covered in integration tests
-      expect(true).toBe(true);
+    it('should handle message queue errors gracefully', async () => {
+      // Create a failing message queue that returns errors for enqueue operations
+      const failingMessageQueue = {
+        enqueue: vi.fn().mockReturnValue(
+          failure({
+            code: 'QUEUE_SYSTEM_ERROR',
+            message: 'Message queue system failure',
+            category: 'SYSTEM',
+            context: { reason: 'Storage backend unavailable' }
+          })
+        ),
+        next: vi.fn(),
+        done: vi.fn(),
+        clear: vi.fn(),
+        destroy: vi.fn(),
+        getState: vi.fn().mockReturnValue(success({ started: true, messageCount: 0 })),
+        getStats: vi.fn()
+      };
+
+      // Create CLI with the failing message queue
+      const cliWithFailingQueue = new MessageDrivenCLI(
+        mockTerminal,
+        mockInputManager,
+        mockProgressRenderer,
+        mockModeRenderer,
+        mockStreamRenderer,
+        mockCommandRouter,
+        failingMessageQueue as any
+      );
+
+      // Initialize the CLI
+      await cliWithFailingQueue.initialize();
+
+      // Spy on console.error to verify error logging
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Test: handleInput should gracefully handle message queue failures
+      // This should NOT throw, but should log the error and maintain CLI stability
+      expect(() => {
+        cliWithFailingQueue.handleInput('test command that will fail to enqueue');
+      }).not.toThrow();
+
+      // Verify that the message queue enqueue was called
+      expect(failingMessageQueue.enqueue).toHaveBeenCalled();
+
+      // Verify that error was logged with proper QiCore error structure
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Input handling error:',
+        expect.objectContaining({
+          code: 'CLI_MESSAGE_ENQUEUE_FAILED',
+          message: expect.stringContaining('Failed to enqueue message'),
+          category: 'SYSTEM'
+        })
+      );
+
+      // Test: CLI should remain functional after message queue error
+      // (it should not be in a broken state)
+      const workingMessageQueue = new QiAsyncMessageQueue();
+      
+      // Replace with working message queue
+      (cliWithFailingQueue as any).messageQueue = workingMessageQueue;
+      
+      // Should work fine now
+      expect(() => {
+        cliWithFailingQueue.handleInput('recovery test');
+      }).not.toThrow();
+
+      consoleErrorSpy.mockRestore();
     });
   });
   

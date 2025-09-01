@@ -5,7 +5,7 @@
  * Creates a clean interface layer that hides QiCore complexity.
  */
 
-import { match, type Result } from '@qi/base';
+import { match } from '@qi/base';
 import { createQiLogger } from '../../utils/QiCoreLogger.js';
 import { DefaultWorkflowHandler } from '../impl/DefaultWorkflowHandler.js';
 import { QiCoreWorkflowManager } from '../impl/QiCoreWorkflowManager.js';

@@ -91,9 +91,9 @@ const DEFAULT_REWOO_CONFIG: ReWOOConfig = {
  * ReWOO Pattern Implementation using LangGraph StateGraph
  */
 export class ReWOOPattern {
+  private config: ReWOOConfig;
   private logger: SimpleLogger;
   private toolExecutor?: WorkflowToolExecutor;
-  private config: ReWOOConfig;
   private graph: any;
 
   constructor(toolExecutor?: WorkflowToolExecutor, config: Partial<ReWOOConfig> = {}) {
@@ -485,13 +485,16 @@ export class ReWOOPattern {
     });
 
     // If it's a tool action and we have a tool executor
-    if (this.toolExecutor && this.toolExecutor.isToolAvailable(step.action)) {
+    if (this.toolExecutor?.isToolAvailable(step.action)) {
       const toolExecutionResult = await fromAsyncTryCatch(
         async (): Promise<{
           evidence: ReWOOEvidence;
           toolResult?: WorkflowToolResult;
         }> => {
-          const result = await this.toolExecutor!.executeTool({
+          if (!this.toolExecutor) {
+            throw new Error('Tool executor not available');
+          }
+          const result = await this.toolExecutor.executeTool({
             toolName: step.action,
             input: step.input,
             nodeId: 'rewoo-worker',
@@ -501,13 +504,13 @@ export class ReWOOPattern {
 
           const executionTime = Date.now() - startTime;
 
-          if (result.tag === 'success') {
+          if (result?.tag === 'success') {
             return {
               evidence: {
                 stepId: step.id,
                 action: step.action,
                 input: step.input,
-                result: result.value.output,
+                result: result.value?.output || '',
                 success: true,
                 executionTime,
               },
@@ -519,7 +522,7 @@ export class ReWOOPattern {
                 stepId: step.id,
                 action: step.action,
                 input: step.input,
-                result: `Tool failed: ${result.error.message}`,
+                result: `Tool failed: ${result?.tag === 'failure' ? result.error?.message || 'Unknown error' : 'Tool execution failed'}`,
                 success: false,
                 executionTime,
               },
