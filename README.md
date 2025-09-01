@@ -1,178 +1,310 @@
-# qi-v2-agent
+# @qi/agent
 
-Reusable and extensible AI agent framework with tool-specialized sub-agents and workflow orchestration.
+Agent capabilities package with AutoGen/AgentChat abstractions, professional context engineering, and comprehensive tool management.
 
 ## Overview
 
-qi-v2-agent is an extensible framework for building specialized AI agents. It provides a foundation for creating agents with tool-specialized sub-agents, multi-provider LLM support, and unified MCP storage, built on QiCore functional programming patterns. The framework includes reference implementations: qi-prompt for prompt engineering and qi-code for coding assistance.
+@qi/agent provides advanced agent capabilities through clean abstractions over Microsoft's AutoGen and AgentChat frameworks. It features professional-grade context engineering, comprehensive tool management, and seamless integration with QiCore foundation packages (@qi/cli, @qi/amsg).
 
-## Framework Architecture
+## Four-Module Architecture
 
-### Extensible Agent System
-- **QiCore Foundation**: Functional programming patterns with Result<T> error handling
-- **Sub-Agent Architecture**: Composable, tool-specialized agents for specific domains
-- **Workflow Orchestration**: ReAct, ReWOO, and ADaPT patterns for complex task coordination
-- **Multi-Provider LLM**: Unified interface across 5 providers with 25+ models
-- **MCP Integration**: Model Context Protocol for standardized storage and persistence
+### 🧠 Context Engineering
+Professional context optimization with advanced prompt engineering capabilities:
+- **Token Management**: Smart optimization, relevance scoring, precise token counting
+- **RAG Integration**: Knowledge retrieval with Chroma MCP integration
+- **Cache Strategies**: KV-cache optimization, append-only patterns for performance
+- **Dynamic Adaptation**: Task-based context selection and real-time optimization
 
-### Reference Sub-Agent Implementations
-- **FileOpsSubAgent**: File system operations (read, write, edit, search)
-- **SearchSubAgent**: Content and pattern search capabilities
-- **GitSubAgent**: Version control operations with workflow integration
-- **WebSubAgent**: Web operations, search, and content extraction
+### 🔄 Workflow Engine (AutoGen Abstraction)  
+Multi-agent workflow orchestration with intelligent planning:
+- **AutoGen Integration**: Clean abstraction over Microsoft AutoGen framework
+- **Planning Strategies**: ReAct, ReWOO, and ADaPT reasoning patterns
+- **Agent Coordination**: Multi-agent task distribution and collaboration
+- **Workflow Management**: State tracking, progress monitoring, error recovery
 
-### Framework Features
-- **Composable Architecture**: Mix and match sub-agents for different use cases
-- **Extensible Design**: Create custom agents by extending base classes
-- **Unified Storage**: Model Context Protocol (MCP) for consistent persistence
-- **Multi-Provider LLM**: Abstract interface supporting multiple LLM providers
-- **Binary Distribution**: Compile to portable executables with zero dependencies
-- **Professional CLI**: Complete configuration flexibility and professional interface
+### 🤖 Sub-Agent (AgentChat Abstraction)
+Single-agent task execution with conversation management:
+- **AgentChat Integration**: Clean abstraction over Microsoft AgentChat framework
+- **Tool Coordination**: Seamless tool execution and management
+- **Conversation Management**: Dialog state, context maintenance
+- **Specialization**: Domain-specific agents (FileOps, Web, Git operations)
 
-## Reference Implementations
+### 🛠️ Tools
+Comprehensive tool execution and MCP integration:
+- **Tool Registry**: Discovery, registration, and lifecycle management
+- **MCP Integration**: Model Context Protocol server connectivity
+- **Execution Engine**: Safe tool execution with validation and error handling
+- **Metrics & Monitoring**: Performance tracking and usage analytics
 
-### qi-prompt
-Advanced prompt application demonstrating context management and simple workflows.
-
-### qi-code  
-Complete coding agent showcasing tool-specialized sub-agents and advanced orchestration.
-
-## Quick Start
-
-### Install & Run
-```bash
-bun install
-bun run build
-
-# qi-prompt: Advanced prompt application
-bun run --cwd app qi-prompt
-
-# qi-code: Full coding agent with sub-agents
-bun run --cwd app qi-code
-```
-
-### Usage Examples
-
-#### Using qi-prompt (Context Management)
-```bash
-# File reference patterns
-@package.json analyze dependencies
-@src/main.ts explain this code  
-@config/llm-providers.yaml check this configuration
-
-# Framework options
-./app/qi-prompt --framework hybrid    # Auto-detect (default)
-./app/qi-prompt --framework ink       # Rich UI with colors
-./app/qi-prompt --framework readline  # Basic terminal
-```
-
-#### Using qi-code (Advanced Workflow Orchestration)
-```bash
-# Development mode
-bun run --cwd app qi-code --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env
-
-# Production binary
-./app/qi-code --config-path config/llm-providers.yaml --schema-path config/qi-prompt.schema.json --env-path .env
-```
-
-## Binary Compilation
+## Installation
 
 ```bash
-# Build portable binary
-bun run build
-
-# Run with configuration
-./app/qi-prompt --config-path config/llm-providers.yaml --schema-path config/llm-providers.schema.json --env-path .env --framework hybrid
+npm install @qi/agent
+# or
+bun add @qi/agent
 ```
 
-Binary features:
-- Single 5.1MB executable 
-- No native dependencies
-- Complete configuration flexibility
-- Cross-platform compatibility (Linux/macOS)
-
-## Storage and State Management
-
-### MCP Integration
-- Single storage system using MCP memory server
-- Unified persistence architecture 
-- QiCore Result<T> functional patterns
-- Reliable session and conversation storage
-
-### Implementation Details
-- **Frontend**: React/Ink with hybrid framework support
-- **Runtime**: Bun with TypeScript
-- **State Management**: XState v5 with MCP integration
-- **Storage Protocol**: Model Context Protocol
-- **Error Handling**: QiCore functional programming patterns
-
-## Commands
-
+### Peer Dependencies
+Requires QiCore foundation packages:
 ```bash
-# System commands
-/help           # Show available commands
-/tools          # List registered tools
-/workflows      # Show execution statistics
-/files          # List session file references
-
-# Development
-bun run check   # TypeScript + lint + tests
-bun run build   # Build library and compile binary
+npm install @qi/base @qi/core @qi/cli @qi/amsg
 ```
 
-## Interface
+## Usage
 
-### Keyboard Controls
-- **Shift+Tab**: Cycle through Interactive/Command/Streaming modes
-- **↑/↓**: Navigate command history
-- **ESC**: Cancel operations or clear input
-- **Ctrl+D**: Graceful exit
+### Basic Agent Setup
+```typescript
+import { 
+  createContextEngineering, 
+  createWorkflowEngine, 
+  createSubAgent,
+  createToolRegistry 
+} from '@qi/agent';
+
+// Initialize agent capabilities
+const contextEngineering = createContextEngineering({
+  maxTokens: 4000,
+  enableRAG: true
+});
+
+const workflowEngine = createWorkflowEngine({
+  defaultStrategy: 'react',
+  maxAgentsPerWorkflow: 5
+});
+
+const subAgent = createSubAgent({
+  enableToolCoordination: true
+});
+
+const toolRegistry = createToolRegistry({
+  enableMCP: true,
+  mcpServers: [
+    { endpoint: 'chroma://localhost:8000', name: 'knowledge' }
+  ]
+});
+```
+
+### Context Engineering
+```typescript
+import { createContextEngineering } from '@qi/agent/context-engineering';
+
+const contextEngine = createContextEngineering({
+  maxTokens: 4000,
+  relevanceThreshold: 0.7,
+  enableRAG: true
+});
+
+// Optimize context for token efficiency
+const optimized = await contextEngine.optimizeContext({
+  content: longText,
+  maxTokens: 2000,
+  contextType: 'code'
+});
+
+// Calculate precise token counts
+const tokenCount = contextEngine.calculateTokenCount(text, 'gpt-4');
+
+// Score relevance between text and query
+const relevance = contextEngine.scoreRelevance(text, query);
+```
+
+### Workflow Engine (AutoGen)
+```typescript
+import { createWorkflowEngine } from '@qi/agent/workflow-engine';
+
+const workflowEngine = createWorkflowEngine({
+  defaultStrategy: 'react',
+  maxAgentsPerWorkflow: 3
+});
+
+// Execute complex multi-agent workflow
+const task = {
+  id: 'analysis-task',
+  description: 'Analyze codebase and suggest improvements',
+  context: projectContext,
+  priority: 'high'
+};
+
+// Streaming execution with progress updates
+for await (const progress of workflowEngine.executeWorkflow(task)) {
+  console.log(`Progress: ${progress.progress * 100}%`);
+  console.log(`Current step: ${progress.message}`);
+}
+```
+
+### Sub-Agent (AgentChat)
+```typescript
+import { createSubAgent } from '@qi/agent/sub-agent';
+
+const subAgent = createSubAgent({
+  maxConversationTurns: 10,
+  enableToolCoordination: true
+});
+
+// Execute single-agent task
+const result = await subAgent.executeTask({
+  id: 'file-analysis',
+  type: 'code-review',
+  description: 'Review this TypeScript file for issues',
+  context: fileContent
+});
+
+// Handle conversation
+const response = await subAgent.handleConversation(
+  'Can you explain the main function in this code?',
+  contextId
+);
+```
+
+### Tool Management
+```typescript
+import { createToolRegistry } from '@qi/agent/tools';
+
+const toolRegistry = createToolRegistry({
+  enableMCP: true,
+  mcpServers: [
+    { endpoint: 'filesystem://tools', name: 'fs-tools' },
+    { endpoint: 'web://search', name: 'web-tools' }
+  ]
+});
+
+// Discover available tools
+const discovery = await toolRegistry.discoverMCPTools();
+console.log(`Found ${discovery.totalTools} tools`);
+
+// Execute tool
+const result = await toolRegistry.executeTool({
+  toolId: 'file-read',
+  parameters: { path: '/path/to/file.ts' }
+});
+```
+
+## Integration with QiCore
+
+### Message-Driven Architecture
+```typescript
+import { QiAsyncMessageQueue } from '@qi/amsg';
+import { createCLI } from '@qi/cli';
+import { AgentCoordinator } from '@qi/agent';
+
+// Integration with QiCore messaging
+const messageQueue = new QiAsyncMessageQueue();
+const cli = createCLI({ framework: 'hybrid', messageQueue });
+
+const agent = new AgentCoordinator({
+  enableContextEngineering: true,
+  enableWorkflowEngine: true,
+  enableSubAgent: true,
+  enableTools: true
+});
+
+// Process messages with agent capabilities
+for await (const message of messageQueue) {
+  const result = await agent.processMessage(message);
+  cli.displayMessage(result.content);
+}
+```
+
+## Module Exports
+
+### Context Engineering
+```typescript
+import {
+  IContextEngineering,
+  createContextEngineering,
+  ContextOptimizationRequest,
+  RAGRequest
+} from '@qi/agent/context-engineering';
+```
+
+### Workflow Engine  
+```typescript
+import {
+  IWorkflowEngine,
+  createWorkflowEngine,
+  WorkflowTask,
+  WorkflowPlan
+} from '@qi/agent/workflow-engine';
+```
+
+### Sub-Agent
+```typescript
+import {
+  ISubAgent,
+  createSubAgent,
+  createFileOpsAgent,
+  createWebAgent
+} from '@qi/agent/sub-agent';
+```
+
+### Tools
+```typescript
+import {
+  IToolRegistry,
+  createToolRegistry,
+  createMCPIntegration,
+  Tool
+} from '@qi/agent/tools';
+```
 
 ## Configuration
 
-Requires three configuration files:
-- `config/llm-providers.yaml` - LLM provider settings
-- `config/llm-providers.schema.json` - Configuration schema
-- `.env` - Environment variables
+### AutoGen Integration
+```typescript
+const workflowEngine = createWorkflowEngine({
+  autoGenConfig: {
+    endpoint: 'https://api.autogen.example.com',
+    apiKey: process.env.AUTOGEN_API_KEY,
+    model: 'gpt-4'
+  }
+});
+```
 
-See `config/` directory for examples.
+### AgentChat Integration
+```typescript
+const subAgent = createSubAgent({
+  agentChatConfig: {
+    endpoint: 'https://api.agentchat.example.com',
+    apiKey: process.env.AGENTCHAT_API_KEY,
+    model: 'gpt-4'
+  }
+});
+```
 
-## Framework Usage
+## Architecture Benefits
 
-| Component | qi-prompt | qi-code |
-|-----------|-----------|---------|
-| **Purpose** | Demonstrates context management | Showcases advanced orchestration |
-| **Orchestrator** | PromptAppOrchestrator | QiCodeAgent |
-| **Sub-Agents** | None | FileOps, Search, Git, Web |
-| **Workflows** | Simple patterns | Advanced ReAct, ReWOO, ADaPT |
-| **Complexity** | Minimal, focused | Sophisticated multi-agent coordination |
-| **Use Cases** | Prompt engineering, context work | Complex coding, multi-step projects |
-| **Framework Role** | Simple reference implementation | Advanced framework demonstration |
+### Clean Abstractions
+- **Version Independence**: AutoGen/AgentChat updates don't break applications
+- **Framework Agnostic**: Can support other agent frameworks in future
+- **Consistent APIs**: All modules follow QiCore Result<T> patterns
+
+### Professional Features
+- **Context Engineering**: Advanced prompt optimization not available elsewhere
+- **Message Integration**: Seamless integration with @qi/amsg async messaging
+- **Tool Coordination**: Comprehensive MCP protocol support
+- **Error Handling**: Production-grade error handling and recovery
+
+### QiCore Integration
+- **Result<T> Patterns**: Functional error handling throughout
+- **Structured Logging**: Professional logging with context
+- **Configuration Management**: Standard Qi configuration patterns
 
 ## Version
 
-**Current**: v-0.10.3 - CLI Framework Fix & Development Experience
+**Current**: v-0.1.0-alpha.1 - @qi/agent Package Architecture (Interfaces Only)
 
-### Latest Updates (v-0.10.3)
-- Fixed CLI Framework: Resolved "Cannot access 'InkCLIFramework' before initialization" error
-- Development Support: Both qi-prompt and qi-code work with `bun run` for development
-- Zod Conflict Resolution: Fixed module loading issues that prevented Hybrid CLI initialization
-- CLI Argument Parity: qi-code now supports same configuration arguments as qi-prompt
-- Production Ready: Built binaries continue to work with improved development experience
+### Features
+- ✅ Four-module architecture (context-engineering, workflow-engine, sub-agent, tools)
+- ✅ AutoGen and AgentChat abstractions with clean interfaces
+- ✅ Professional context engineering interface definitions
+- ✅ Comprehensive tool management with MCP protocol interfaces
+- ⚠️ QiCore foundation package integration planned (@qi/cli, @qi/amsg need extraction)
 
-### Development Experience
-```bash
-# Both applications work with CLI arguments during development
-bun run --cwd app qi-prompt --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env --framework hybrid
-bun run --cwd app qi-code --config-path ../config/llm-providers.yaml --schema-path ../config/qi-prompt.schema.json --env-path ../.env --debug
-```
-
-### Release History
-- **v-0.8.x**: qi-prompt production-ready with unified MCP storage  
-- **v-0.9.x**: Enhanced workflow system with intelligent pattern selection
-- **v-0.10.x**: qi-code milestone with tool-specialized sub-agents
-- **v-0.10.3**: CLI framework issues resolved, seamless development experience
+### Limitations (v-0.1.0-alpha.1)
+- Interface definitions only, no implementations
+- Missing @qi/cli and @qi/amsg packages
+- Cannot be used until QiCore migration complete
 
 ## Status
 
-Extensible agent framework complete with reference implementations and sub-agent architecture.
+@qi/agent package with four-module architecture and clean abstractions over AutoGen/AgentChat frameworks.

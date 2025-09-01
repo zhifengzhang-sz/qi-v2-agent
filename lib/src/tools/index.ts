@@ -1,200 +1,306 @@
 /**
- * Tool Registry
- *
- * Central registry for all tools in the toolbox architecture.
- * Provides composable, single-purpose tools for workflows.
+ * Tools Module
+ * 
+ * Tool execution, registry management, MCP integration,
+ * and comprehensive tool coordination for agent frameworks.
  */
 
-export * from './context/index.js';
-// Export core tool interfaces and registry
-export * from './core/interfaces/index.js';
-export * from './core/registry/ToolRegistry.js';
-// Export tool implementations
-export * from './impl/file/index.js';
-export * from './parsing/index.js';
+import type { Result, QiError } from '@qi/base';
 
-/**
- * Generic tool interface
- */
-export interface Tool<TInput = unknown, TOutput = unknown> {
-  readonly name: string;
-  readonly description: string;
-  readonly version: string;
-  execute(input: TInput): Promise<TOutput>;
-  validate?(input: TInput): boolean;
-  cleanup?(): Promise<void>;
-}
-
-/**
- * Tool metadata for registry management
- */
-export interface ToolMetadata {
+// Core Types
+export interface Tool {
+  readonly id: string;
   readonly name: string;
   readonly description: string;
   readonly version: string;
   readonly category: string;
-  readonly dependencies: readonly string[];
-  readonly tags: readonly string[];
+  readonly parameters: ToolParameterSchema;
+  readonly returnType: string;
+  readonly metadata?: Record<string, unknown>;
+  readonly isAvailable: boolean;
+  readonly source: 'mcp' | 'builtin' | 'external';
 }
 
-/**
- * Tool Registry for managing and accessing tools
- */
-export class ToolRegistry {
-  private tools = new Map<string, Tool>();
-  private metadata = new Map<string, ToolMetadata>();
+export interface ToolParameterSchema {
+  readonly type: 'object';
+  readonly properties: Record<string, {
+    type: string;
+    description: string;
+    required?: boolean;
+    default?: unknown;
+    enum?: unknown[];
+  }>;
+  readonly required?: string[];
+}
+
+export interface ToolExecutionRequest {
+  readonly toolId: string;
+  readonly parameters: Record<string, unknown>;
+  readonly timeout?: number;
+  readonly metadata?: Record<string, unknown>;
+}
+
+export interface ToolExecutionResult {
+  readonly toolId: string;
+  readonly success: boolean;
+  readonly output: unknown;
+  readonly metadata: {
+    executionTime: number;
+    parametersUsed: Record<string, unknown>;
+    source: string;
+  };
+  readonly error?: string;
+  readonly warnings?: string[];
+}
+
+export interface MCPServer {
+  readonly id: string;
+  readonly name: string;
+  readonly version: string;
+  readonly endpoint: string;
+  readonly isConnected: boolean;
+  readonly capabilities: string[];
+  readonly tools: Tool[];
+  readonly metadata?: Record<string, unknown>;
+}
+
+export interface ToolDiscoveryResult {
+  readonly servers: MCPServer[];
+  readonly totalTools: number;
+  readonly toolsByCategory: Record<string, number>;
+  readonly discoveryTime: number;
+}
+
+// Core Interfaces
+export interface IToolRegistry {
+  /**
+   * Register a tool
+   */
+  registerTool(tool: Tool): Result<void, QiError>;
 
   /**
-   * Register a tool in the registry
+   * Discover tools from MCP servers
    */
-  register<T extends Tool>(tool: T, metadata: ToolMetadata): void {
-    if (this.tools.has(metadata.name)) {
-      throw new Error(`Tool '${metadata.name}' is already registered`);
-    }
+  discoverMCPTools(): Promise<Result<ToolDiscoveryResult, QiError>>;
 
-    // Validate tool implements required interface
-    if (!tool.name || !tool.description || !tool.execute) {
-      throw new Error(`Tool '${metadata.name}' does not implement required Tool interface`);
-    }
+  /**
+   * Execute a tool with parameters
+   */
+  executeTool(request: ToolExecutionRequest): Promise<Result<ToolExecutionResult, QiError>>;
 
-    this.tools.set(metadata.name, tool);
-    this.metadata.set(metadata.name, metadata);
+  /**
+   * Get all available tools
+   */
+  getAvailableTools(): Result<Tool[], QiError>;
+
+  /**
+   * Get tools by category
+   */
+  getToolsByCategory(category: string): Result<Tool[], QiError>;
+
+  /**
+   * Get tool by ID
+   */
+  getTool(id: string): Result<Tool | null, QiError>;
+
+  /**
+   * Check if tool is available
+   */
+  isToolAvailable(id: string): Result<boolean, QiError>;
+
+  /**
+   * Remove tool from registry
+   */
+  unregisterTool(id: string): Result<void, QiError>;
+}
+
+export interface IToolExecutor {
+  /**
+   * Execute tool with validation and error handling
+   */
+  execute(tool: Tool, parameters: Record<string, unknown>): Promise<Result<ToolExecutionResult, QiError>>;
+
+  /**
+   * Validate parameters against tool schema
+   */
+  validateParameters(tool: Tool, parameters: Record<string, unknown>): Result<boolean, QiError>;
+
+  /**
+   * Handle tool execution errors
+   */
+  handleError(tool: Tool, error: unknown): Result<ToolExecutionResult, QiError>;
+
+  /**
+   * Get execution metrics
+   */
+  getMetrics(): Result<ToolExecutionMetrics, QiError>;
+}
+
+export interface IMCPIntegration {
+  /**
+   * Connect to MCP server
+   */
+  connectToServer(endpoint: string): Promise<Result<MCPServer, QiError>>;
+
+  /**
+   * Disconnect from MCP server
+   */
+  disconnectFromServer(serverId: string): Promise<Result<void, QiError>>;
+
+  /**
+   * Get connected servers
+   */
+  getConnectedServers(): Result<MCPServer[], QiError>;
+
+  /**
+   * Refresh server capabilities
+   */
+  refreshServer(serverId: string): Promise<Result<MCPServer, QiError>>;
+
+  /**
+   * Execute tool through MCP protocol
+   */
+  executeMCPTool(serverId: string, toolId: string, parameters: Record<string, unknown>): Promise<Result<ToolExecutionResult, QiError>>;
+}
+
+// Configuration
+export interface ToolsConfig {
+  readonly maxConcurrentExecutions?: number;
+  readonly defaultTimeout?: number;
+  readonly enableMCP?: boolean;
+  readonly mcpServers?: Array<{
+    endpoint: string;
+    name: string;
+    autoConnect?: boolean;
+  }>;
+  readonly builtinTools?: Tool[];
+  readonly executionConfig?: {
+    retryAttempts: number;
+    retryDelay: number;
+    enableCaching: boolean;
+  };
+}
+
+// Metrics
+export interface ToolExecutionMetrics {
+  readonly totalExecutions: number;
+  readonly successfulExecutions: number;
+  readonly failedExecutions: number;
+  readonly averageExecutionTime: number;
+  readonly toolUsageStats: Record<string, number>;
+  readonly errorStats: Record<string, number>;
+}
+
+// Error Types
+export interface ToolError extends QiError {
+  readonly toolId: string;
+  readonly parameters?: Record<string, unknown>;
+  readonly source: 'validation' | 'execution' | 'timeout' | 'mcp' | 'network';
+}
+
+// Implementation
+export class ToolRegistry implements IToolRegistry {
+  constructor(private config: ToolsConfig = {}) {}
+
+  registerTool(tool: Tool): Result<void, QiError> {
+    // Implementation pending
+    throw new Error('ToolRegistry.registerTool implementation pending');
   }
 
-  /**
-   * Get a tool by name
-   */
-  get<T extends Tool = Tool>(name: string): T | null {
-    return (this.tools.get(name) as T) || null;
+  async discoverMCPTools(): Promise<Result<ToolDiscoveryResult, QiError>> {
+    // Implementation pending
+    throw new Error('ToolRegistry.discoverMCPTools implementation pending');
   }
 
-  /**
-   * Check if a tool is registered
-   */
-  has(name: string): boolean {
-    return this.tools.has(name);
+  async executeTool(request: ToolExecutionRequest): Promise<Result<ToolExecutionResult, QiError>> {
+    // Implementation pending
+    throw new Error('ToolRegistry.executeTool implementation pending');
   }
 
-  /**
-   * Get tool metadata
-   */
-  getMetadata(name: string): ToolMetadata | null {
-    return this.metadata.get(name) || null;
+  getAvailableTools(): Result<Tool[], QiError> {
+    // Implementation pending
+    throw new Error('ToolRegistry.getAvailableTools implementation pending');
   }
 
-  /**
-   * List all registered tools
-   */
-  listTools(): ToolMetadata[] {
-    return Array.from(this.metadata.values());
+  getToolsByCategory(category: string): Result<Tool[], QiError> {
+    // Implementation pending
+    throw new Error('ToolRegistry.getToolsByCategory implementation pending');
   }
 
-  /**
-   * List tools by category
-   */
-  listByCategory(category: string): ToolMetadata[] {
-    return this.listTools().filter((meta) => meta.category === category);
+  getTool(id: string): Result<Tool | null, QiError> {
+    // Implementation pending
+    throw new Error('ToolRegistry.getTool implementation pending');
   }
 
-  /**
-   * List tools by tag
-   */
-  listByTag(tag: string): ToolMetadata[] {
-    return this.listTools().filter((meta) => meta.tags.includes(tag));
+  isToolAvailable(id: string): Result<boolean, QiError> {
+    // Implementation pending
+    throw new Error('ToolRegistry.isToolAvailable implementation pending');
   }
 
-  /**
-   * Unregister a tool
-   */
-  unregister(name: string): boolean {
-    const tool = this.tools.get(name);
-    if (!tool) return false;
-
-    // Call cleanup if available
-    if (tool.cleanup) {
-      tool
-        .cleanup()
-        .catch((error) => console.warn(`Error during cleanup of tool '${name}':`, error));
-    }
-
-    this.tools.delete(name);
-    this.metadata.delete(name);
-    return true;
-  }
-
-  /**
-   * Execute a tool by name
-   */
-  async execute<TInput, TOutput>(toolName: string, input: TInput): Promise<TOutput> {
-    const tool = this.tools.get(toolName);
-    if (!tool) {
-      throw new Error(`Tool '${toolName}' not found in registry`);
-    }
-
-    // Validate input if validator is available
-    if (tool.validate && !tool.validate(input)) {
-      throw new Error(`Invalid input for tool '${toolName}'`);
-    }
-
-    try {
-      return (await tool.execute(input)) as TOutput;
-    } catch (error) {
-      throw new Error(`Tool '${toolName}' execution failed: ${error}`);
-    }
-  }
-
-  /**
-   * Clear all tools from registry
-   */
-  async clear(): Promise<void> {
-    const cleanupPromises = Array.from(this.tools.values())
-      .filter((tool) => tool.cleanup)
-      .map((tool) =>
-        tool.cleanup?.().catch((error) => console.warn(`Error during cleanup:`, error))
-      );
-
-    await Promise.all(cleanupPromises);
-
-    this.tools.clear();
-    this.metadata.clear();
-  }
-
-  /**
-   * Get registry statistics
-   */
-  getStats(): {
-    totalTools: number;
-    categories: Record<string, number>;
-    tags: Record<string, number>;
-  } {
-    const metadata = this.listTools();
-    const categories: Record<string, number> = {};
-    const tags: Record<string, number> = {};
-
-    for (const meta of metadata) {
-      categories[meta.category] = (categories[meta.category] || 0) + 1;
-
-      for (const tag of meta.tags) {
-        tags[tag] = (tags[tag] || 0) + 1;
-      }
-    }
-
-    return {
-      totalTools: metadata.length,
-      categories,
-      tags,
-    };
+  unregisterTool(id: string): Result<void, QiError> {
+    // Implementation pending
+    throw new Error('ToolRegistry.unregisterTool implementation pending');
   }
 }
 
-/**
- * Create and configure a default tool registry
- */
-export function createDefaultToolRegistry(): ToolRegistry {
-  const registry = new ToolRegistry();
+export class ToolExecutor implements IToolExecutor {
+  async execute(tool: Tool, parameters: Record<string, unknown>): Promise<Result<ToolExecutionResult, QiError>> {
+    // Implementation pending
+    throw new Error('ToolExecutor.execute implementation pending');
+  }
 
-  // Tools will be registered by the application or during initialization
-  // This keeps the registry flexible and prevents circular dependencies
+  validateParameters(tool: Tool, parameters: Record<string, unknown>): Result<boolean, QiError> {
+    // Implementation pending
+    throw new Error('ToolExecutor.validateParameters implementation pending');
+  }
 
-  return registry;
+  handleError(tool: Tool, error: unknown): Result<ToolExecutionResult, QiError> {
+    // Implementation pending
+    throw new Error('ToolExecutor.handleError implementation pending');
+  }
+
+  getMetrics(): Result<ToolExecutionMetrics, QiError> {
+    // Implementation pending
+    throw new Error('ToolExecutor.getMetrics implementation pending');
+  }
+}
+
+export class MCPIntegration implements IMCPIntegration {
+  async connectToServer(endpoint: string): Promise<Result<MCPServer, QiError>> {
+    // Implementation pending
+    throw new Error('MCPIntegration.connectToServer implementation pending');
+  }
+
+  async disconnectFromServer(serverId: string): Promise<Result<void, QiError>> {
+    // Implementation pending
+    throw new Error('MCPIntegration.disconnectFromServer implementation pending');
+  }
+
+  getConnectedServers(): Result<MCPServer[], QiError> {
+    // Implementation pending
+    throw new Error('MCPIntegration.getConnectedServers implementation pending');
+  }
+
+  async refreshServer(serverId: string): Promise<Result<MCPServer, QiError>> {
+    // Implementation pending
+    throw new Error('MCPIntegration.refreshServer implementation pending');
+  }
+
+  async executeMCPTool(serverId: string, toolId: string, parameters: Record<string, unknown>): Promise<Result<ToolExecutionResult, QiError>> {
+    // Implementation pending
+    throw new Error('MCPIntegration.executeMCPTool implementation pending');
+  }
+}
+
+// Factory Functions
+export function createToolRegistry(config: ToolsConfig = {}): IToolRegistry {
+  return new ToolRegistry(config);
+}
+
+export function createToolExecutor(): IToolExecutor {
+  return new ToolExecutor();
+}
+
+export function createMCPIntegration(): IMCPIntegration {
+  return new MCPIntegration();
 }

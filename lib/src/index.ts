@@ -1,107 +1,56 @@
 /**
- * qi-v2-agent Library - Main Entry Point
- *
- * This is the main entry point for the qi-v2-agent library.
- * It exports all public APIs and abstractions with explicit re-exports to avoid conflicts.
+ * @qi/agent - Agent Capabilities Package
+ * 
+ * Advanced agent capabilities with AutoGen/AgentChat abstractions,
+ * professional context engineering, and comprehensive tool management.
  */
 
-// Core Agent Framework
-export * from './agent/index.js';
-export type {
-  ClassificationConfig,
-  ClassificationMethod,
-  ClassificationOptions,
-  ClassificationResult,
-  ClassificationStats,
-  ClassificationType,
-  IClassificationMethod,
-  IClassifier,
-  ProcessingContext as ClassificationProcessingContext,
-} from './classifier/index.js';
-// Input Classification System
-export {
-  createAccurateClassifier,
-  createBasicClassifier,
-  createClassifier,
-  createCompleteClassifier,
-  createFastClassifier,
-  createInputClassifier,
-  createRuleBasedClassifier,
-  getClassificationSchema,
-  // Schema registry exports
-  globalSchemaRegistry,
-  selectOptimalClassificationSchema,
-} from './classifier/index.js';
-// Command Processing
-export * from './command/index.js';
-export type {
-  AgentSpecialization,
-  AppContext,
-  ContextAccessAudit,
-  ContextMessage,
-  ConversationContext,
-  IContextManager,
-  IsolatedContext,
-  IsolatedContextConfig,
-  SecurityRestrictions,
-} from './context/index.js';
-// Context Management
-export {
-  ContextManager,
-  createContextManager,
-  createDefaultAppContext,
-  SecurityBoundaryManager,
-} from './context/index.js';
+// Context Engineering Module
+export * from './context-engineering/index.js';
 
-// MCP Integration System
-export * from './mcp/index.js';
+// Workflow Engine Module (AutoGen Abstraction)
+export * from './workflow-engine/index.js';
 
-// Model Provider System
-export * from './models/index.js';
-// Prompt Processing
-export * from './prompt/index.js';
-// Classification Schemas
-export {
-  ClassificationSchemas,
-  type IntentResult,
-  IntentSchema,
-  type SchemaKey,
-  type SchemaResult,
-  type SentimentResult,
-  SentimentSchema,
-  type ThreeTypeResult,
-  ThreeTypeSchema,
-  type TopicResult,
-  TopicSchema,
-} from './schemas/ClassificationSchemas.js';
-export type { IStateManager as StateManagerInterface } from './state/index.js';
-// State Management
-export { createStateManager as createStateManagerFactory } from './state/index.js';
+// Sub-Agent Module (AgentChat Abstraction) 
+export * from './sub-agent/index.js';
 
-// Workflow Processing
-export type {
-  ExecutableWorkflow,
-  IWorkflowEngine,
-  IWorkflowEngineConfig,
-  IWorkflowExtractor,
-  IWorkflowExtractorConfig,
-  ProcessingContext as WorkflowProcessingContext,
-  ToolResult,
-  WorkflowCondition,
-  WorkflowConditionSpec,
-  WorkflowCustomization,
-  WorkflowEdge,
-  WorkflowEdgeSpec,
-  WorkflowError,
-  WorkflowExtractionResult,
-  WorkflowMetadata,
-  WorkflowMode,
-  WorkflowNode,
-  WorkflowNodeHandler,
-  WorkflowNodeSpec,
-  WorkflowPerformance,
-  WorkflowResult,
-  WorkflowSpec,
-  WorkflowState,
-  WorkflowStreamChunk,
-} from './workflow/index.js';
+// Tools Module
+export * from './tools/index.js';
+
+// Core Types and Interfaces
+export interface AgentCapabilities {
+  contextEngineering: boolean;
+  workflowEngine: boolean;
+  subAgent: boolean;
+  toolManagement: boolean;
+}
+
+export interface AgentConfig {
+  enableContextEngineering?: boolean;
+  enableWorkflowEngine?: boolean;
+  enableSubAgent?: boolean;
+  enableTools?: boolean;
+  contextOptimization?: {
+    maxTokens?: number;
+    relevanceThreshold?: number;
+    enableRAG?: boolean;
+  };
+  workflowConfig?: {
+    maxAgents?: number;
+    planningStrategy?: 'react' | 'rewoo' | 'adapt';
+  };
+  toolConfig?: {
+    enableMCP?: boolean;
+    maxConcurrentTools?: number;
+  };
+}
+
+/**
+ * Main agent coordinator that integrates all four modules
+ */
+export class AgentCoordinator {
+  constructor(config: AgentConfig) {
+    // Implementation will be added in subsequent phases
+    throw new Error('AgentCoordinator implementation pending');
+  }
+}
